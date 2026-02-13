@@ -711,8 +711,8 @@ TEST_CASE("BuildGraph::finalize evaluates genex in commands", "[genex][finalize]
     SECTION("COMPILE_LANGUAGE genex with task-specific language") {
         BuildTask task;
         task.id = "test_task";
+        task.kind = CompileTask{"file.cpp", Language::CXX};
         task.commands = {{"g++", "$<$<COMPILE_LANGUAGE:CXX>:-std=c++17>", "file.cpp"}};
-        task.compile_language = Language::CXX;
 
         graph.add_task(std::move(task));
 
