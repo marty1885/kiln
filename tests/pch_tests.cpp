@@ -87,7 +87,7 @@ TEST_CASE("PCH Task Generation", "[target][pch]") {
     REQUIRE(graph.has_task(obj_file));
     auto& obj_task = graph.get_task(obj_file);
 
-    REQUIRE(obj_task.dependencies.count(pch_gch_expected) > 0);
+    REQUIRE(std::find(obj_task.explicit_deps.begin(), obj_task.explicit_deps.end(), pch_gch_expected) != obj_task.explicit_deps.end());
     REQUIRE(std::find_if(obj_task.commands.begin(), obj_task.commands.end(), [](const auto& command) {
         return std::find(command.begin(), command.end(), "-include") != command.end();
     }) != obj_task.commands.end());

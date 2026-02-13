@@ -117,9 +117,9 @@ std::expected<void, std::string> BuildGraph::generate_compile_commands(const std
     std::string current_dir = std::filesystem::current_path().string();
 
     auto commands = filter_map(tasks_,
-        [](const auto& pair) { return pair.second.is_compilation && !pair.second.commands.empty(); },
-        [&](const auto& pair) -> CompileCommand {
-            const auto& task = pair.second;
+        [](const auto& ptr) { return ptr->is_compilation && !ptr->commands.empty(); },
+        [&](const auto& ptr) -> CompileCommand {
+            const auto& task = *ptr;
             return {
                 .directory = current_dir,
                 .command = join_command(task.commands[0]),
@@ -148,13 +148,16 @@ std::expected<void, std::string> BuildGraph::finalize(const GenexEvaluationConte
     // Build map of outputs to task IDs for dependency inference
     // Use unordered_map for O(1) lookups
     std::unordered_map<std::string, std::string> file_to_task;
-    for (const auto& [id, task] : tasks_) {
-        for (const auto& out : task.outputs) {
-            file_to_task[out] = id;
+    for (const auto& task_ptr : tasks_) {
+        for (const auto& out : task_ptr->outputs) {
+            file_to_task[out] = task_ptr->id;
         }
     }
 
-    for (auto& [id, task] : tasks_) {
+    for (auto& task_ptr : tasks_) {
+        auto& task = *task_ptr;
+        const auto& id = task.id;
+
         // Create per-task context with compile_language if set
         GenexEvaluationContext task_ctx = ctx;
         if (task.compile_language) {
@@ -221,30 +224,53 @@ std::expected<void, std::string> BuildGraph::finalize(const GenexEvaluationConte
             task.working_dir = *result;
         }
     }
+
+    // Resolve explicit_deps (string IDs set during task creation) to pointer edges
+    resolve_explicit_deps();
+
     return {};
 }
 
+void BuildGraph::resolve_explicit_deps() {
+    for (auto& task_ptr : tasks_) {
+        for (const auto& dep_id : task_ptr->explicit_deps) {
+            auto it = task_by_id_.find(dep_id);
+            if (it != task_by_id_.end()) {
+                task_ptr->dependencies.push_back(it->second);
+            }
+        }
+        task_ptr->explicit_deps.clear();
+        // Deduplicate (explicit_deps may contain duplicates from multiple sources)
+        std::sort(task_ptr->dependencies.begin(), task_ptr->dependencies.end());
+        task_ptr->dependencies.erase(
+            std::unique(task_ptr->dependencies.begin(), task_ptr->dependencies.end()),
+            task_ptr->dependencies.end());
+    }
+}
+
 void BuildGraph::add_task(BuildTask task) {
-    std::string id = task.id;
-    tasks_[id] = std::move(task);
+    auto ptr = std::make_unique<BuildTask>(std::move(task));
+    auto* raw = ptr.get();
+    task_by_id_[raw->id] = raw;
+    tasks_.push_back(std::move(ptr));
 }
 
 std::optional<std::string> BuildGraph::check_for_cycles() {
-    std::map<std::string, int> color; // 0: White, 1: Gray, 2: Black
-    std::vector<std::string> stack;
+    std::unordered_map<BuildTask*, int> color; // 0: White, 1: Gray, 2: Black
+    std::vector<BuildTask*> stack;
 
-    std::function<std::optional<std::string>(const std::string&)> visit = [&](const std::string& u) -> std::optional<std::string> {
+    std::function<std::optional<std::string>(BuildTask*)> visit = [&](BuildTask* u) -> std::optional<std::string> {
         color[u] = 1; // Gray
         stack.push_back(u);
 
-        for (const auto& v : tasks_[u].dependencies) {
+        for (auto* v : u->dependencies) {
             if (color[v] == 1) { // Cycle!
                 std::ostringstream oss;
                 oss << "Circular dependency detected: ";
                 for (size_t i = 0; i < stack.size(); ++i) {
                     if (stack[i] == v) {
-                        for (size_t j = i; j < stack.size(); ++j) oss << tasks_[stack[j]].id << " -> ";
-                        oss << v;
+                        for (size_t j = i; j < stack.size(); ++j) oss << stack[j]->id << " -> ";
+                        oss << v->id;
                         break;
                     }
                 }
@@ -261,9 +287,9 @@ std::optional<std::string> BuildGraph::check_for_cycles() {
         return std::nullopt;
     };
 
-    for (const auto& [id, task] : tasks_) {
-        if (color[id] == 0) {
-            auto res = visit(id);
+    for (const auto& task_ptr : tasks_) {
+        if (color[task_ptr.get()] == 0) {
+            auto res = visit(task_ptr.get());
             if (res) return res;
         }
     }
@@ -276,16 +302,16 @@ BuildGraph::extract_dirty_tasks(const std::string& build_dir) {
     // Used by EP orchestrator to extract tasks for injection into parent graph.
 
     // 1. Resolve cross-target dependencies (same as execute() step 1)
-    std::map<std::string, std::string> file_to_task;
-    for (const auto& [id, task] : tasks_) {
-        for (const auto& out : task.outputs) file_to_task[out] = id;
+    std::unordered_map<std::string, BuildTask*> file_to_task;
+    for (const auto& task_ptr : tasks_) {
+        for (const auto& out : task_ptr->outputs) file_to_task[out] = task_ptr.get();
     }
-    for (auto& [id, task] : tasks_) {
-        for (const auto& in : task.inputs) {
+    for (auto& task_ptr : tasks_) {
+        for (const auto& in : task_ptr->inputs) {
             auto it = file_to_task.find(in);
-            if (it != file_to_task.end() && it->second != id) {
-                task.dependencies.insert(it->second);
-                tasks_[it->second].dependents.insert(id);
+            if (it != file_to_task.end() && it->second != task_ptr.get()) {
+                task_ptr->dependencies.push_back(it->second);
+                it->second->dependents.push_back(task_ptr.get());
             }
         }
     }
@@ -293,8 +319,9 @@ BuildGraph::extract_dirty_tasks(const std::string& build_dir) {
     // 2. Load cache and compute dirty set
     auto cache = load_cache(build_dir);
 
-    std::unordered_set<std::string> dirty_set;
-    for (const auto& [id, task] : tasks_) {
+    std::unordered_set<BuildTask*> dirty_set;
+    for (const auto& task_ptr : tasks_) {
+        auto& task = *task_ptr;
         // Skip marker tasks
         if (task.outputs.empty() && task.commands.empty() &&
             !task.is_module_collator && !task.is_ep_orchestrator && !task.is_ep_sentinel) continue;
@@ -306,13 +333,13 @@ BuildGraph::extract_dirty_tasks(const std::string& build_dir) {
         }
 
         if (!outputs_exist || task.always_run) {
-            dirty_set.insert(id);
+            dirty_set.insert(task_ptr.get());
             continue;
         }
 
         auto sig_res = calculate_signature(task);
-        if (!sig_res || !(cache.count(id) && cache[id] == *sig_res)) {
-            dirty_set.insert(id);
+        if (!sig_res || !(cache.count(task.id) && cache[task.id] == *sig_res)) {
+            dirty_set.insert(task_ptr.get());
         }
     }
 
@@ -321,11 +348,11 @@ BuildGraph::extract_dirty_tasks(const std::string& build_dir) {
         bool changed;
         do {
             changed = false;
-            for (const auto& [id, task] : tasks_) {
-                if (dirty_set.count(id)) continue;
-                for (const auto& dep : task.dependencies) {
+            for (const auto& task_ptr : tasks_) {
+                if (dirty_set.count(task_ptr.get())) continue;
+                for (auto* dep : task_ptr->dependencies) {
                     if (dirty_set.count(dep)) {
-                        dirty_set.insert(id);
+                        dirty_set.insert(task_ptr.get());
                         changed = true;
                         break;
                     }
@@ -334,22 +361,30 @@ BuildGraph::extract_dirty_tasks(const std::string& build_dir) {
         } while (changed);
     }
 
-    // 4. Collect dirty tasks
+    // 4. Collect dirty tasks as copies with explicit_deps (for inject_tasks compatibility)
     std::vector<BuildTask> dirty_tasks;
     std::string last_task_id;
 
-    for (const auto& id : dirty_set) {
-        dirty_tasks.push_back(tasks_[id]);
+    for (auto* task : dirty_set) {
+        // Make a copy with pointer deps converted back to string explicit_deps
+        BuildTask copy = *task;
+        copy.dependencies.clear();
+        copy.dependents.clear();
+        for (auto* dep : task->dependencies) {
+            copy.explicit_deps.push_back(dep->id);
+        }
+        dirty_tasks.push_back(std::move(copy));
+
         // Track the "last" task - the one with no dirty dependents (final output)
         bool has_dirty_dependent = false;
-        for (const auto& dep_id : tasks_[id].dependents) {
-            if (dirty_set.count(dep_id)) {
+        for (auto* dep_task : task->dependents) {
+            if (dirty_set.count(dep_task)) {
                 has_dirty_dependent = true;
                 break;
             }
         }
-        if (!has_dirty_dependent && !tasks_[id].outputs.empty()) {
-            last_task_id = id;  // This could be the final task
+        if (!has_dirty_dependent && !task->outputs.empty()) {
+            last_task_id = task->id;
         }
     }
 
@@ -357,16 +392,17 @@ BuildGraph::extract_dirty_tasks(const std::string& build_dir) {
 }
 
 std::expected<void, std::string> BuildGraph::execute(const std::string& build_dir, int jobs) {
-    // 1. Resolve cross-target dependencies
-    std::map<std::string, std::string> file_to_task;
-    for (const auto& [id, task] : tasks_) {
-        for (const auto& out : task.outputs) file_to_task[out] = id;
+    // 1. Resolve cross-target dependencies (file inputs → pointer deps)
+    std::unordered_map<std::string, BuildTask*> file_to_task;
+    for (const auto& task_ptr : tasks_) {
+        for (const auto& out : task_ptr->outputs) file_to_task[out] = task_ptr.get();
     }
 
-    for (auto& [id, task] : tasks_) {
-        for (const auto& in : task.inputs) {
-            if (file_to_task.count(in) && file_to_task[in] != id) {
-                task.dependencies.insert(file_to_task[in]);
+    for (auto& task_ptr : tasks_) {
+        for (const auto& in : task_ptr->inputs) {
+            auto it = file_to_task.find(in);
+            if (it != file_to_task.end() && it->second != task_ptr.get()) {
+                task_ptr->dependencies.push_back(it->second);
             }
         }
     }
@@ -377,37 +413,35 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     // add_dependencies(). We replicate this, skipping compilation tasks that are
     // transitive dependencies of any ALL custom target (to avoid cycles).
     {
-        std::vector<std::string> all_custom_task_ids;
-        std::set<std::string> excluded_tasks;  // union of transitive deps of all ALL custom targets
+        std::vector<BuildTask*> all_custom_tasks;
+        std::unordered_set<BuildTask*> excluded_tasks;  // union of transitive deps of all ALL custom targets
 
-        for (const auto& [id, task] : tasks_) {
-            if (!task.parent_target || !task.always_run) continue;
-            auto* custom = dynamic_cast<CustomTarget*>(task.parent_target);
+        for (const auto& task_ptr : tasks_) {
+            if (!task_ptr->parent_target || !task_ptr->always_run) continue;
+            auto* custom = dynamic_cast<CustomTarget*>(task_ptr->parent_target);
             if (!custom || !custom->is_build_by_default()) continue;
 
-            all_custom_task_ids.push_back(id);
+            all_custom_tasks.push_back(task_ptr.get());
 
             // BFS to find all transitive dependencies
-            std::vector<std::string> stack = {id};
-            while (!stack.empty()) {
-                std::string cur = stack.back();
-                stack.pop_back();
+            std::vector<BuildTask*> bfs_stack = {task_ptr.get()};
+            while (!bfs_stack.empty()) {
+                auto* cur = bfs_stack.back();
+                bfs_stack.pop_back();
                 if (!excluded_tasks.insert(cur).second) continue;
-                auto it = tasks_.find(cur);
-                if (it != tasks_.end()) {
-                    for (const auto& dep : it->second.dependencies) {
-                        stack.push_back(dep);
-                    }
+                for (auto* dep : cur->dependencies) {
+                    bfs_stack.push_back(dep);
                 }
             }
         }
 
-        if (!all_custom_task_ids.empty()) {
-            for (auto& [id, task] : tasks_) {
-                if (!task.is_compilation || excluded_tasks.count(id)) continue;
-                for (const auto& ct_id : all_custom_task_ids) {
-                    if (task.dependencies.count(ct_id)) continue;
-                    task.dependencies.insert(ct_id);
+        if (!all_custom_tasks.empty()) {
+            for (auto& task_ptr : tasks_) {
+                if (!task_ptr->is_compilation || excluded_tasks.count(task_ptr.get())) continue;
+                for (auto* ct : all_custom_tasks) {
+                    if (std::find(task_ptr->dependencies.begin(), task_ptr->dependencies.end(), ct) == task_ptr->dependencies.end()) {
+                        task_ptr->dependencies.push_back(ct);
+                    }
                 }
             }
         }
@@ -418,35 +452,19 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
 
     // 1b. Build reverse dependency graph for efficient completion notification.
     // Must be done AFTER all dependencies are added (including CMake compatibility).
-    for (auto& [id, task] : tasks_) {
-        for (const auto& dep_id : task.dependencies) {
-            if (tasks_.count(dep_id)) {
-                tasks_[dep_id].dependents.insert(id);
-            }
+    for (auto& task_ptr : tasks_) {
+        for (auto* dep : task_ptr->dependencies) {
+            dep->dependents.push_back(task_ptr.get());
         }
     }
 
-    // 1c. Validate all dependencies reference existing tasks (catches phantom deps
-    // that would cause stalls at runtime)
-    for (const auto& [id, task] : tasks_) {
-        for (const auto& dep : task.dependencies) {
-            if (!tasks_.count(dep)) {
-                return std::unexpected(
-                    "Build graph error: Task '" + id + "' depends on '" + dep +
-                    "' which is not a known task");
-            }
-        }
-    }
-
-    // 1d. Validate build graph: inputs that don't exist and aren't produced by
-    // any task are warned about but not fatal. CMake's Ninja generator resolves
-    // DEPENDS target names at generation time; unresolved names become file
-    // inputs that may or may not exist. We match that behavior.
-    for (const auto& [id, task] : tasks_) {
-        for (const auto& in : task.inputs) {
+    // 1c. Validate build graph: inputs that don't exist and aren't produced by
+    // any task are warned about but not fatal.
+    for (const auto& task_ptr : tasks_) {
+        for (const auto& in : task_ptr->inputs) {
             if (!std::filesystem::exists(in) && !file_to_task.count(in)) {
                 dmake::print_message(std::cerr, "WARNING",
-                    "Task '" + id + "' references '" + in +
+                    "Task '" + task_ptr->id + "' references '" + in +
                     "' which doesn't exist and isn't produced by any task "
                     "(CMake/Ninja resolves DEPENDS at generation time)");
             }
@@ -467,9 +485,10 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     //   - nullopt: maybe dirty (depends on EP sentinel), schedule but re-check at runtime
     //   - not in map: clean, skip
     ProfileScope pre_scan_profile("pre-scan incremental check", "build");
-    std::unordered_map<std::string, std::optional<bool>> dirty_state;
+    std::unordered_map<BuildTask*, std::optional<bool>> dirty_state;
 
-    for (const auto& [id, task] : tasks_) {
+    for (const auto& task_ptr : tasks_) {
+        auto& task = *task_ptr;
         // Skip marker tasks (but NOT EP orchestrator/sentinel which run in-process)
         if (task.outputs.empty() && task.commands.empty() &&
             !task.is_module_collator && !task.is_ep_orchestrator && !task.is_ep_sentinel) continue;
@@ -485,13 +504,13 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
             // EP sentinels and orchestrators are "maybe" - we can't know if EP will inject tasks
             // Their dependents should be re-checked at runtime
             bool is_ep_task = task.is_ep_sentinel || task.is_ep_orchestrator;
-            dirty_state[id] = is_ep_task ? std::nullopt : std::optional<bool>(true);
+            dirty_state[task_ptr.get()] = is_ep_task ? std::nullopt : std::optional<bool>(true);
             continue;
         }
 
         auto sig_res = calculate_signature(task);
-        if (!sig_res || !(cache.count(id) && cache[id] == *sig_res)) {
-            dirty_state[id] = true;
+        if (!sig_res || !(cache.count(task.id) && cache[task.id] == *sig_res)) {
+            dirty_state[task_ptr.get()] = true;
         }
     }
 
@@ -500,12 +519,12 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
         bool changed;
         do {
             changed = false;
-            for (const auto& [id, task] : tasks_) {
-                if (dirty_state.count(id)) continue;
+            for (const auto& task_ptr : tasks_) {
+                if (dirty_state.count(task_ptr.get())) continue;
 
                 bool dominated_by_dirty = false;
                 bool dominated_by_maybe = false;
-                for (const auto& dep : task.dependencies) {
+                for (auto* dep : task_ptr->dependencies) {
                     auto it = dirty_state.find(dep);
                     if (it != dirty_state.end()) {
                         if (it->second == true) {
@@ -518,10 +537,10 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                 }
 
                 if (dominated_by_dirty) {
-                    dirty_state[id] = true;
+                    dirty_state[task_ptr.get()] = true;
                     changed = true;
                 } else if (dominated_by_maybe) {
-                    dirty_state[id] = std::nullopt;
+                    dirty_state[task_ptr.get()] = std::nullopt;
                     changed = true;
                 }
             }
@@ -531,7 +550,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     // Count definitely dirty tasks for progress bar
     int dirty_task_count = 0;
     int maybe_dirty_count = 0;
-    for (const auto& [id, state] : dirty_state) {
+    for (const auto& [ptr, state] : dirty_state) {
         if (state == true) dirty_task_count++;
         else maybe_dirty_count++;
     }
@@ -543,18 +562,18 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
 
     // 3. Parallel execution with fixed worker threads
     // Pre-populate completed with clean tasks (not in dirty_state).
-    std::set<std::string> completed;
-    for (const auto& [id, task] : tasks_) {
-        if (dirty_state.count(id)) continue;
+    std::unordered_set<BuildTask*> completed;
+    for (const auto& task_ptr : tasks_) {
+        if (dirty_state.count(task_ptr.get())) continue;
         bool has_dirty_dep = false;
-        for (const auto& dep : task.dependencies) {
+        for (auto* dep : task_ptr->dependencies) {
             if (dirty_state.count(dep)) { has_dirty_dep = true; break; }
         }
         if (!has_dirty_dep) {
-            completed.insert(id);
+            completed.insert(task_ptr.get());
         }
     }
-    std::set<std::string> running;
+    std::unordered_set<BuildTask*> running;
     std::string fatal_error;
     std::mutex loop_mutex;
     std::condition_variable cv;
@@ -565,19 +584,19 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     }
 
     // Check if all dependencies of a task are complete
-    auto is_ready = [&](const std::string& id) {
-        for (const auto& dep : tasks_[id].dependencies) {
-            if (completed.find(dep) == completed.end()) return false;
+    auto is_ready = [&](BuildTask* t) {
+        for (auto* dep : t->dependencies) {
+            if (!completed.count(dep)) return false;
         }
         return true;
     };
 
     // Initialize ready_set with dirty/maybe tasks whose deps are all complete.
-    // Using std::set for deterministic ordering (alphabetical by task ID).
-    std::set<std::string> ready_set;
-    for (const auto& [id, state] : dirty_state) {
-        if (is_ready(id)) {
-            ready_set.insert(id);
+    // Using std::set with TaskPtrIdCmp for deterministic ordering (alphabetical by task ID).
+    std::set<BuildTask*, TaskPtrIdCmp> ready_set;
+    for (const auto& [ptr, state] : dirty_state) {
+        if (is_ready(ptr)) {
+            ready_set.insert(ptr);
         }
     }
 
@@ -591,21 +610,30 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
             bool profiling = g_profiling_enabled.load(std::memory_order_relaxed);
 
             while (true) {
-                std::string id;
+                BuildTask* current = nullptr;
 
-                // Grab the next ready task from ready_set (O(log n) instead of O(n))
+                // Grab the next ready task from ready_set
                 {
                     std::unique_lock<std::mutex> lock(loop_mutex);
                     cv.wait(lock, [&] {
                         if (!fatal_error.empty()) return true;
-                        if (completed.size() == tasks_.size()) return true;
+                        if (completed.size() + running.size() >= tasks_.size()) return true;
                         if (!ready_set.empty()) return true;
                         if (running.empty()) return true; // stall: nothing ready and nothing in flight
                         return g_interrupted.load(std::memory_order_relaxed);
                     });
 
-                    if (!fatal_error.empty() || completed.size() == tasks_.size()) {
+                    if (!fatal_error.empty()) {
                         return;
+                    }
+                    // Check termination: all tasks are either completed or not in dirty_state
+                    if (ready_set.empty() && running.empty()) {
+                        // Check if we're truly done
+                        bool all_done = true;
+                        for (const auto& [ptr, state] : dirty_state) {
+                            if (!completed.count(ptr)) { all_done = false; break; }
+                        }
+                        if (all_done) return;
                     }
                     if (g_interrupted.load(std::memory_order_relaxed)) {
                         if (fatal_error.empty()) fatal_error = "Interrupted";
@@ -615,18 +643,18 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
 
                     if (!ready_set.empty()) {
                         auto it = ready_set.begin();
-                        id = *it;
+                        current = *it;
                         ready_set.erase(it);
-                        running.insert(id);
-                    } else if (running.empty() && completed.size() < tasks_.size()) {
+                        running.insert(current);
+                    } else if (running.empty()) {
                         // Stall detection
                         std::ostringstream oss;
                         oss << "Internal error: Build graph stalled. Unresolved dependencies for tasks:";
-                        for (const auto& [tid, task] : tasks_) {
-                            if (completed.count(tid)) continue;
-                            oss << "\n  - " << tid << " depends on: ";
-                            for (const auto& dep : task.dependencies) {
-                                if (completed.find(dep) == completed.end()) oss << dep << " ";
+                        for (const auto& [ptr, state] : dirty_state) {
+                            if (completed.count(ptr)) continue;
+                            oss << "\n  - " << ptr->id << " depends on: ";
+                            for (auto* dep : ptr->dependencies) {
+                                if (!completed.count(dep)) oss << dep->id << " ";
                             }
                         }
                         fatal_error = oss.str();
@@ -639,7 +667,8 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                 }
 
                 // Execute the task (outside lock)
-                auto& task = tasks_.at(id);
+                auto& task = *current;
+                const auto& id = task.id;
                 std::string sig;
                 std::string task_error;
                 std::string active_display_name;  // tracks name in progress bar's active list
@@ -648,7 +677,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                 do { // do-while(false) for break-on-error
                     // Check for "maybe" dirty tasks: if state is nullopt (not true),
                     // re-check signature at runtime. If clean, skip execution.
-                    auto state_it = dirty_state.find(id);
+                    auto state_it = dirty_state.find(current);
                     if (state_it != dirty_state.end() && !state_it->second.has_value()) {
                         // "Maybe" dirty - re-check signature now that deps are complete
                         bool outputs_exist = !task.outputs.empty();
@@ -954,22 +983,22 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                             new_cache[id] = sig;
                         }
                     }
-                    completed.insert(id);
-                    running.erase(id);
+                    completed.insert(current);
+                    running.erase(current);
 
                     // Check if any dirty/maybe dependents are now ready
-                    for (const auto& dep_id : task.dependents) {
-                        if (!dirty_state.count(dep_id)) continue;  // clean task, skip
-                        if (completed.count(dep_id)) continue;   // already done
-                        if (running.count(dep_id)) continue;     // already running
-                        if (ready_set.count(dep_id)) continue;   // already in ready set
+                    for (auto* dep_task : task.dependents) {
+                        if (!dirty_state.count(dep_task)) continue;  // clean task, skip
+                        if (completed.count(dep_task)) continue;   // already done
+                        if (running.count(dep_task)) continue;     // already running
+                        if (ready_set.count(dep_task)) continue;   // already in ready set
 
                         // Check if all its dependencies are complete
                         bool ready = true;
-                        for (const auto& d : tasks_[dep_id].dependencies) {
+                        for (auto* d : dep_task->dependencies) {
                             if (!completed.count(d)) { ready = false; break; }
                         }
-                        if (ready) ready_set.insert(dep_id);
+                        if (ready) ready_set.insert(dep_task);
                     }
 
                     cv.notify_all();
@@ -1006,29 +1035,23 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
     // Compute critical path: longest dependency chain by execution time
-    // critical_path_s[task] = execution_time_s + max(critical_path_s[dep])
-    // Tasks complete in dependency order, so all deps are already computed.
     double max_critical_path = 0.0;
     if (dirty_task_count > 1) {
-        // Topological traversal: process tasks whose deps are all done
-        std::set<std::string> visited;
-        std::function<double(const std::string&)> compute_critical = [&](const std::string& tid) -> double {
-            auto it = tasks_.find(tid);
-            if (it == tasks_.end()) return 0.0;
-            auto& t = it->second;
-            if (t.critical_path_s > 0.0) return t.critical_path_s;  // memoized
-            if (!visited.insert(tid).second) return 0.0;  // cycle guard
+        std::unordered_set<BuildTask*> visited;
+        std::function<double(BuildTask*)> compute_critical = [&](BuildTask* t) -> double {
+            if (t->critical_path_s > 0.0) return t->critical_path_s;  // memoized
+            if (!visited.insert(t).second) return 0.0;  // cycle guard
 
             double dep_max = 0.0;
-            for (const auto& dep : t.dependencies) {
+            for (auto* dep : t->dependencies) {
                 dep_max = std::max(dep_max, compute_critical(dep));
             }
-            t.critical_path_s = t.execution_time_s + dep_max;
-            return t.critical_path_s;
+            t->critical_path_s = t->execution_time_s + dep_max;
+            return t->critical_path_s;
         };
 
-        for (const auto& [tid, _] : tasks_) {
-            max_critical_path = std::max(max_critical_path, compute_critical(tid));
+        for (const auto& task_ptr : tasks_) {
+            max_critical_path = std::max(max_critical_path, compute_critical(task_ptr.get()));
         }
     }
 
@@ -1324,9 +1347,9 @@ void BuildGraph::inject_module_dependencies(
 
     std::lock_guard<std::mutex> lock(graph_mutation_mutex_);
 
-    for (auto& [task_id, task] : tasks_) {
+    for (auto& task_ptr : tasks_) {
         // Find module requirements for this task
-        auto req_it = task_requires.find(task_id);
+        auto req_it = task_requires.find(task_ptr->id);
         if (req_it == task_requires.end()) continue;
 
         const auto& required_modules = req_it->second;
@@ -1339,21 +1362,19 @@ void BuildGraph::inject_module_dependencies(
 
             auto provider_it = module_to_task.find(required_module);
             if (provider_it == module_to_task.end()) {
-                // Module not found - this might be a system module or error
-                // For now, we'll silently skip; proper error handling would
-                // require context about whether this is expected
                 continue;
             }
 
-            const std::string& provider_task_id = provider_it->second;
+            auto task_it = task_by_id_.find(provider_it->second);
+            if (task_it == task_by_id_.end()) continue;
+
+            auto* provider = task_it->second;
 
             // Add dependency: this task depends on the provider task
-            task.dependencies.insert(provider_task_id);
+            task_ptr->dependencies.push_back(provider);
 
             // Update reverse dependency
-            if (tasks_.count(provider_task_id)) {
-                tasks_[provider_task_id].dependents.insert(task_id);
-            }
+            provider->dependents.push_back(task_ptr.get());
         }
     }
 }
@@ -1363,9 +1384,9 @@ void BuildGraph::inject_tasks(
     const std::string& sentinel_id,
     const std::string& last_task_id,
     const std::string& ep_binary_dir,
-    std::set<std::string>& completed,
-    std::unordered_map<std::string, std::optional<bool>>& dirty_state,
-    std::set<std::string>& ready_set,
+    std::unordered_set<BuildTask*>& completed,
+    std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state,
+    std::set<BuildTask*, TaskPtrIdCmp>& ready_set,
     ProgressBar& progress) {
 
     // This is called under loop_mutex (from run_ep_orchestrator)
@@ -1384,57 +1405,76 @@ void BuildGraph::inject_tasks(
     }
 
     // 2. Add new tasks to the graph with EP binary dir for cache routing
+    std::vector<BuildTask*> added_tasks;
     for (auto& task : new_tasks) {
         task.ep_binary_dir = ep_binary_dir;
-        tasks_[task.id] = std::move(task);
+        std::string id = task.id;
+        auto ptr = std::make_unique<BuildTask>(std::move(task));
+        auto* raw = ptr.get();
+        task_by_id_[id] = raw;
+        tasks_.push_back(std::move(ptr));
+        added_tasks.push_back(raw);
+    }
+
+    // 2b. Resolve explicit_deps on newly added tasks
+    for (auto* task : added_tasks) {
+        for (const auto& dep_id : task->explicit_deps) {
+            auto it = task_by_id_.find(dep_id);
+            if (it != task_by_id_.end()) {
+                task->dependencies.push_back(it->second);
+            }
+        }
+        task->explicit_deps.clear();
     }
 
     // 3. Resolve file->task dependencies for all tasks
     //    (new tasks may depend on each other, or existing tasks may depend on new outputs)
-    for (auto& [id, task] : tasks_) {
-        for (const auto& in : task.inputs) {
+    for (auto& task_ptr : tasks_) {
+        for (const auto& in : task_ptr->inputs) {
             auto it = new_file_to_task.find(in);
-            if (it != new_file_to_task.end() && it->second != id) {
-                task.dependencies.insert(it->second);
-                tasks_[it->second].dependents.insert(id);
+            if (it != new_file_to_task.end()) {
+                auto* producer = task_by_id_[it->second];
+                if (producer != task_ptr.get()) {
+                    task_ptr->dependencies.push_back(producer);
+                    producer->dependents.push_back(task_ptr.get());
+                }
             }
         }
     }
 
     // 4. Wire sentinel to depend on the last injected task
-    if (!last_task_id.empty() && tasks_.count(sentinel_id) && tasks_.count(last_task_id)) {
-        tasks_[sentinel_id].dependencies.insert(last_task_id);
-        tasks_[last_task_id].dependents.insert(sentinel_id);
+    auto* sentinel = task_by_id_.count(sentinel_id) ? task_by_id_[sentinel_id] : nullptr;
+    auto* last_task = task_by_id_.count(last_task_id) ? task_by_id_[last_task_id] : nullptr;
+    if (sentinel && last_task) {
+        sentinel->dependencies.push_back(last_task);
+        last_task->dependents.push_back(sentinel);
         // Sentinel now has unsatisfied dependency - remove from ready set
-        ready_set.erase(sentinel_id);
+        ready_set.erase(sentinel);
     }
 
     // 5. Mark all new tasks as definitely dirty and ensure they're NOT in completed
-    //    (They may be in completed if parent pre-scan marked a file path as "clean"
-    //     before we injected the task that produces it)
-    for (const auto& [out, task_id] : new_file_to_task) {
-        dirty_state[task_id] = true;  // Definitely dirty - just injected
-        completed.erase(task_id);
+    for (auto* task : added_tasks) {
+        dirty_state[task] = true;
+        completed.erase(task);
     }
-    // Sentinel stays as maybe (nullopt) - it's still a sync point
 
     // 6. Update progress total
-    progress.bump_total(static_cast<int>(new_file_to_task.size()));
+    progress.bump_total(static_cast<int>(added_tasks.size()));
 
     // 7. Compute ready set for new tasks
-    for (const auto& [out, task_id] : new_file_to_task) {
-        if (completed.count(task_id)) continue;  // already done (shouldn't happen)
-        if (ready_set.count(task_id)) continue;   // already ready
+    for (auto* task : added_tasks) {
+        if (completed.count(task)) continue;
+        if (ready_set.count(task)) continue;
 
         bool all_deps_done = true;
-        for (const auto& dep : tasks_[task_id].dependencies) {
+        for (auto* dep : task->dependencies) {
             if (!completed.count(dep)) {
                 all_deps_done = false;
                 break;
             }
         }
         if (all_deps_done) {
-            ready_set.insert(task_id);
+            ready_set.insert(task);
         }
     }
 }
@@ -1443,9 +1483,9 @@ std::expected<int, std::string>
 BuildGraph::attach_ep_graph(
     BuildGraph&& ep_graph,
     const std::string& ep_binary_dir,
-    std::set<std::string>& completed,
-    std::unordered_map<std::string, std::optional<bool>>& dirty_state,
-    std::set<std::string>& ready_set,
+    std::unordered_set<BuildTask*>& completed,
+    std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state,
+    std::set<BuildTask*, TaskPtrIdCmp>& ready_set,
     ProgressBar& progress,
     std::mutex& loop_mutex,
     std::condition_variable& cv) {
@@ -1456,88 +1496,99 @@ BuildGraph::attach_ep_graph(
     // 1. Load EP's cache for dirty computation
     auto ep_cache = load_cache(ep_binary_dir);
 
-    // 2. Build file→task map for EP tasks (for dependency resolution)
-    std::unordered_map<std::string, std::string> ep_file_to_task;
-    for (const auto& [id, task] : ep_graph.tasks_) {
-        for (const auto& out : task.outputs) {
-            ep_file_to_task[out] = id;
-        }
-    }
+    // 2. Build file→task map for EP tasks (for cross-graph dependency resolution)
+    std::unordered_map<std::string, BuildTask*> ep_file_to_task;
 
-    // 3. Compute dirty status and move tasks into main graph
+    // 3. Compute dirty status and transfer task ownership to main graph
+    //    Moving unique_ptrs preserves pointer stability - all internal BuildTask*
+    //    edges within the EP graph remain valid.
     int dirty_count = 0;
-    for (auto& [id, task] : ep_graph.tasks_) {
-        // Skip marker tasks
-        if (task.outputs.empty() && task.commands.empty() &&
-            !task.is_module_collator && !task.is_ep_orchestrator && !task.is_ep_sentinel) {
-            continue;
+    std::vector<BuildTask*> transferred_tasks;
+    for (auto& task_uptr : ep_graph.tasks_) {
+        auto& task = *task_uptr;
+
+        // Build file map before moving
+        for (const auto& out : task.outputs) {
+            ep_file_to_task[out] = task_uptr.get();
         }
 
-        // Check if outputs exist
-        bool outputs_exist = true;
-        for (const auto& out : task.outputs) {
-            if (!std::filesystem::exists(out)) {
-                outputs_exist = false;
-                break;
-            }
-        }
+        // Skip marker tasks for dirty computation
+        bool is_marker = task.outputs.empty() && task.commands.empty() &&
+            !task.is_module_collator && !task.is_ep_orchestrator && !task.is_ep_sentinel;
 
         bool is_dirty = false;
-        if (!outputs_exist || task.always_run) {
-            is_dirty = true;
-        } else {
-            auto sig_res = calculate_signature(task);
-            if (!sig_res || !(ep_cache.count(id) && ep_cache[id] == *sig_res)) {
+        if (!is_marker) {
+            // Check if outputs exist
+            bool outputs_exist = true;
+            for (const auto& out : task.outputs) {
+                if (!std::filesystem::exists(out)) {
+                    outputs_exist = false;
+                    break;
+                }
+            }
+
+            if (!outputs_exist || task.always_run) {
                 is_dirty = true;
+            } else {
+                auto sig_res = calculate_signature(task);
+                if (!sig_res || !(ep_cache.count(task.id) && ep_cache[task.id] == *sig_res)) {
+                    is_dirty = true;
+                }
             }
         }
 
         // Set EP binary dir for cache routing
         task.ep_binary_dir = ep_binary_dir;
 
-        // Remove from completed if this ID was pre-populated as a phantom task
-        completed.erase(id);
-
-        // Move task into main graph
-        tasks_[id] = std::move(task);
+        // Transfer ownership: move unique_ptr from EP graph to main graph
+        auto* raw = task_uptr.get();
+        task_by_id_[raw->id] = raw;
+        tasks_.push_back(std::move(task_uptr));
+        transferred_tasks.push_back(raw);
 
         // Update state based on dirty status
-        if (is_dirty) {
-            dirty_state[id] = true;
-            dirty_count++;
-        } else {
-            // Clean task - add to completed immediately
-            completed.insert(id);
+        if (!is_marker) {
+            if (is_dirty) {
+                dirty_state[raw] = true;
+                dirty_count++;
+            } else {
+                completed.insert(raw);
+            }
         }
     }
+    ep_graph.tasks_.clear();
+    ep_graph.task_by_id_.clear();
 
-    // 4. Resolve file→task dependencies for ALL tasks in main graph
-    std::set<std::string> tasks_with_new_deps;
-    for (auto& [id, task] : tasks_) {
-        for (const auto& in : task.inputs) {
+    // 4. Resolve cross-graph file→task dependencies
+    //    EP tasks already have internal pointer deps (from EP's finalize()).
+    //    Now wire: main tasks whose inputs match EP outputs, and vice versa.
+    std::vector<BuildTask*> tasks_with_new_deps;
+    for (auto& task_ptr : tasks_) {
+        bool added_dep = false;
+        for (const auto& in : task_ptr->inputs) {
             auto it = ep_file_to_task.find(in);
-            if (it != ep_file_to_task.end() && it->second != id) {
-                if (task.dependencies.insert(it->second).second) {
-                    tasks_with_new_deps.insert(id);
-                }
-                if (tasks_.count(it->second)) {
-                    tasks_[it->second].dependents.insert(id);
-                }
+            if (it != ep_file_to_task.end() && it->second != task_ptr.get()) {
+                task_ptr->dependencies.push_back(it->second);
+                it->second->dependents.push_back(task_ptr.get());
+                added_dep = true;
             }
+        }
+        if (added_dep) {
+            tasks_with_new_deps.push_back(task_ptr.get());
         }
     }
 
     // Remove tasks with new unsatisfied dependencies from ready_set
-    for (const auto& id : tasks_with_new_deps) {
+    for (auto* task : tasks_with_new_deps) {
         bool has_unsatisfied = false;
-        for (const auto& dep : tasks_[id].dependencies) {
+        for (auto* dep : task->dependencies) {
             if (!completed.count(dep)) {
                 has_unsatisfied = true;
                 break;
             }
         }
         if (has_unsatisfied) {
-            ready_set.erase(id);
+            ready_set.erase(task);
         }
     }
 
@@ -1546,11 +1597,12 @@ BuildGraph::attach_ep_graph(
         bool changed;
         do {
             changed = false;
-            for (auto& [id, task] : tasks_) {
-                if (dirty_state.count(id)) continue;
-                for (const auto& dep : task.dependencies) {
-                    if (dirty_state.count(dep) && dirty_state[dep] == true) {
-                        dirty_state[id] = true;
+            for (auto& task_ptr : tasks_) {
+                if (dirty_state.count(task_ptr.get())) continue;
+                for (auto* dep : task_ptr->dependencies) {
+                    auto dit = dirty_state.find(dep);
+                    if (dit != dirty_state.end() && dit->second == true) {
+                        dirty_state[task_ptr.get()] = true;
                         dirty_count++;
                         changed = true;
                         break;
@@ -1563,20 +1615,20 @@ BuildGraph::attach_ep_graph(
     // 6. Update progress and add ready dirty tasks to ready_set
     progress.bump_total(dirty_count);
 
-    for (const auto& [id, state] : dirty_state) {
+    for (const auto& [ptr, state] : dirty_state) {
         if (!state.has_value() || !*state) continue;  // Only check definitely-dirty
-        if (completed.count(id)) continue;
-        if (ready_set.count(id)) continue;
+        if (completed.count(ptr)) continue;
+        if (ready_set.count(ptr)) continue;
 
         bool all_deps_done = true;
-        for (const auto& dep : tasks_[id].dependencies) {
+        for (auto* dep : ptr->dependencies) {
             if (!completed.count(dep)) {
                 all_deps_done = false;
                 break;
             }
         }
         if (all_deps_done) {
-            ready_set.insert(id);
+            ready_set.insert(ptr);
         }
     }
 
@@ -1589,9 +1641,9 @@ BuildGraph::attach_ep_graph(
 std::optional<std::string> BuildGraph::run_ep_orchestrator(
     BuildTask& task,
     const std::string& build_dir,
-    std::set<std::string>& completed,
-    std::unordered_map<std::string, std::optional<bool>>& dirty_state,
-    std::set<std::string>& ready_set,
+    std::unordered_set<BuildTask*>& completed,
+    std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state,
+    std::set<BuildTask*, TaskPtrIdCmp>& ready_set,
     ProgressBar& progress,
     std::map<std::string, std::string>& new_cache,
     bool stdout_is_tty,
@@ -1608,8 +1660,6 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
     std::string sentinel_id = ep_name;  // Sentinel task ID is the EP name
 
     // Helper to print output lines with EP name prefix (for child interpreter output)
-    // DIM + WHITE gives gray text for the prefix
-    // Uses progress.print_line() to properly handle the progress bar
     auto print_prefixed_output = [&](const std::string& output) {
         if (output.empty()) return;
         std::string prefix = std::string(c(stdout_is_tty, colors::DIM)) + std::string(c(stdout_is_tty, colors::WHITE)) + "[" + ep_name + "] " + std::string(c(stdout_is_tty, colors::RESET));
@@ -1742,8 +1792,6 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
 
         // For cmake-based EPs, we interpret CMakeLists.txt so we use install rules,
         // not any custom INSTALL_COMMAND (which would require cmake-generated Makefile).
-        // However, we still run extra commands from INSTALL_COMMAND (those that aren't
-        // "make install") - e.g., extra cp commands to copy internal headers.
         const auto& install_rules = ep_interp->get_install_rules();
         std::string install_prefix = ep_target->get_ep_install_dir();
         std::string config = ep_interp->get_variable("CMAKE_BUILD_TYPE");
@@ -1798,23 +1846,24 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
                 install_task.ep_name = ep_name;
                 install_task.ep_binary_dir = binary_dir;
                 install_task.inputs = std::move(install_inputs);
-                // No outputs - install doesn't declare what it produces
-                // (consumers depend on sentinel, not installed files directly)
 
                 // Inject install task and wire sentinel to depend on it
                 {
-                    std::lock_guard<std::mutex> lock(loop_mutex);
+                    std::lock_guard<std::mutex> lk(loop_mutex);
 
                     // Add install task to graph
-                    tasks_[install_id] = std::move(install_task);
+                    auto install_ptr = std::make_unique<BuildTask>(std::move(install_task));
+                    auto* install_raw = install_ptr.get();
+                    task_by_id_[install_id] = install_raw;
+                    tasks_.push_back(std::move(install_ptr));
 
                     // Wire install task dependencies via file→task resolution
-                    for (const auto& in : tasks_[install_id].inputs) {
-                        for (const auto& [task_id, task] : tasks_) {
-                            for (const auto& out : task.outputs) {
+                    for (const auto& in : install_raw->inputs) {
+                        for (const auto& task_ptr : tasks_) {
+                            for (const auto& out : task_ptr->outputs) {
                                 if (out == in) {
-                                    tasks_[install_id].dependencies.insert(task_id);
-                                    tasks_[task_id].dependents.insert(install_id);
+                                    install_raw->dependencies.push_back(task_ptr.get());
+                                    task_ptr->dependents.push_back(install_raw);
                                     break;
                                 }
                             }
@@ -1822,15 +1871,16 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
                     }
 
                     // Wire sentinel to depend on install task (not directly on EP tasks)
-                    tasks_[sentinel_id].dependencies.insert(install_id);
-                    tasks_[install_id].dependents.insert(sentinel_id);
+                    auto* sentinel = task_by_id_[sentinel_id];
+                    sentinel->dependencies.push_back(install_raw);
+                    install_raw->dependents.push_back(sentinel);
 
                     // Mark install task as dirty
-                    dirty_state[install_id] = true;
+                    dirty_state[install_raw] = true;
                     progress.bump_total(1);
 
                     // Remove sentinel from ready set (has unsatisfied dependency now)
-                    ready_set.erase(sentinel_id);
+                    ready_set.erase(sentinel);
                 }
             }
             // Extra install commands will be run by install task (it has access to ep_target)

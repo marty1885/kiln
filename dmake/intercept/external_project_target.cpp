@@ -72,10 +72,10 @@ void ExternalProjectTarget::generate_tasks(
             // Target dependency - depend on the target's output or its task ID
             std::string dep_out = dep_it->second->get_output_path();
             if (!dep_out.empty()) {
-                orchestrator.dependencies.insert(dep_out);
+                orchestrator.explicit_deps.push_back(dep_out);
             } else {
                 // Custom/EP targets may not have output paths - use target name as task ID
-                orchestrator.dependencies.insert(dep_name);
+                orchestrator.explicit_deps.push_back(dep_name);
             }
         }
         // File dependencies are not relevant for orchestrator (it doesn't use files directly)
@@ -93,7 +93,7 @@ void ExternalProjectTarget::generate_tasks(
     // No commands - sentinel is just a synchronization point
 
     // Sentinel depends on orchestrator
-    sentinel.dependencies.insert(orchestrator_id);
+    sentinel.explicit_deps.push_back(orchestrator_id);
 
     graph.add_task(std::move(sentinel));
 }

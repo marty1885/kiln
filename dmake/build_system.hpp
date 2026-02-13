@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <expected>
 #include <optional>
+#include <memory>
 #include <filesystem>
 #include <mutex>
 #include <condition_variable>
@@ -62,13 +63,23 @@ struct BuildTask {
     // For COMPILE_LANGUAGE genex support
     std::optional<Language> compile_language;  // Language being compiled (for $<COMPILE_LANGUAGE:...>)
 
-    // For graph execution
-    std::set<std::string> dependencies; // Task IDs we depend on
-    std::set<std::string> dependents;   // Task IDs that depend on us
+    // Dependency edges (resolved pointers, set by graph)
+    std::vector<BuildTask*> dependencies;
+    std::vector<BuildTask*> dependents;
+
+    // Unresolved dependency IDs (set during task creation, resolved to pointers in finalize)
+    std::vector<std::string> explicit_deps;
 
     // Filled during execution for critical path computation
     double execution_time_s = 0.0;    // wall time for this task
     double critical_path_s = 0.0;     // longest chain ending at this task
+};
+
+// Comparator for deterministic ordering of BuildTask pointers (by task ID)
+struct TaskPtrIdCmp {
+    bool operator()(const BuildTask* a, const BuildTask* b) const {
+        return a->id < b->id;
+    }
 };
 
 class BuildGraph {
@@ -78,6 +89,7 @@ public:
     // Move constructor/assignment - needed because mutexes aren't movable
     BuildGraph(BuildGraph&& other) noexcept
         : tasks_(std::move(other.tasks_)),
+          task_by_id_(std::move(other.task_by_id_)),
           ep_target_owners_(std::move(other.ep_target_owners_)),
           stat_cache_(std::move(other.stat_cache_)),
           deps_cache_(std::move(other.deps_cache_)),
@@ -86,6 +98,7 @@ public:
     BuildGraph& operator=(BuildGraph&& other) noexcept {
         if (this != &other) {
             tasks_ = std::move(other.tasks_);
+            task_by_id_ = std::move(other.task_by_id_);
             ep_target_owners_ = std::move(other.ep_target_owners_);
             stat_cache_ = std::move(other.stat_cache_);
             deps_cache_ = std::move(other.deps_cache_);
@@ -109,6 +122,7 @@ public:
     std::expected<void, std::string> generate_compile_commands(const std::string& build_dir);
 
     // Finalize the build graph: evaluate all generator expressions in all tasks.
+    // Also resolves explicit_deps (string IDs) to pointer-based dependencies.
     // Call after generate_tasks() and before execute().
     std::expected<void, std::string> finalize(const GenexEvaluationContext& ctx);
 
@@ -119,15 +133,16 @@ public:
     extract_dirty_tasks(const std::string& build_dir);
 
     // Helpers for target task generation
-    bool has_task(const std::string& id) const { return tasks_.count(id); }
-    BuildTask& get_task(const std::string& id) { return tasks_.at(id); }
+    bool has_task(const std::string& id) const { return task_by_id_.count(id); }
+    BuildTask& get_task(const std::string& id) { return *task_by_id_.at(id); }
 
-    // Returns dependency IDs that no task produces (for resolving missing targets)
+    // Returns dependency IDs that no task produces (for resolving missing targets).
+    // Checks explicit_deps (unresolved strings) since this is called before finalize().
     std::vector<std::string> get_missing_dependencies() const {
         std::vector<std::string> missing;
-        for (const auto& [id, task] : tasks_) {
-            for (const auto& dep : task.dependencies) {
-                if (!tasks_.count(dep)) {
+        for (const auto& task_ptr : tasks_) {
+            for (const auto& dep : task_ptr->explicit_deps) {
+                if (!task_by_id_.count(dep)) {
                     missing.push_back(dep);
                 }
             }
@@ -145,15 +160,12 @@ public:
     // ExternalProject support: run EP orchestrator task in-process
     // Called by execute() when an EP orchestrator task becomes ready.
     // Returns error message on failure, nullopt on success.
-    // The orchestrator either:
-    //   1. Spawns an isolated interpreter (cmake-based EP), extracts dirty tasks, injects them
-    //   2. Runs shell commands (custom CONFIGURE_COMMAND/BUILD_COMMAND/INSTALL_COMMAND)
     std::optional<std::string> run_ep_orchestrator(
         BuildTask& task,
         const std::string& build_dir,
-        std::set<std::string>& completed,
-        std::unordered_map<std::string, std::optional<bool>>& dirty_state,
-        std::set<std::string>& ready_set,
+        std::unordered_set<BuildTask*>& completed,
+        std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state,
+        std::set<BuildTask*, TaskPtrIdCmp>& ready_set,
         ProgressBar& progress,
         std::map<std::string, std::string>& new_cache,
         bool stdout_is_tty,
@@ -161,46 +173,47 @@ public:
         std::condition_variable& cv);
 
     // Inject tasks into the live build graph during execution.
-    // Called by run_ep_orchestrator after extracting dirty tasks from a child interpreter.
-    // sentinel_id: The EP sentinel task ID - its dependencies will be updated
-    // last_task_id: The final task in the injected chain (sentinel will depend on this)
-    // ep_binary_dir: EP binary directory for cache routing
     // DEPRECATED: Use attach_ep_graph() instead for proper incremental builds.
     void inject_tasks(
         std::vector<BuildTask> new_tasks,
         const std::string& sentinel_id,
         const std::string& last_task_id,
         const std::string& ep_binary_dir,
-        std::set<std::string>& completed,
-        std::unordered_map<std::string, std::optional<bool>>& dirty_state,
-        std::set<std::string>& ready_set,
+        std::unordered_set<BuildTask*>& completed,
+        std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state,
+        std::set<BuildTask*, TaskPtrIdCmp>& ready_set,
         ProgressBar& progress);
 
     // Atomically attach entire EP graph to main graph.
     // Unlike inject_tasks(), this attaches ALL tasks (not just dirty ones).
     // Clean tasks are added to completed immediately; dirty tasks execute normally.
-    // This fixes validation failures where partial shoveling causes missing dependencies.
     // Returns dirty_count for progress reporting.
     // IMPORTANT: Caller must NOT hold loop_mutex; this function acquires it.
     std::expected<int, std::string>
     attach_ep_graph(
         BuildGraph&& ep_graph,
         const std::string& ep_binary_dir,
-        std::set<std::string>& completed,
-        std::unordered_map<std::string, std::optional<bool>>& dirty_state,
-        std::set<std::string>& ready_set,
+        std::unordered_set<BuildTask*>& completed,
+        std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state,
+        std::set<BuildTask*, TaskPtrIdCmp>& ready_set,
         ProgressBar& progress,
         std::mutex& loop_mutex,
         std::condition_variable& cv);
 
-    // Access to tasks map (needed by EP orchestrator for isolated interpreter)
-    const std::map<std::string, BuildTask>& get_tasks() const { return tasks_; }
+    // Access to tasks (needed by EP orchestrator for isolated interpreter)
+    const std::vector<std::unique_ptr<BuildTask>>& get_tasks() const { return tasks_; }
+    size_t task_count() const { return tasks_.size(); }
 
 private:
-    std::map<std::string, BuildTask> tasks_;
+    std::vector<std::unique_ptr<BuildTask>> tasks_;
+    std::unordered_map<std::string, BuildTask*> task_by_id_;
     mutable std::mutex output_mutex_;
     mutable std::mutex state_mutex_;
     mutable std::mutex graph_mutation_mutex_;  // For thread-safe module dependency injection
+
+    // Resolve explicit_deps (string IDs) to pointer-based dependencies.
+    // Called by finalize() after all tasks are created and genex evaluated.
+    void resolve_explicit_deps();
 
     // Keeps EP child interpreter targets alive while injected tasks hold raw parent_target pointers
     std::vector<std::shared_ptr<Target>> ep_target_owners_;

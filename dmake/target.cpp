@@ -737,7 +737,7 @@ static void resolve_command_target_references(
             std::string output = resolved->get_output_path();
             if (!output.empty()) {
                 cmd[0] = output;
-                task.dependencies.insert(output);
+                task.explicit_deps.push_back(output);
             }
         }
     }
@@ -774,10 +774,10 @@ static void generate_custom_command_task(BuildGraph& graph, const CustomCommandR
         if (dep_it != all_targets.end()) {
             std::string dep_out = dep_it->second->get_output_path();
             if (!dep_out.empty()) {
-                task.dependencies.insert(dep_out);
+                task.explicit_deps.push_back(dep_out);
                 task.inputs.push_back(dep_out);
             } else {
-                task.dependencies.insert(dep);
+                task.explicit_deps.push_back(dep);
             }
         } else {
             std::filesystem::path p(dep);
@@ -801,7 +801,7 @@ static void generate_custom_command_task(BuildGraph& graph, const CustomCommandR
             }
             if (cc_it != custom_rules.end()) {
                 generate_custom_command_task(graph, *cc_it->second, all_targets, custom_rules, generated);
-                task.dependencies.insert(cc_it->second->outputs[0]);
+                task.explicit_deps.push_back(cc_it->second->outputs[0]);
             }
             task.inputs.push_back(normalized);
         }
@@ -1199,13 +1199,13 @@ void Target::generate_object_tasks(BuildGraph& graph, const Toolchain& toolchain
         }
 
         if (!pch_gch_path.empty()) {
-            task.dependencies.insert(pch_gch_path);
+            task.explicit_deps.push_back(pch_gch_path);
             task.inputs.push_back(pch_gch_path);
         }
 
         // Pre-resolved manual dependencies (hoisted)
         for (const auto& dep : resolved_manual_deps) {
-            task.dependencies.insert(dep.id);
+            task.explicit_deps.push_back(dep.id);
         }
 
         // OBJECT_DEPENDS
@@ -1226,21 +1226,21 @@ void Target::generate_object_tasks(BuildGraph& graph, const Toolchain& toolchain
 
         // Depend on PRE_BUILD task
         if (!pre_build_task_id.empty()) {
-            task.dependencies.insert(pre_build_task_id);
+            task.explicit_deps.push_back(pre_build_task_id);
         }
 
         // Depend on custom command that generates this source
         {
             auto cc_it = custom_rules.find(src_normalized);
             if (cc_it != custom_rules.end()) {
-                task.dependencies.insert(cc_it->second->outputs[0]);
+                task.explicit_deps.push_back(cc_it->second->outputs[0]);
                 task.inputs.push_back(cc_it->second->outputs[0]);
             }
         }
 
         // Module mapper dependency
         if (!module_mapper_path.empty()) {
-            task.dependencies.insert(module_mapper_path);
+            task.explicit_deps.push_back(module_mapper_path);
             task.inputs.push_back(module_mapper_path);
         }
 
@@ -1650,7 +1650,7 @@ void Target::generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const
 
     for (const auto& obj : obj_files) {
         link.inputs.push_back(obj);
-        link.dependencies.insert(obj);
+        link.explicit_deps.push_back(obj);
     }
 
     // Static libraries are just .o archives — ar doesn't resolve symbols against
@@ -1665,7 +1665,7 @@ void Target::generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const
                  // are pre-existing - we don't build them.
                  for (const auto& [name, target] : all_targets) {
                      if (target->get_output_path() == lib && !target->is_imported()) {
-                         link.dependencies.insert(lib);
+                         link.explicit_deps.push_back(lib);
                          break;
                      }
                  }
@@ -1693,10 +1693,10 @@ void Target::generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const
             if (dep_it != all_targets.end()) {
                 std::string dep_out = dep_it->second->get_output_path();
                 if (!dep_out.empty()) {
-                    link.dependencies.insert(dep_out);
+                    link.explicit_deps.push_back(dep_out);
                 } else {
                     // Custom/EP targets may not have output paths - use target name as task ID
-                    link.dependencies.insert(dep_name);
+                    link.explicit_deps.push_back(dep_name);
                 }
             }
         }
@@ -1708,9 +1708,9 @@ void Target::generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const
         if (dep_it != all_targets.end()) {
             std::string dep_out = dep_it->second->get_output_path();
             if (!dep_out.empty()) {
-                link.dependencies.insert(dep_out);
+                link.explicit_deps.push_back(dep_out);
             } else {
-                link.dependencies.insert(dep_name);
+                link.explicit_deps.push_back(dep_name);
             }
         }
     }
@@ -1757,7 +1757,7 @@ void Target::generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const
         resolve_command_target_references(post_build.commands, post_build, all_targets);
 
         // POST_BUILD depends on the link task completing
-        post_build.dependencies.insert(output_path);
+        post_build.explicit_deps.push_back(output_path);
         post_build.inputs.push_back(output_path);
 
         graph.add_task(std::move(post_build));
@@ -1798,10 +1798,10 @@ void CustomTarget::generate_tasks(BuildGraph& graph, const Toolchain&, const std
         if (dep_it != all_targets.end()) {
             std::string dep_out = dep_it->second->get_output_path();
             if (!dep_out.empty()) {
-                task.dependencies.insert(dep_out);
+                task.explicit_deps.push_back(dep_out);
                 task.inputs.push_back(dep_out);
             } else {
-                task.dependencies.insert(dep_name);
+                task.explicit_deps.push_back(dep_name);
             }
         } else {
             std::filesystem::path p(dep_name);
@@ -1824,7 +1824,7 @@ void CustomTarget::generate_tasks(BuildGraph& graph, const Toolchain&, const std
             }
             if (cc_it != custom_rules.end()) {
                 generate_custom_command_task(graph, *cc_it->second, all_targets, custom_rules, generated_cc_tasks);
-                task.dependencies.insert(cc_it->second->outputs[0]);
+                task.explicit_deps.push_back(cc_it->second->outputs[0]);
             }
             task.inputs.push_back(normalized);
         }
@@ -1836,9 +1836,9 @@ void CustomTarget::generate_tasks(BuildGraph& graph, const Toolchain&, const std
         if (dep_it != all_targets.end()) {
             std::string dep_out = dep_it->second->get_output_path();
             if (!dep_out.empty()) {
-                task.dependencies.insert(dep_out);
+                task.explicit_deps.push_back(dep_out);
             } else {
-                task.dependencies.insert(dep_name);
+                task.explicit_deps.push_back(dep_name);
             }
         }
     }
@@ -1967,7 +1967,7 @@ void Target::generate_module_collator_task(BuildGraph& graph, const std::vector<
 
     // Collator depends on all scanner tasks
     for (const auto& scanner_id : scanner_task_ids) {
-        collator.dependencies.insert(scanner_id);
+        collator.explicit_deps.push_back(scanner_id);
         collator.inputs.push_back(scanner_id);
     }
 
