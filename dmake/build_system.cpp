@@ -25,6 +25,7 @@
 #include <glaze/glaze.hpp>
 #include <type_traits>
 #include <unordered_map>
+#include <cassert>
 
 namespace dmake {
 
@@ -757,6 +758,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
 
                     // ExternalProject: handle orchestrator tasks specially (in-process execution)
                     if (task.is_ep_orchestrator) {
+                        assert(std::holds_alternative<EPOrchestratorTask>(task.kind));
                         print_status("Configuring", task.ep_name);
 
                         // Run the EP orchestrator outside the lock - it acquires loop_mutex when attaching the graph
@@ -768,6 +770,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         // EP orchestrator completed successfully
 
                     } else if (task.is_ep_install) {
+                        assert(std::holds_alternative<EPInstallTask>(task.kind));
                         // EP install task - runs install rules after EP build tasks complete
                         print_status("Installing", task.ep_name);
                         auto* ep_target = dynamic_cast<ExternalProjectTarget*>(task.parent_target);
@@ -823,12 +826,14 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         }
 
                     } else if (task.is_ep_sentinel) {
+                        assert(std::holds_alternative<EPSentinelTask>(task.kind));
                         // Sentinel task - pure synchronization point, signals EP completion
                         // Install is now handled by a separate install task that sentinel depends on
                         print_status("Ready", task.ep_name);
 
                     // C++20 modules: handle collator tasks specially (in-process execution)
                     } else if (task.is_module_collator) {
+                        assert(std::holds_alternative<ModuleCollatorTask>(task.kind));
                         print_status("Collating", "modules");
 
                         std::map<std::string, std::string> module_to_task;
@@ -867,6 +872,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         inject_module_dependencies(module_to_task, task_requires);
 
                     } else if (task.is_module_scanner) {
+                        assert(std::holds_alternative<ModuleScannerTask>(task.kind));
                         std::string scan_display = std::filesystem::path(task.source_file).filename().string();
                         print_status("Scanning", scan_display);
 
@@ -1841,6 +1847,7 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
                 std::string install_id = ep_name + ":install";
                 BuildTask install_task;
                 install_task.id = install_id;
+                install_task.kind = EPInstallTask{ep_name};
                 install_task.parent_target = ep_target;
                 install_task.is_ep_install = true;
                 install_task.ep_name = ep_name;

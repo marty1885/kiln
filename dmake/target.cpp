@@ -755,6 +755,7 @@ static void generate_custom_command_task(BuildGraph& graph, const CustomCommandR
 
     BuildTask task;
     task.id = rule.outputs[0];
+    task.kind = CustomCommandTask{};
     task.working_dir = rule.working_dir;
     task.always_run = false;
     task.is_shell_command = true;
@@ -1185,6 +1186,7 @@ void Target::generate_object_tasks(BuildGraph& graph, const Toolchain& toolchain
 
         BuildTask task;
         task.id = obj;
+        task.kind = CompileTask{src_abs_str, lang_info.lang};
         task.parent_target = this;
         task.commands.push_back(compiler->get_compile_command(ctx));
         task.inputs.push_back(src_abs_str);
@@ -1303,6 +1305,7 @@ static std::pair<std::string, std::string> generate_pch_task(
 
     BuildTask pch_task;
     pch_task.id = pch_gch_path;
+    pch_task.kind = PCHTask{pch_wrapper};
     pch_task.parent_target = const_cast<Target*>(target);
 
     CompileContext ctx;
@@ -1398,6 +1401,7 @@ void Target::generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const
         pre_build_task_id = name_ + "_pre_build";
         BuildTask pre_build;
         pre_build.id = pre_build_task_id;
+        pre_build.kind = PreBuildTask{};
         pre_build.parent_target = this;
         pre_build.always_run = true;
         pre_build.working_dir = binary_dir_;
@@ -1534,6 +1538,7 @@ void Target::generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const
     std::string output_path = get_output_path();
     BuildTask link;
     link.id = output_path;
+    link.kind = LinkTask{};
     link.parent_target = this;
 
     // Use resolved LINK_LIBRARIES directly — resolve() already flattened
@@ -1742,6 +1747,7 @@ void Target::generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const
         std::string post_build_task_id = name_ + "_post_build";
         BuildTask post_build;
         post_build.id = post_build_task_id;
+        post_build.kind = PostBuildTask{};
         post_build.parent_target = this;
         post_build.always_run = true;
         post_build.is_shell_command = true;
@@ -1767,6 +1773,7 @@ void Target::generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const
 void CustomTarget::generate_tasks(BuildGraph& graph, const Toolchain&, const std::map<std::string, std::shared_ptr<Target>>& all_targets, const Interpreter& interp, const std::vector<std::string>&, const std::vector<std::string>&) {
     BuildTask task;
     task.id = name_;
+    task.kind = CustomTargetTask{};
     task.parent_target = this;
     task.is_shell_command = true;
     task.always_run = true;
@@ -1938,6 +1945,7 @@ bool Target::generate_module_scanner_tasks(BuildGraph& graph, const Toolchain& t
 
         BuildTask scanner;
         scanner.id = ddi_path;
+        scanner.kind = ModuleScannerTask{src_abs.string()};
         scanner.parent_target = this;
         scanner.commands.push_back(compiler->get_module_scan_command(ctx));
         scanner.inputs.push_back(src_abs.string());
@@ -1962,6 +1970,7 @@ void Target::generate_module_collator_task(BuildGraph& graph, const std::vector<
 
     BuildTask collator;
     collator.id = mapper_path;
+    collator.kind = ModuleCollatorTask{};
     collator.parent_target = this;
     collator.is_module_collator = true;
 

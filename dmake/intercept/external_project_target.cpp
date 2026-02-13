@@ -55,6 +55,7 @@ void ExternalProjectTarget::generate_tasks(
     // --- Orchestrator task ---
     BuildTask orchestrator;
     orchestrator.id = orchestrator_id;
+    orchestrator.kind = EPOrchestratorTask{name_};
     orchestrator.parent_target = this;
     orchestrator.always_run = true;  // Must check if EP needs rebuilding
     orchestrator.is_ep_orchestrator = true;
@@ -86,6 +87,7 @@ void ExternalProjectTarget::generate_tasks(
     // --- Sentinel task ---
     BuildTask sentinel;
     sentinel.id = sentinel_id;
+    sentinel.kind = EPSentinelTask{name_};
     sentinel.parent_target = this;
     sentinel.always_run = true;  // Sentinel must run every build to check if EP is dirty
     sentinel.is_ep_sentinel = true;

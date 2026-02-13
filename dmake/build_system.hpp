@@ -13,10 +13,34 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <variant>
 #include "utils.hpp"
 #include "language.hpp"
 
 namespace dmake {
+
+// Variant-based task kind system (Phase 1: coexists with booleans)
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+
+struct CompileTask        { std::string source_file; std::optional<Language> compile_language; };
+struct PCHTask            { std::string source_file; };
+struct LinkTask           {};
+struct CustomCommandTask  {};
+struct CustomTargetTask   {};
+struct PreBuildTask       {};
+struct PostBuildTask      {};
+struct ModuleScannerTask  { std::string source_file; };
+struct ModuleCollatorTask {};
+struct EPOrchestratorTask { std::string ep_name; };
+struct EPSentinelTask     { std::string ep_name; };
+struct EPInstallTask      { std::string ep_name; };
+
+using TaskKind = std::variant<
+    CompileTask, PCHTask, LinkTask,
+    CustomCommandTask, CustomTargetTask, PreBuildTask, PostBuildTask,
+    ModuleScannerTask, ModuleCollatorTask,
+    EPOrchestratorTask, EPSentinelTask, EPInstallTask
+>;
 
 // Forward declarations
 class ProgressBar;
@@ -34,6 +58,7 @@ struct GenexEvaluationContext;
 
 struct BuildTask {
     std::string id;              // Unique identifier (usually the primary output file)
+    TaskKind kind{LinkTask{}};   // Variant-based task type (default: LinkTask as placeholder)
     std::vector<std::vector<std::string>> commands;
     std::vector<std::string> inputs;
     std::vector<std::string> outputs;
