@@ -757,8 +757,6 @@ static void generate_custom_command_task(BuildGraph& graph, const CustomCommandR
     task.id = rule.outputs[0];
     task.kind = CustomCommandTask{};
     task.working_dir = rule.working_dir;
-    task.always_run = false;
-    task.is_shell_command = true;
 
     for (const auto& cmd : rule.commands) {
         task.commands.push_back(cmd);
@@ -1192,13 +1190,6 @@ void Target::generate_object_tasks(BuildGraph& graph, const Toolchain& toolchain
         task.inputs.push_back(src_abs_str);
         task.outputs.push_back(obj);
         task.outputs.push_back(obj + ".d");
-        task.is_compilation = true;
-        task.source_file = src_abs_str;
-        task.compile_language = lang_info.lang;
-
-        if (lang_info.is_module_interface) {
-            task.is_module_source = true;
-        }
 
         if (!pch_gch_path.empty()) {
             task.explicit_deps.push_back(pch_gch_path);
@@ -1342,8 +1333,6 @@ static std::pair<std::string, std::string> generate_pch_task(
 
     pch_task.commands.push_back(compiler->get_compile_command(ctx));
     pch_task.inputs.push_back(pch_wrapper);
-    pch_task.is_compilation = true;
-    pch_task.source_file = pch_wrapper;
 
     for (const auto& hdr : own_pchs) {
         auto hdr_abs = std::filesystem::path(hdr).is_absolute() ?
@@ -1750,7 +1739,6 @@ void Target::generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const
         post_build.kind = PostBuildTask{};
         post_build.parent_target = this;
         post_build.always_run = true;
-        post_build.is_shell_command = true;
         post_build.working_dir = binary_dir_;
 
         for (const auto& cmd : post_build_commands_) {
@@ -1775,7 +1763,6 @@ void CustomTarget::generate_tasks(BuildGraph& graph, const Toolchain&, const std
     task.id = name_;
     task.kind = CustomTargetTask{};
     task.parent_target = this;
-    task.is_shell_command = true;
     task.always_run = true;
     task.working_dir = binary_dir_;
 
@@ -1950,8 +1937,6 @@ bool Target::generate_module_scanner_tasks(BuildGraph& graph, const Toolchain& t
         scanner.commands.push_back(compiler->get_module_scan_command(ctx));
         scanner.inputs.push_back(src_abs.string());
         scanner.outputs.push_back(ddi_path);
-        scanner.is_module_scanner = true;
-        scanner.source_file = src_abs.string();
 
         graph.add_task(std::move(scanner));
         scanner_ids.push_back(ddi_path);
@@ -1972,7 +1957,6 @@ void Target::generate_module_collator_task(BuildGraph& graph, const std::vector<
     collator.id = mapper_path;
     collator.kind = ModuleCollatorTask{};
     collator.parent_target = this;
-    collator.is_module_collator = true;
 
     // Collator depends on all scanner tasks
     for (const auto& scanner_id : scanner_task_ids) {

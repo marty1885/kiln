@@ -118,13 +118,13 @@ std::expected<void, std::string> BuildGraph::generate_compile_commands(const std
     std::string current_dir = std::filesystem::current_path().string();
 
     auto commands = filter_map(tasks_,
-        [](const auto& ptr) { return ptr->is_compilation && !ptr->commands.empty(); },
+        [](const auto& ptr) { return ptr->is_compilation() && !ptr->commands.empty(); },
         [&](const auto& ptr) -> CompileCommand {
             const auto& task = *ptr;
             return {
                 .directory = current_dir,
                 .command = join_command(task.commands[0]),
-                .file = task.source_file,
+                .file = std::string(task.get_source_file()),
                 .output = task.outputs.empty() ? "" : task.outputs[0]
             };
         });
@@ -161,8 +161,9 @@ std::expected<void, std::string> BuildGraph::finalize(const GenexEvaluationConte
 
         // Create per-task context with compile_language if set
         GenexEvaluationContext task_ctx = ctx;
-        if (task.compile_language) {
-            task_ctx.compile_language = task.compile_language;
+        auto task_lang = task.get_compile_language();
+        if (task_lang) {
+            task_ctx.compile_language = task_lang;
         }
         GenexEvaluator evaluator(task_ctx);
 
@@ -324,8 +325,7 @@ BuildGraph::extract_dirty_tasks(const std::string& build_dir) {
     for (const auto& task_ptr : tasks_) {
         auto& task = *task_ptr;
         // Skip marker tasks
-        if (task.outputs.empty() && task.commands.empty() &&
-            !task.is_module_collator && !task.is_ep_orchestrator && !task.is_ep_sentinel) continue;
+        if (task.is_marker_task()) continue;
 
         // Check if outputs exist
         bool outputs_exist = true;
@@ -438,7 +438,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
 
         if (!all_custom_tasks.empty()) {
             for (auto& task_ptr : tasks_) {
-                if (!task_ptr->is_compilation || excluded_tasks.count(task_ptr.get())) continue;
+                if (!task_ptr->is_compilation() || excluded_tasks.count(task_ptr.get())) continue;
                 for (auto* ct : all_custom_tasks) {
                     if (std::find(task_ptr->dependencies.begin(), task_ptr->dependencies.end(), ct) == task_ptr->dependencies.end()) {
                         task_ptr->dependencies.push_back(ct);
@@ -491,8 +491,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     for (const auto& task_ptr : tasks_) {
         auto& task = *task_ptr;
         // Skip marker tasks (but NOT EP orchestrator/sentinel which run in-process)
-        if (task.outputs.empty() && task.commands.empty() &&
-            !task.is_module_collator && !task.is_ep_orchestrator && !task.is_ep_sentinel) continue;
+        if (task.is_marker_task()) continue;
 
         bool outputs_exist = !task.outputs.empty();
         if (outputs_exist) {
@@ -504,8 +503,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
         if (!outputs_exist || task.always_run) {
             // EP sentinels and orchestrators are "maybe" - we can't know if EP will inject tasks
             // Their dependents should be re-checked at runtime
-            bool is_ep_task = task.is_ep_sentinel || task.is_ep_orchestrator;
-            dirty_state[task_ptr.get()] = is_ep_task ? std::nullopt : std::optional<bool>(true);
+            dirty_state[task_ptr.get()] = task.is_ep_task() ? std::nullopt : std::optional<bool>(true);
             continue;
         }
 
@@ -703,12 +701,14 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                     if (profiling) {
                         profile_start = Profiler::instance().now_us();
                         std::string artifact = task.parent_target ? task.parent_target->get_name() : "";
-                        if (task.is_module_collator) profile_name = "collate " + artifact;
-                        else if (task.is_module_scanner) profile_name = "scan " + std::filesystem::path(task.source_file).filename().string();
-                        else if (task.is_compilation) profile_name = "compile " + std::filesystem::path(task.source_file).filename().string();
-                        else if (task.parent_target && id == task.parent_target->get_output_path())
-                            profile_name = "link " + artifact;
-                        else profile_name = "run " + std::filesystem::path(id).filename().string();
+                        profile_name = std::visit(overloaded{
+                            [&](const ModuleCollatorTask&) { return "collate " + artifact; },
+                            [&](const ModuleScannerTask& t) { return "scan " + std::filesystem::path(t.source_file).filename().string(); },
+                            [&](const CompileTask& t) { return "compile " + std::filesystem::path(t.source_file).filename().string(); },
+                            [&](const PCHTask& t) { return "compile " + std::filesystem::path(t.source_file).filename().string(); },
+                            [&](const LinkTask&) { return "link " + artifact; },
+                            [&](const auto&) { return "run " + std::filesystem::path(id).filename().string(); }
+                        }, task.kind);
                     }
 
                     std::string artifact_name = task.parent_target ? task.parent_target->get_name() : "unknown";
@@ -756,181 +756,176 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         progress.print_line(oss.str());
                     };
 
-                    // ExternalProject: handle orchestrator tasks specially (in-process execution)
-                    if (task.is_ep_orchestrator) {
-                        assert(std::holds_alternative<EPOrchestratorTask>(task.kind));
-                        print_status("Configuring", task.ep_name);
+                    // Dispatch based on task kind
+                    std::visit(overloaded{
+                        [&](const EPOrchestratorTask& ep) {
+                            print_status("Configuring", ep.ep_name);
 
-                        // Run the EP orchestrator outside the lock - it acquires loop_mutex when attaching the graph
-                        auto ep_result = run_ep_orchestrator(task, build_dir, completed, dirty_state, ready_set, progress, new_cache, stdout_is_tty, loop_mutex, cv);
-                        if (ep_result) {
-                            task_error = *ep_result;
-                            break;
-                        }
-                        // EP orchestrator completed successfully
-
-                    } else if (task.is_ep_install) {
-                        assert(std::holds_alternative<EPInstallTask>(task.kind));
-                        // EP install task - runs install rules after EP build tasks complete
-                        print_status("Installing", task.ep_name);
-                        auto* ep_target = dynamic_cast<ExternalProjectTarget*>(task.parent_target);
-                        if (ep_target) {
-                            // 1. Install pre-computed target artifacts (TARGETS rules)
-                            for (const auto& install : ep_target->get_pending_target_installs()) {
-                                std::filesystem::path dest_dir = std::filesystem::path(install.dest_path).parent_path();
-                                std::filesystem::create_directories(dest_dir);
-                                std::error_code ec;
-                                std::filesystem::copy_file(install.artifact_path, install.dest_path,
-                                                          std::filesystem::copy_options::overwrite_existing, ec);
-                                if (ec) {
-                                    task_error = "EP " + task.ep_name + " install failed: cannot copy " +
-                                                install.artifact_path + " to " + install.dest_path + ": " + ec.message();
-                                    break;
-                                }
-                                std::cout << "-- Installing: " << install.dest_path << std::endl;
+                            // Run the EP orchestrator outside the lock - it acquires loop_mutex when attaching the graph
+                            auto ep_result = run_ep_orchestrator(task, build_dir, completed, dirty_state, ready_set, progress, new_cache, stdout_is_tty, loop_mutex, cv);
+                            if (ep_result) {
+                                task_error = *ep_result;
                             }
-                            if (!task_error.empty()) break;
-
-                            // 2. Run other install rules (FILES, DIRECTORY, SCRIPT, CODE)
-                            // TARGETS rules are skipped since interp is null (we handled them above)
-                            const auto& install_rules = ep_target->get_pending_install_rules();
-                            if (!install_rules.empty()) {
-                                std::string install_prefix = ep_target->get_ep_install_dir();
-                                std::string config = ep_target->get_pending_install_config();
-                                auto install_result = execute_install_rules(nullptr, install_rules,
-                                                                            install_prefix, config);
-                                if (!install_result) {
-                                    task_error = "EP " + task.ep_name + " install failed: " + install_result.error();
-                                    break;
+                        },
+                        [&](const EPInstallTask& ep) {
+                            // EP install task - runs install rules after EP build tasks complete
+                            print_status("Installing", ep.ep_name);
+                            auto* ep_target = dynamic_cast<ExternalProjectTarget*>(task.parent_target);
+                            if (ep_target) {
+                                // 1. Install pre-computed target artifacts (TARGETS rules)
+                                for (const auto& install : ep_target->get_pending_target_installs()) {
+                                    std::filesystem::path dest_dir = std::filesystem::path(install.dest_path).parent_path();
+                                    std::filesystem::create_directories(dest_dir);
+                                    std::error_code ec;
+                                    std::filesystem::copy_file(install.artifact_path, install.dest_path,
+                                                              std::filesystem::copy_options::overwrite_existing, ec);
+                                    if (ec) {
+                                        task_error = "EP " + ep.ep_name + " install failed: cannot copy " +
+                                                    install.artifact_path + " to " + install.dest_path + ": " + ec.message();
+                                        return;
+                                    }
+                                    std::cout << "-- Installing: " << install.dest_path << std::endl;
                                 }
-                            }
-                            // Run extra install commands from INSTALL_COMMAND (skip "make install")
-                            const auto& install_cmd = ep_target->get_install_command();
-                            if (!install_cmd.is_empty && !install_cmd.commands.empty()) {
-                                std::string working_dir = ep_target->get_ep_binary_dir();
-                                for (const auto& cmd : install_cmd.commands) {
-                                    // Skip "make install" - we handle that with our install rules
-                                    if (is_make_install_command(cmd)) continue;
-                                    auto result = dmake::run_command(cmd, working_dir);
-                                    if (result.exit_code != 0) {
-                                        {
-                                            std::lock_guard<std::mutex> lock(output_mutex_);
-                                            if (!result.output.empty()) std::cerr << result.output << std::endl;
-                                        }
-                                        task_error = "EP " + task.ep_name + " install command failed";
-                                        break;
+                                if (!task_error.empty()) return;
+
+                                // 2. Run other install rules (FILES, DIRECTORY, SCRIPT, CODE)
+                                // TARGETS rules are skipped since interp is null (we handled them above)
+                                const auto& install_rules = ep_target->get_pending_install_rules();
+                                if (!install_rules.empty()) {
+                                    std::string install_prefix = ep_target->get_ep_install_dir();
+                                    std::string config = ep_target->get_pending_install_config();
+                                    auto install_result = execute_install_rules(nullptr, install_rules,
+                                                                                install_prefix, config);
+                                    if (!install_result) {
+                                        task_error = "EP " + ep.ep_name + " install failed: " + install_result.error();
+                                        return;
                                     }
                                 }
-                                if (!task_error.empty()) break;
-                            }
-                        }
-
-                    } else if (task.is_ep_sentinel) {
-                        assert(std::holds_alternative<EPSentinelTask>(task.kind));
-                        // Sentinel task - pure synchronization point, signals EP completion
-                        // Install is now handled by a separate install task that sentinel depends on
-                        print_status("Ready", task.ep_name);
-
-                    // C++20 modules: handle collator tasks specially (in-process execution)
-                    } else if (task.is_module_collator) {
-                        assert(std::holds_alternative<ModuleCollatorTask>(task.kind));
-                        print_status("Collating", "modules");
-
-                        std::map<std::string, std::string> module_to_task;
-                        std::map<std::string, std::vector<std::string>> task_requires;
-                        std::vector<ModuleMapEntry> mapper_entries;
-
-                        for (const auto& ddi_path : task.inputs) {
-                            auto ddi_result = parse_ddi_file(ddi_path);
-                            if (!ddi_result) { task_error = ddi_result.error(); break; }
-
-                            const auto& ddi = *ddi_result;
-                            std::string obj_path = get_obj_path(task.parent_target->get_binary_dir(), task.parent_target->get_name(), ddi.source);
-
-                            if (!ddi.provides.empty()) {
-                                module_to_task[ddi.provides] = obj_path;
-                                ModuleMapEntry entry;
-                                entry.module_name = ddi.provides;
-                                entry.bmi_path = get_bmi_path(task.parent_target->get_binary_dir(), ddi.provides);
-                                entry.source_path = ddi.source;
-                                entry.object_task_id = obj_path;
-                                mapper_entries.push_back(entry);
-                            }
-
-                            if (!ddi.imports.empty()) {
-                                task_requires[obj_path] = ddi.imports;
-                            }
-                        }
-                        if (!task_error.empty()) break;
-
-                        std::string mapper_content = generate_module_mapper_content(mapper_entries);
-                        std::ofstream mapper_file(task.outputs[0]);
-                        if (!mapper_file) { task_error = "Failed to write module mapper: " + task.outputs[0]; break; }
-                        mapper_file << mapper_content;
-                        mapper_file.close();
-
-                        inject_module_dependencies(module_to_task, task_requires);
-
-                    } else if (task.is_module_scanner) {
-                        assert(std::holds_alternative<ModuleScannerTask>(task.kind));
-                        std::string scan_display = std::filesystem::path(task.source_file).filename().string();
-                        print_status("Scanning", scan_display);
-
-                        auto result = run_command(task.commands[0], task.working_dir);
-                        ModuleDependencyInfo ddi = parse_module_scan_output(result.output, task.source_file);
-                        ddi.timestamp = std::filesystem::last_write_time(task.source_file);
-
-                        auto write_result = write_ddi_file(task.outputs[0], ddi);
-                        if (!write_result) { task_error = write_result.error(); break; }
-
-                    } else {
-                        // Regular task execution
-                        std::string verb = "Running";
-                        std::string target_display = task.source_file.empty() ?
-                            std::filesystem::path(id).filename().string() :
-                            std::filesystem::path(task.source_file).filename().string();
-
-                        if (task.is_compilation) {
-                             verb = "Compiling";
-                        } else if (task.parent_target && id == task.parent_target->get_output_path() && task.parent_target->get_type() != TargetType::CUSTOM) {
-                            verb = "  Linking";
-                        }
-
-                        if (task.parent_target && task.parent_target->get_type() == TargetType::CUSTOM) {
-                            std::string comment = task.parent_target->get_property("COMMENT");
-                            if (!comment.empty()) {
-                                target_display = comment;
-                            }
-                        }
-
-                        print_status(verb, target_display);
-
-                        for (auto cmd : task.commands) {
-                            // Strip shell-style quoting from COMMAND args.
-                            // CMake expects shell to strip quotes like -flag="value".
-                            // Since we use execvp (no shell), we strip them here.
-                            if (task.is_shell_command) {
-                                for (auto& arg : cmd) {
-                                    arg = strip_shell_quoting(arg);
+                                // Run extra install commands from INSTALL_COMMAND (skip "make install")
+                                const auto& install_cmd = ep_target->get_install_command();
+                                if (!install_cmd.is_empty && !install_cmd.commands.empty()) {
+                                    std::string working_dir = ep_target->get_ep_binary_dir();
+                                    for (const auto& cmd : install_cmd.commands) {
+                                        // Skip "make install" - we handle that with our install rules
+                                        if (is_make_install_command(cmd)) continue;
+                                        auto result = dmake::run_command(cmd, working_dir);
+                                        if (result.exit_code != 0) {
+                                            {
+                                                std::lock_guard<std::mutex> lock(output_mutex_);
+                                                if (!result.output.empty()) std::cerr << result.output << std::endl;
+                                            }
+                                            task_error = "EP " + ep.ep_name + " install command failed";
+                                            return;
+                                        }
+                                    }
                                 }
                             }
-                            auto result = dmake::run_command(cmd, task.working_dir);
-                            if (result.exit_code != 0) {
-                                {
+                        },
+                        [&](const EPSentinelTask& ep) {
+                            // Sentinel task - pure synchronization point, signals EP completion
+                            // Install is now handled by a separate install task that sentinel depends on
+                            print_status("Ready", ep.ep_name);
+                        },
+                        [&](const ModuleCollatorTask&) {
+                            // C++20 modules: handle collator tasks specially (in-process execution)
+                            print_status("Collating", "modules");
+
+                            std::map<std::string, std::string> module_to_task;
+                            std::map<std::string, std::vector<std::string>> task_requires;
+                            std::vector<ModuleMapEntry> mapper_entries;
+
+                            for (const auto& ddi_path : task.inputs) {
+                                auto ddi_result = parse_ddi_file(ddi_path);
+                                if (!ddi_result) { task_error = ddi_result.error(); return; }
+
+                                const auto& ddi = *ddi_result;
+                                std::string obj_path = get_obj_path(task.parent_target->get_binary_dir(), task.parent_target->get_name(), ddi.source);
+
+                                if (!ddi.provides.empty()) {
+                                    module_to_task[ddi.provides] = obj_path;
+                                    ModuleMapEntry entry;
+                                    entry.module_name = ddi.provides;
+                                    entry.bmi_path = get_bmi_path(task.parent_target->get_binary_dir(), ddi.provides);
+                                    entry.source_path = ddi.source;
+                                    entry.object_task_id = obj_path;
+                                    mapper_entries.push_back(entry);
+                                }
+
+                                if (!ddi.imports.empty()) {
+                                    task_requires[obj_path] = ddi.imports;
+                                }
+                            }
+                            if (!task_error.empty()) return;
+
+                            std::string mapper_content = generate_module_mapper_content(mapper_entries);
+                            std::ofstream mapper_file(task.outputs[0]);
+                            if (!mapper_file) { task_error = "Failed to write module mapper: " + task.outputs[0]; return; }
+                            mapper_file << mapper_content;
+                            mapper_file.close();
+
+                            inject_module_dependencies(module_to_task, task_requires);
+                        },
+                        [&](const ModuleScannerTask& scanner) {
+                            std::string scan_display = std::filesystem::path(scanner.source_file).filename().string();
+                            print_status("Scanning", scan_display);
+
+                            auto result = run_command(task.commands[0], task.working_dir);
+                            ModuleDependencyInfo ddi = parse_module_scan_output(result.output, scanner.source_file);
+                            ddi.timestamp = std::filesystem::last_write_time(scanner.source_file);
+
+                            auto write_result = write_ddi_file(task.outputs[0], ddi);
+                            if (!write_result) { task_error = write_result.error(); }
+                        },
+                        [&](const auto&) {
+                            // Regular task execution (compile, PCH, link, custom command/target, pre/post-build)
+                            std::string verb = "Running";
+                            auto src = task.get_source_file();
+                            std::string target_display = src.empty() ?
+                                std::filesystem::path(id).filename().string() :
+                                std::filesystem::path(src).filename().string();
+
+                            if (task.is_compilation()) {
+                                 verb = "Compiling";
+                            } else if (task.parent_target && id == task.parent_target->get_output_path() && task.parent_target->get_type() != TargetType::CUSTOM) {
+                                verb = "  Linking";
+                            }
+
+                            if (task.parent_target && task.parent_target->get_type() == TargetType::CUSTOM) {
+                                std::string comment = task.parent_target->get_property("COMMENT");
+                                if (!comment.empty()) {
+                                    target_display = comment;
+                                }
+                            }
+
+                            print_status(verb, target_display);
+
+                            for (auto cmd : task.commands) {
+                                // Strip shell-style quoting from COMMAND args.
+                                // CMake expects shell to strip quotes like -flag="value".
+                                // Since we use execvp (no shell), we strip them here.
+                                if (task.is_shell_command()) {
+                                    for (auto& arg : cmd) {
+                                        arg = strip_shell_quoting(arg);
+                                    }
+                                }
+                                auto result = dmake::run_command(cmd, task.working_dir);
+                                if (result.exit_code != 0) {
+                                    {
+                                        std::lock_guard<std::mutex> lock(output_mutex_);
+                                        progress.erase();
+                                        std::cout.flush();  // erase wrote to cout; flush before cerr
+                                        if (!result.output.empty()) std::cerr << result.output << std::endl;
+                                    }
+                                    task_error = "Command failed: " + join_command(cmd);
+                                    return;
+                                } else if (!result.output.empty()) {
                                     std::lock_guard<std::mutex> lock(output_mutex_);
-                                    progress.erase();
-                                    std::cout.flush();  // erase wrote to cout; flush before cerr
-                                    if (!result.output.empty()) std::cerr << result.output << std::endl;
+                                    progress.print_line(result.output);
                                 }
-                                task_error = "Command failed: " + join_command(cmd);
-                                break;
-                            } else if (!result.output.empty()) {
-                                std::lock_guard<std::mutex> lock(output_mutex_);
-                                progress.print_line(result.output);
                             }
                         }
-                        if (!task_error.empty()) break;
-                    }
+                    }, task.kind);
+                    if (!task_error.empty()) break;
 
                     // Emit profiling event with full command details
                     if (profiling) {
@@ -1235,8 +1230,7 @@ std::expected<std::string, std::string> BuildGraph::calculate_signature(const Bu
 
     // 3. If no .d file exists but it's a compile task, use g++ -H (slow but accurate path)
     // Skip for ASM tasks - g++ -H doesn't work reliably with raw .s files
-    auto is_compile_task = task.is_compilation;
-    if (!found_deps && is_compile_task && task.compile_language != std::optional{Language::ASM}) {
+    if (!found_deps && task.is_compilation() && task.get_compile_language() != std::optional{Language::ASM}) {
         auto headers_res = get_headers_via_h_flag(task.commands);
         if (!headers_res) return std::unexpected(headers_res.error());
         for (const auto& header : *headers_res) {
@@ -1519,8 +1513,7 @@ BuildGraph::attach_ep_graph(
         }
 
         // Skip marker tasks for dirty computation
-        bool is_marker = task.outputs.empty() && task.commands.empty() &&
-            !task.is_module_collator && !task.is_ep_orchestrator && !task.is_ep_sentinel;
+        bool is_marker = task.is_marker_task();
 
         bool is_dirty = false;
         if (!is_marker) {
@@ -1849,8 +1842,6 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
                 install_task.id = install_id;
                 install_task.kind = EPInstallTask{ep_name};
                 install_task.parent_target = ep_target;
-                install_task.is_ep_install = true;
-                install_task.ep_name = ep_name;
                 install_task.ep_binary_dir = binary_dir;
                 install_task.inputs = std::move(install_inputs);
 

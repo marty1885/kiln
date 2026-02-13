@@ -19,7 +19,6 @@
 
 namespace dmake {
 
-// Variant-based task kind system (Phase 1: coexists with booleans)
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 
 struct CompileTask        { std::string source_file; std::optional<Language> compile_language; };
@@ -58,35 +57,14 @@ struct GenexEvaluationContext;
 
 struct BuildTask {
     std::string id;              // Unique identifier (usually the primary output file)
-    TaskKind kind{LinkTask{}};   // Variant-based task type (default: LinkTask as placeholder)
+    TaskKind kind{LinkTask{}};   // Variant-based task type
     std::vector<std::vector<std::string>> commands;
     std::vector<std::string> inputs;
     std::vector<std::string> outputs;
     Target* parent_target = nullptr;
     bool always_run = false;
-    bool is_shell_command = false;  // Commands contain user shell syntax (custom commands) - don't escape
     std::string working_dir;
-
-    // For compile_commands.json
-    bool is_compilation = false;
-    std::string source_file;
-
-    // For C++20 modules support
-    bool is_module_scanner = false;    // True if this is a module scanning task
-    bool is_module_collator = false;   // True if this is the collator task that builds the module map
-    bool is_module_source = false;     // True if this source file uses modules (imports or exports)
-    std::string module_provides;       // Module name this source provides (if any)
-    std::vector<std::string> module_requires;  // Module names this source requires
-
-    // For ExternalProject support (build-time execution)
-    bool is_ep_orchestrator = false;   // True if this is an EP orchestrator task
-    bool is_ep_sentinel = false;       // True if this is an EP sentinel task
-    bool is_ep_install = false;        // True if this is an EP install task
-    std::string ep_name;               // EP name (for orchestrator/sentinel identification)
-    std::string ep_binary_dir;         // EP binary dir for cache routing (empty = use main cache)
-
-    // For COMPILE_LANGUAGE genex support
-    std::optional<Language> compile_language;  // Language being compiled (for $<COMPILE_LANGUAGE:...>)
+    std::string ep_binary_dir;   // EP binary dir for cache routing (empty = use main cache)
 
     // Dependency edges (resolved pointers, set by graph)
     std::vector<BuildTask*> dependencies;
@@ -98,6 +76,56 @@ struct BuildTask {
     // Filled during execution for critical path computation
     double execution_time_s = 0.0;    // wall time for this task
     double critical_path_s = 0.0;     // longest chain ending at this task
+
+    // --- Convenience query methods ---
+
+    bool is_compilation() const {
+        return std::holds_alternative<CompileTask>(kind) || std::holds_alternative<PCHTask>(kind);
+    }
+
+    bool is_shell_command() const {
+        return std::holds_alternative<CustomCommandTask>(kind)
+            || std::holds_alternative<CustomTargetTask>(kind)
+            || std::holds_alternative<PostBuildTask>(kind);
+    }
+
+    bool is_ep_task() const {
+        return std::holds_alternative<EPOrchestratorTask>(kind)
+            || std::holds_alternative<EPSentinelTask>(kind)
+            || std::holds_alternative<EPInstallTask>(kind);
+    }
+
+    bool is_marker_task() const {
+        if (outputs.empty() && commands.empty()
+            && !std::holds_alternative<ModuleCollatorTask>(kind)
+            && !std::holds_alternative<EPOrchestratorTask>(kind)
+            && !std::holds_alternative<EPSentinelTask>(kind))
+            return true;
+        return false;
+    }
+
+    std::string_view get_source_file() const {
+        return std::visit(overloaded{
+            [](const CompileTask& t) -> std::string_view { return t.source_file; },
+            [](const PCHTask& t) -> std::string_view { return t.source_file; },
+            [](const ModuleScannerTask& t) -> std::string_view { return t.source_file; },
+            [](const auto&) -> std::string_view { return {}; }
+        }, kind);
+    }
+
+    std::string_view get_ep_name() const {
+        return std::visit(overloaded{
+            [](const EPOrchestratorTask& t) -> std::string_view { return t.ep_name; },
+            [](const EPSentinelTask& t) -> std::string_view { return t.ep_name; },
+            [](const EPInstallTask& t) -> std::string_view { return t.ep_name; },
+            [](const auto&) -> std::string_view { return {}; }
+        }, kind);
+    }
+
+    std::optional<Language> get_compile_language() const {
+        if (auto* ct = std::get_if<CompileTask>(&kind)) return ct->compile_language;
+        return std::nullopt;
+    }
 };
 
 // Comparator for deterministic ordering of BuildTask pointers (by task ID)
