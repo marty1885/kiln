@@ -73,6 +73,7 @@ struct CustomCommand {
 };
 
 class BuildGraph;
+class GraphTransaction;
 class Toolchain;
 struct GenexEvaluationContext;
 
@@ -152,7 +153,7 @@ public:
     virtual std::string get_output_path() const;
 
     // The core task generation logic
-    virtual void generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const std::map<std::string, std::shared_ptr<Target>>& all_targets, const class Interpreter& interp, const std::vector<std::string>& exe_linker_flags = {}, const std::vector<std::string>& shared_linker_flags = {});
+    virtual void generate_tasks(GraphTransaction& txn, const Toolchain& toolchain, const std::map<std::string, std::shared_ptr<Target>>& all_targets, const class Interpreter& interp, const std::vector<std::string>& exe_linker_flags = {}, const std::vector<std::string>& shared_linker_flags = {});
 
     // Resolves transitive properties (includes, definitions, options, libraries).
     // Must be called before generating tasks. Safe to call multiple times (cached).
@@ -224,7 +225,7 @@ protected:
     std::vector<std::string> deferred_circular_deps_;
 
     // Helper methods for task generation
-    void generate_object_tasks(BuildGraph& graph, const Toolchain& toolchain, std::vector<std::string>& obj_files,
+    void generate_object_tasks(GraphTransaction& txn, const Toolchain& toolchain, std::vector<std::string>& obj_files,
                                const std::string& pch_gch_path, const std::string& pch_include_arg,
                                bool is_shared, bool is_pie, const std::map<std::string, std::shared_ptr<Target>>& all_targets,
                                class GenexEvaluator& evaluator, const class Interpreter& interp,
@@ -235,11 +236,11 @@ protected:
 
     // C++20 modules task generation
     // Returns true if any module sources were detected
-    bool generate_module_scanner_tasks(BuildGraph& graph, const Toolchain& toolchain, int cxx_default_std = 0);
+    bool generate_module_scanner_tasks(GraphTransaction& txn, const Toolchain& toolchain, int cxx_default_std = 0);
 
     // Generate the collator task that depends on all scanner tasks
     // The collator parses DDI files and injects module dependencies into compile tasks
-    void generate_module_collator_task(BuildGraph& graph, const std::vector<std::string>& scanner_task_ids);
+    void generate_module_collator_task(GraphTransaction& txn, const std::vector<std::string>& scanner_task_ids);
 
     // Check if target has any module sources
     bool has_module_sources() const;
@@ -311,7 +312,7 @@ public:
     void set_build_by_default(bool b) { build_by_default_ = b; }
     bool is_build_by_default() const { return build_by_default_; }
 
-    void generate_tasks(BuildGraph& graph, const Toolchain& toolchain, const std::map<std::string, std::shared_ptr<Target>>& all_targets, const class Interpreter& interp, const std::vector<std::string>& exe_linker_flags = {}, const std::vector<std::string>& shared_linker_flags = {}) override;
+    void generate_tasks(GraphTransaction& txn, const Toolchain& toolchain, const std::map<std::string, std::shared_ptr<Target>>& all_targets, const class Interpreter& interp, const std::vector<std::string>& exe_linker_flags = {}, const std::vector<std::string>& shared_linker_flags = {}) override;
 
 private:
     std::vector<CustomCommand> custom_commands_;

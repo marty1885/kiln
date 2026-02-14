@@ -28,7 +28,7 @@ std::vector<std::pair<std::string, std::string>> ExternalProjectTarget::get_toke
 }
 
 void ExternalProjectTarget::generate_tasks(
-    BuildGraph& graph,
+    GraphTransaction& txn,
     const Toolchain&,
     const std::map<std::string, std::shared_ptr<Target>>& all_targets,
     const Interpreter& interp,
@@ -80,7 +80,7 @@ void ExternalProjectTarget::generate_tasks(
         // File dependencies are not relevant for orchestrator (it doesn't use files directly)
     }
 
-    graph.add_task(std::move(orchestrator));
+    txn.add(std::move(orchestrator));
 
     // --- Sentinel task ---
     BuildTask sentinel;
@@ -93,7 +93,7 @@ void ExternalProjectTarget::generate_tasks(
     // Sentinel depends on orchestrator
     sentinel.explicit_deps.push_back(orchestrator_id);
 
-    graph.add_task(std::move(sentinel));
+    txn.add(std::move(sentinel));
 }
 
 } // namespace dmake

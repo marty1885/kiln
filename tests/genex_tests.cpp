@@ -637,33 +637,33 @@ TEST_CASE("GenexEvaluator - Pure genex whitespace splitting", "[genex][evaluator
 }
 
 // ============================================================================
-// BuildGraph::finalize() Tests
+// BuildGraph::evaluate_genex() Tests
 // ============================================================================
 
-TEST_CASE("BuildGraph::finalize evaluates genex in commands", "[genex][finalize]") {
+TEST_CASE("BuildGraph::evaluate_genex evaluates genex in commands", "[genex][evaluate_genex]") {
     BuildGraph graph;
 
     SECTION("CONFIG genex in command arguments") {
         BuildTask task;
         task.id = "test_task";
-        // $<CONFIG:Debug> returns "1" if config is Debug, "0" otherwise
-        // $<$<CONFIG:Debug>:DEBUG_MODE> returns "DEBUG_MODE" if Debug, empty otherwise
         task.commands = {{"echo", "Config: $<CONFIG:Debug>", "$<$<CONFIG:Debug>:DEBUG_MODE>"}};
 
-        graph.add_task(std::move(task));
+        auto txn = graph.begin();
+        txn.add(std::move(task));
+        txn.commit();
 
         GenexEvaluationContext ctx;
         ctx.build_type = "Debug";
         ctx.phase = GenexEvaluationContext::Phase::BUILD;
 
-        auto result = graph.finalize(ctx);
+        auto result = graph.evaluate_genex(ctx);
         REQUIRE(result.has_value());
 
         auto& finalized = graph.get_task("test_task");
         REQUIRE(finalized.commands.size() == 1);
         REQUIRE(finalized.commands[0].size() == 3);
         REQUIRE(finalized.commands[0][0] == "echo");
-        REQUIRE(finalized.commands[0][1] == "Config: 1");  // $<CONFIG:Debug> evaluates to "1"
+        REQUIRE(finalized.commands[0][1] == "Config: 1");
         REQUIRE(finalized.commands[0][2] == "DEBUG_MODE");
     }
 
@@ -672,18 +672,20 @@ TEST_CASE("BuildGraph::finalize evaluates genex in commands", "[genex][finalize]
         task.id = "test_task";
         task.commands = {{"echo", "$<$<CONFIG:Release>:RELEASE_MODE>", "always"}};
 
-        graph.add_task(std::move(task));
+        auto txn = graph.begin();
+        txn.add(std::move(task));
+        txn.commit();
 
         GenexEvaluationContext ctx;
-        ctx.build_type = "Debug";  // Not Release, so genex evaluates to empty
+        ctx.build_type = "Debug";
         ctx.phase = GenexEvaluationContext::Phase::BUILD;
 
-        auto result = graph.finalize(ctx);
+        auto result = graph.evaluate_genex(ctx);
         REQUIRE(result.has_value());
 
         auto& finalized = graph.get_task("test_task");
         REQUIRE(finalized.commands.size() == 1);
-        REQUIRE(finalized.commands[0].size() == 2);  // Empty argument omitted
+        REQUIRE(finalized.commands[0].size() == 2);
         REQUIRE(finalized.commands[0][0] == "echo");
         REQUIRE(finalized.commands[0][1] == "always");
     }
@@ -692,16 +694,17 @@ TEST_CASE("BuildGraph::finalize evaluates genex in commands", "[genex][finalize]
         BuildTask task;
         task.id = "test_task";
         task.commands = {{"ls"}};
-        // Use $<$<CONFIG:Debug>:debug> to produce "debug" if Debug config, empty otherwise
         task.working_dir = "/build/$<$<CONFIG:Debug>:debug>";
 
-        graph.add_task(std::move(task));
+        auto txn = graph.begin();
+        txn.add(std::move(task));
+        txn.commit();
 
         GenexEvaluationContext ctx;
         ctx.build_type = "Debug";
         ctx.phase = GenexEvaluationContext::Phase::BUILD;
 
-        auto result = graph.finalize(ctx);
+        auto result = graph.evaluate_genex(ctx);
         REQUIRE(result.has_value());
 
         auto& finalized = graph.get_task("test_task");
@@ -714,12 +717,14 @@ TEST_CASE("BuildGraph::finalize evaluates genex in commands", "[genex][finalize]
         task.kind = CompileTask{"file.cpp", Language::CXX};
         task.commands = {{"g++", "$<$<COMPILE_LANGUAGE:CXX>:-std=c++17>", "file.cpp"}};
 
-        graph.add_task(std::move(task));
+        auto txn = graph.begin();
+        txn.add(std::move(task));
+        txn.commit();
 
         GenexEvaluationContext ctx;
         ctx.phase = GenexEvaluationContext::Phase::BUILD;
 
-        auto result = graph.finalize(ctx);
+        auto result = graph.evaluate_genex(ctx);
         REQUIRE(result.has_value());
 
         auto& finalized = graph.get_task("test_task");
@@ -733,12 +738,14 @@ TEST_CASE("BuildGraph::finalize evaluates genex in commands", "[genex][finalize]
         task.id = "test_task";
         task.commands = {{"g++", "-O2", "-Wall", "file.cpp"}};
 
-        graph.add_task(std::move(task));
+        auto txn = graph.begin();
+        txn.add(std::move(task));
+        txn.commit();
 
         GenexEvaluationContext ctx;
         ctx.phase = GenexEvaluationContext::Phase::BUILD;
 
-        auto result = graph.finalize(ctx);
+        auto result = graph.evaluate_genex(ctx);
         REQUIRE(result.has_value());
 
         auto& finalized = graph.get_task("test_task");
@@ -753,13 +760,15 @@ TEST_CASE("BuildGraph::finalize evaluates genex in commands", "[genex][finalize]
             {"echo", "$<$<CONFIG:Debug>:cmd2>"}
         };
 
-        graph.add_task(std::move(task));
+        auto txn = graph.begin();
+        txn.add(std::move(task));
+        txn.commit();
 
         GenexEvaluationContext ctx;
         ctx.build_type = "Debug";
         ctx.phase = GenexEvaluationContext::Phase::BUILD;
 
-        auto result = graph.finalize(ctx);
+        auto result = graph.evaluate_genex(ctx);
         REQUIRE(result.has_value());
 
         auto& finalized = graph.get_task("test_task");

@@ -43,7 +43,7 @@ public:
         : CustomTarget(std::move(name), std::move(source_dir), std::move(binary_dir)) {}
 
     // Generate tasks creates TWO tasks: orchestrator and sentinel
-    void generate_tasks(BuildGraph& graph, const Toolchain& toolchain,
+    void generate_tasks(GraphTransaction& txn, const Toolchain& toolchain,
                         const std::map<std::string, std::shared_ptr<Target>>& all_targets,
                         const Interpreter& interp,
                         const std::vector<std::string>& exe_linker_flags = {},
