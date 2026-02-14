@@ -114,6 +114,37 @@ static bool is_make_install_command(const std::vector<std::string>& cmd) {
     return false;
 }
 
+struct ExecutionState {
+    // Configuration (set once, read-only during execution)
+    std::string build_dir;
+    bool stdout_is_tty;
+
+    // Synchronization (protects all mutable fields below)
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::string fatal_error;
+
+    // Task tracking (protected by mutex)
+    std::unordered_set<BuildTask*> completed;
+    std::unordered_set<BuildTask*> running;
+    std::set<BuildTask*, TaskPtrIdCmp> ready_set;
+    std::unordered_map<BuildTask*, std::optional<bool>> dirty_state;
+
+    // Progress (ProgressBar is internally thread-safe)
+    ProgressBar progress;
+
+    // Caching (cache is read-only; new_cache/ep_caches protected by mutex)
+    std::map<std::string, std::string> cache;
+    std::map<std::string, std::string> new_cache;
+    std::map<std::string, std::map<std::string, std::string>> ep_caches;
+
+    ExecutionState(std::string build_dir_, bool is_tty, int task_count,
+                   std::map<std::string, std::string> loaded_cache)
+        : build_dir(std::move(build_dir_)), stdout_is_tty(is_tty)
+        , progress(task_count, is_tty)
+        , cache(std::move(loaded_cache)), new_cache(cache) {}
+};
+
 std::expected<void, std::string> BuildGraph::generate_compile_commands(const std::string& build_dir) {
     std::string current_dir = std::filesystem::current_path().string();
 
@@ -480,11 +511,6 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
 
     // Incremental check
     auto cache = load_cache(build_dir);
-    std::map<std::string, std::string> new_cache = cache; // Preserve entries for targets not built this time
-
-    // EP-specific caches: ep_binary_dir -> task_id -> signature
-    // Populated when EP tasks complete, saved separately at the end
-    std::map<std::string, std::map<std::string, std::string>> ep_caches;
 
     // 2b. Pre-scan: determine which tasks need to execute.
     // Dirtiness is tracked as optional<bool>:
@@ -555,33 +581,31 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     // Count definitely dirty tasks for progress bar
     int dirty_task_count = 0;
     int maybe_dirty_count = 0;
-    for (const auto& [ptr, state] : dirty_state) {
-        if (state == true) dirty_task_count++;
+    for (const auto& [ptr, ds] : dirty_state) {
+        if (ds == true) dirty_task_count++;
         else maybe_dirty_count++;
     }
     pre_scan_profile.stop();
 
     bool stdout_is_tty = isatty(STDOUT_FILENO);
-    // Include maybe-dirty tasks in progress total (they'll be skipped if clean at runtime)
-    ProgressBar progress(dirty_task_count + maybe_dirty_count, stdout_is_tty);
 
     // 3. Parallel execution with fixed worker threads
+    // Bundle all execution-phase state into a single struct.
+    ExecutionState state(build_dir, stdout_is_tty,
+                         dirty_task_count + maybe_dirty_count, std::move(cache));
+    state.dirty_state = std::move(dirty_state);
+
     // Pre-populate completed with clean tasks (not in dirty_state).
-    std::unordered_set<BuildTask*> completed;
     for (const auto& task_ptr : tasks_) {
-        if (dirty_state.count(task_ptr.get())) continue;
+        if (state.dirty_state.count(task_ptr.get())) continue;
         bool has_dirty_dep = false;
         for (auto* dep : task_ptr->dependencies) {
-            if (dirty_state.count(dep)) { has_dirty_dep = true; break; }
+            if (state.dirty_state.count(dep)) { has_dirty_dep = true; break; }
         }
         if (!has_dirty_dep) {
-            completed.insert(task_ptr.get());
+            state.completed.insert(task_ptr.get());
         }
     }
-    std::unordered_set<BuildTask*> running;
-    std::string fatal_error;
-    std::mutex loop_mutex;
-    std::condition_variable cv;
 
     if (jobs <= 0) {
         jobs = std::thread::hardware_concurrency();
@@ -591,17 +615,15 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     // Check if all dependencies of a task are complete
     auto is_ready = [&](BuildTask* t) {
         for (auto* dep : t->dependencies) {
-            if (!completed.count(dep)) return false;
+            if (!state.completed.count(dep)) return false;
         }
         return true;
     };
 
     // Initialize ready_set with dirty/maybe tasks whose deps are all complete.
-    // Using std::set with TaskPtrIdCmp for deterministic ordering (alphabetical by task ID).
-    std::set<BuildTask*, TaskPtrIdCmp> ready_set;
-    for (const auto& [ptr, state] : dirty_state) {
+    for (const auto& [ptr, ds] : state.dirty_state) {
         if (is_ready(ptr)) {
-            ready_set.insert(ptr);
+            state.ready_set.insert(ptr);
         }
     }
 
@@ -611,7 +633,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     workers.reserve(jobs);
 
     for (int w = 0; w < jobs; w++) {
-        workers.emplace_back([this, &build_dir, &cache, &new_cache, &ep_caches, &completed, &running, &fatal_error, &loop_mutex, &cv, &progress, stdout_is_tty, &dirty_state, &ready_set]() {
+        workers.emplace_back([this, &state]() {
             bool profiling = g_profiling_enabled.load(std::memory_order_relaxed);
 
             while (true) {
@@ -619,51 +641,51 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
 
                 // Grab the next ready task from ready_set
                 {
-                    std::unique_lock<std::mutex> lock(loop_mutex);
-                    cv.wait(lock, [&] {
-                        if (!fatal_error.empty()) return true;
-                        if (completed.size() + running.size() >= tasks_.size()) return true;
-                        if (!ready_set.empty()) return true;
-                        if (running.empty()) return true; // stall: nothing ready and nothing in flight
+                    std::unique_lock<std::mutex> lock(state.mutex);
+                    state.cv.wait(lock, [&] {
+                        if (!state.fatal_error.empty()) return true;
+                        if (state.completed.size() + state.running.size() >= tasks_.size()) return true;
+                        if (!state.ready_set.empty()) return true;
+                        if (state.running.empty()) return true; // stall: nothing ready and nothing in flight
                         return g_interrupted.load(std::memory_order_relaxed);
                     });
 
-                    if (!fatal_error.empty()) {
+                    if (!state.fatal_error.empty()) {
                         return;
                     }
                     // Check termination: all tasks are either completed or not in dirty_state
-                    if (ready_set.empty() && running.empty()) {
+                    if (state.ready_set.empty() && state.running.empty()) {
                         // Check if we're truly done
                         bool all_done = true;
-                        for (const auto& [ptr, state] : dirty_state) {
-                            if (!completed.count(ptr)) { all_done = false; break; }
+                        for (const auto& [ptr, ds] : state.dirty_state) {
+                            if (!state.completed.count(ptr)) { all_done = false; break; }
                         }
                         if (all_done) return;
                     }
                     if (g_interrupted.load(std::memory_order_relaxed)) {
-                        if (fatal_error.empty()) fatal_error = "Interrupted";
-                        cv.notify_all();
+                        if (state.fatal_error.empty()) state.fatal_error = "Interrupted";
+                        state.cv.notify_all();
                         return;
                     }
 
-                    if (!ready_set.empty()) {
-                        auto it = ready_set.begin();
+                    if (!state.ready_set.empty()) {
+                        auto it = state.ready_set.begin();
                         current = *it;
-                        ready_set.erase(it);
-                        running.insert(current);
-                    } else if (running.empty()) {
+                        state.ready_set.erase(it);
+                        state.running.insert(current);
+                    } else if (state.running.empty()) {
                         // Stall detection
                         std::ostringstream oss;
                         oss << "Internal error: Build graph stalled. Unresolved dependencies for tasks:";
-                        for (const auto& [ptr, state] : dirty_state) {
-                            if (completed.count(ptr)) continue;
+                        for (const auto& [ptr, ds] : state.dirty_state) {
+                            if (state.completed.count(ptr)) continue;
                             oss << "\n  - " << ptr->id << " depends on: ";
                             for (auto* dep : ptr->dependencies) {
-                                if (!completed.count(dep)) oss << dep->id << " ";
+                                if (!state.completed.count(dep)) oss << dep->id << " ";
                             }
                         }
-                        fatal_error = oss.str();
-                        cv.notify_all();
+                        state.fatal_error = oss.str();
+                        state.cv.notify_all();
                         return;
                     } else {
                         // Spurious wakeup or other condition - wait again
@@ -682,8 +704,8 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                 do { // do-while(false) for break-on-error
                     // Check for "maybe" dirty tasks: if state is nullopt (not true),
                     // re-check signature at runtime. If clean, skip execution.
-                    auto state_it = dirty_state.find(current);
-                    if (state_it != dirty_state.end() && !state_it->second.has_value()) {
+                    auto dirty_it = state.dirty_state.find(current);
+                    if (dirty_it != state.dirty_state.end() && !dirty_it->second.has_value()) {
                         // "Maybe" dirty - re-check signature now that deps are complete
                         bool outputs_exist = !task.outputs.empty();
                         if (outputs_exist) {
@@ -693,9 +715,9 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         }
                         if (outputs_exist && !task.always_run) {
                             auto sig_res = calculate_signature(task);
-                            if (sig_res && cache.count(id) && cache[id] == *sig_res) {
+                            if (sig_res && state.cache.count(id) && state.cache[id] == *sig_res) {
                                 // Actually clean - skip execution, adjust progress total
-                                progress.bump_total(-1);
+                                state.progress.bump_total(-1);
                                 sig = *sig_res;
                                 break;  // Skip to completion handling
                             }
@@ -736,21 +758,21 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                     // Uses print_line() to atomically erase bar + print + redraw
                     // in a single write, preventing flicker.
                     auto print_status = [&](std::string_view verb, std::string_view target_display) {
-                        int done = progress.mark_completed();
+                        int done = state.progress.mark_completed();
                         active_display_name = std::string(target_display);
-                        progress.task_started(active_display_name);
+                        state.progress.task_started(active_display_name);
 
                         auto color = [&](std::string_view code) -> std::string_view {
-                            return stdout_is_tty ? code : std::string_view{};
+                            return state.stdout_is_tty ? code : std::string_view{};
                         };
 
                         std::ostringstream oss;
-                        if (stdout_is_tty) {
+                        if (state.stdout_is_tty) {
                             oss << color(dmake::colors::BOLD_GREEN) << std::setw(12) << verb
                                 << color(dmake::colors::RESET) << " ["
                                 << artifact_name << "] " << target_display;
                         } else {
-                            int tot = progress.total();
+                            int tot = state.progress.total();
                             int width = static_cast<int>(std::to_string(tot).size());
                             oss << "   [" << std::setw(width) << done << "/" << tot << "] "
                                 << color(dmake::colors::BOLD_GREEN) << verb
@@ -759,7 +781,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         }
 
                         std::lock_guard<std::mutex> lock(output_mutex_);
-                        progress.print_line(oss.str());
+                        state.progress.print_line(oss.str());
                     };
 
                     // Dispatch based on task kind
@@ -767,8 +789,8 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         [&](const EPOrchestratorTask& ep) {
                             print_status("Configuring", ep.ep_name);
 
-                            // Run the EP orchestrator outside the lock - it acquires loop_mutex when attaching the graph
-                            auto ep_result = run_ep_orchestrator(task, build_dir, completed, dirty_state, ready_set, progress, new_cache, stdout_is_tty, loop_mutex, cv);
+                            // Run the EP orchestrator outside the lock - it acquires state.mutex when attaching the graph
+                            auto ep_result = run_ep_orchestrator(task, state);
                             if (ep_result) {
                                 task_error = *ep_result;
                             }
@@ -918,7 +940,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                                 if (result.exit_code != 0) {
                                     {
                                         std::lock_guard<std::mutex> lock(output_mutex_);
-                                        progress.erase();
+                                        state.progress.erase();
                                         std::cout.flush();  // erase wrote to cout; flush before cerr
                                         if (!result.output.empty()) std::cerr << result.output << std::endl;
                                     }
@@ -926,7 +948,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                                     return;
                                 } else if (!result.output.empty()) {
                                     std::lock_guard<std::mutex> lock(output_mutex_);
-                                    progress.print_line(result.output);
+                                    state.progress.print_line(result.output);
                                 }
                             }
                         }
@@ -967,48 +989,48 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
 
                 // Remove from active task list if we added it
                 if (!active_display_name.empty()) {
-                    progress.task_finished(active_display_name);
+                    state.progress.task_finished(active_display_name);
                 }
 
                 // Mark task complete (or failed)
                 {
-                    std::lock_guard<std::mutex> lock(loop_mutex);
+                    std::lock_guard<std::mutex> lock(state.mutex);
 
                     // Record execution time for critical path computation
                     auto task_end = std::chrono::steady_clock::now();
                     task.execution_time_s = std::chrono::duration<double>(task_end - task_start).count();
 
                     if (!task_error.empty()) {
-                        fatal_error = task_error;
+                        state.fatal_error = task_error;
                     } else {
                         // Route cache entry to appropriate cache file
                         if (!task.ep_binary_dir.empty()) {
                             // EP task: save to EP-specific cache
-                            ep_caches[task.ep_binary_dir][id] = sig;
+                            state.ep_caches[task.ep_binary_dir][id] = sig;
                         } else {
                             // Main project task
-                            new_cache[id] = sig;
+                            state.new_cache[id] = sig;
                         }
                     }
-                    completed.insert(current);
-                    running.erase(current);
+                    state.completed.insert(current);
+                    state.running.erase(current);
 
                     // Check if any dirty/maybe dependents are now ready
                     for (auto* dep_task : get_dependents(current)) {
-                        if (!dirty_state.count(dep_task)) continue;  // clean task, skip
-                        if (completed.count(dep_task)) continue;   // already done
-                        if (running.count(dep_task)) continue;     // already running
-                        if (ready_set.count(dep_task)) continue;   // already in ready set
+                        if (!state.dirty_state.count(dep_task)) continue;  // clean task, skip
+                        if (state.completed.count(dep_task)) continue;   // already done
+                        if (state.running.count(dep_task)) continue;     // already running
+                        if (state.ready_set.count(dep_task)) continue;   // already in ready set
 
                         // Check if all its dependencies are complete
                         bool ready = true;
                         for (auto* d : dep_task->dependencies) {
-                            if (!completed.count(d)) { ready = false; break; }
+                            if (!state.completed.count(d)) { ready = false; break; }
                         }
-                        if (ready) ready_set.insert(dep_task);
+                        if (ready) state.ready_set.insert(dep_task);
                     }
 
-                    cv.notify_all();
+                    state.cv.notify_all();
                 }
             }
         });
@@ -1020,10 +1042,10 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
 
     // Always save cache — even on failure, successful tasks should be cached
     // so we don't redo them on the next build.
-    save_cache(build_dir, new_cache);
+    save_cache(state.build_dir, state.new_cache);
 
     // Save EP-specific caches to their respective build directories
-    for (const auto& [ep_dir, ep_cache_entries] : ep_caches) {
+    for (const auto& [ep_dir, ep_cache_entries] : state.ep_caches) {
         // Load existing EP cache and merge with new entries
         auto ep_cache = load_cache(ep_dir);
         for (const auto& [task_id, sig] : ep_cache_entries) {
@@ -1032,10 +1054,10 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
         save_cache(ep_dir, ep_cache);
     }
 
-    progress.finish();
+    state.progress.finish();
 
-    if (!fatal_error.empty()) {
-        return std::unexpected(fatal_error);
+    if (!state.fatal_error.empty()) {
+        return std::unexpected(state.fatal_error);
     }
 
     auto end_time = std::chrono::steady_clock::now();
@@ -1385,17 +1407,10 @@ void BuildGraph::inject_module_dependencies(
 
 std::expected<int, std::string>
 BuildGraph::attach_ep_graph(
-    BuildGraph&& ep_graph,
-    const std::string& ep_binary_dir,
-    std::unordered_set<BuildTask*>& completed,
-    std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state,
-    std::set<BuildTask*, TaskPtrIdCmp>& ready_set,
-    ProgressBar& progress,
-    std::mutex& loop_mutex,
-    std::condition_variable& cv) {
+    BuildGraph&& ep_graph, const std::string& ep_binary_dir, ExecutionState& state) {
 
-    // Lock loop_mutex for thread safety - same lock used by execute() worker threads
-    std::lock_guard<std::mutex> lock(loop_mutex);
+    // Lock state.mutex for thread safety - same lock used by execute() worker threads
+    std::lock_guard<std::mutex> lock(state.mutex);
 
     // 1. Load EP's cache for dirty computation
     auto ep_cache = load_cache(ep_binary_dir);
@@ -1458,10 +1473,10 @@ BuildGraph::attach_ep_graph(
     for (const auto& info : dirty_info) {
         if (!info.is_marker) {
             if (info.is_dirty) {
-                dirty_state[info.raw] = true;
+                state.dirty_state[info.raw] = true;
                 dirty_count++;
             } else {
-                completed.insert(info.raw);
+                state.completed.insert(info.raw);
             }
         }
     }
@@ -1469,26 +1484,26 @@ BuildGraph::attach_ep_graph(
     // 5. Check if any existing tasks gained new unsatisfied deps from cross-graph resolution
     //    (drain_pending_deps may have wired main→EP deps via pending_file_deps_)
     for (auto& task_ptr : tasks_) {
-        if (!ready_set.count(task_ptr.get())) continue;
+        if (!state.ready_set.count(task_ptr.get())) continue;
         for (auto* dep : task_ptr->dependencies) {
-            if (!completed.count(dep)) {
-                ready_set.erase(task_ptr.get());
+            if (!state.completed.count(dep)) {
+                state.ready_set.erase(task_ptr.get());
                 break;
             }
         }
     }
 
-    // 5. Propagate dirtiness through dependencies
+    // 6. Propagate dirtiness through dependencies
     if (dirty_count > 0) {
         bool changed;
         do {
             changed = false;
             for (auto& task_ptr : tasks_) {
-                if (dirty_state.count(task_ptr.get())) continue;
+                if (state.dirty_state.count(task_ptr.get())) continue;
                 for (auto* dep : task_ptr->dependencies) {
-                    auto dit = dirty_state.find(dep);
-                    if (dit != dirty_state.end() && dit->second == true) {
-                        dirty_state[task_ptr.get()] = true;
+                    auto dit = state.dirty_state.find(dep);
+                    if (dit != state.dirty_state.end() && dit->second == true) {
+                        state.dirty_state[task_ptr.get()] = true;
                         dirty_count++;
                         changed = true;
                         break;
@@ -1498,43 +1513,34 @@ BuildGraph::attach_ep_graph(
         } while (changed);
     }
 
-    // 6. Update progress and add ready dirty tasks to ready_set
-    progress.bump_total(dirty_count);
+    // 7. Update progress and add ready dirty tasks to ready_set
+    state.progress.bump_total(dirty_count);
 
-    for (const auto& [ptr, state] : dirty_state) {
-        if (!state.has_value() || !*state) continue;  // Only check definitely-dirty
-        if (completed.count(ptr)) continue;
-        if (ready_set.count(ptr)) continue;
+    for (const auto& [ptr, ds] : state.dirty_state) {
+        if (!ds.has_value() || !*ds) continue;  // Only check definitely-dirty
+        if (state.completed.count(ptr)) continue;
+        if (state.ready_set.count(ptr)) continue;
 
         bool all_deps_done = true;
         for (auto* dep : ptr->dependencies) {
-            if (!completed.count(dep)) {
+            if (!state.completed.count(dep)) {
                 all_deps_done = false;
                 break;
             }
         }
         if (all_deps_done) {
-            ready_set.insert(ptr);
+            state.ready_set.insert(ptr);
         }
     }
 
     // Notify waiting threads that new tasks are available
-    cv.notify_all();
+    state.cv.notify_all();
 
     return dirty_count;
 }
 
 std::optional<std::string> BuildGraph::run_ep_orchestrator(
-    BuildTask& task,
-    const std::string& build_dir,
-    std::unordered_set<BuildTask*>& completed,
-    std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state,
-    std::set<BuildTask*, TaskPtrIdCmp>& ready_set,
-    ProgressBar& progress,
-    std::map<std::string, std::string>& new_cache,
-    bool stdout_is_tty,
-    std::mutex& loop_mutex,
-    std::condition_variable& cv) {
+    BuildTask& task, ExecutionState& state) {
 
     // Get the ExternalProjectTarget from the task
     auto* ep_target = dynamic_cast<ExternalProjectTarget*>(task.parent_target);
@@ -1548,12 +1554,12 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
     // Helper to print output lines with EP name prefix (for child interpreter output)
     auto print_prefixed_output = [&](const std::string& output) {
         if (output.empty()) return;
-        std::string prefix = std::string(c(stdout_is_tty, colors::DIM)) + std::string(c(stdout_is_tty, colors::WHITE)) + "[" + ep_name + "] " + std::string(c(stdout_is_tty, colors::RESET));
+        std::string prefix = std::string(c(state.stdout_is_tty, colors::DIM)) + std::string(c(state.stdout_is_tty, colors::WHITE)) + "[" + ep_name + "] " + std::string(c(state.stdout_is_tty, colors::RESET));
         std::istringstream iss(output);
         std::string line;
         std::lock_guard<std::mutex> lock(output_mutex_);
         while (std::getline(iss, line)) {
-            progress.print_line(prefix + line);
+            state.progress.print_line(prefix + line);
         }
     };
 
@@ -1571,7 +1577,7 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
         auto ep_interp = std::make_unique<Interpreter>(source_dir, &ep_output, &ep_output, binary_dir);
 
         // Force colors in child interpreter if parent stdout is a TTY
-        if (stdout_is_tty) {
+        if (state.stdout_is_tty) {
             ep_interp->set_force_colors(true);
         }
 
@@ -1667,9 +1673,7 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
 
         // Attach full EP graph to main graph
         // This handles dirty detection and proper dependency wiring
-        auto attach_result = attach_ep_graph(std::move(*graph_result), binary_dir,
-                                             completed, dirty_state, ready_set, progress,
-                                             loop_mutex, cv);
+        auto attach_result = attach_ep_graph(std::move(*graph_result), binary_dir, state);
         if (!attach_result) {
             return "EP " + ep_name + ": " + attach_result.error();
         }
@@ -1734,7 +1738,7 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
 
                 // Inject install task and wire sentinel to depend on it
                 {
-                    auto txn = begin_locked(loop_mutex);
+                    auto txn = begin_locked(state.mutex);
                     auto install_result = txn.add(std::move(install_task));
                     if (!install_result) return install_result.error();
                     auto* install_raw = *install_result;
@@ -1745,11 +1749,11 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
                     if (!cr) return cr.error();
 
                     // Mark install task as dirty
-                    dirty_state[install_raw] = true;
-                    progress.bump_total(1);
+                    state.dirty_state[install_raw] = true;
+                    state.progress.bump_total(1);
 
                     // Remove sentinel from ready set (has unsatisfied dependency now)
-                    ready_set.erase(sentinel);
+                    state.ready_set.erase(sentinel);
                 }
             }
             // Extra install commands will be run by install task (it has access to ep_target)

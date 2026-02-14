@@ -46,6 +46,7 @@ using TaskKind = std::variant<
 class ProgressBar;
 class GraphTransaction;
 class LockedGraphTransaction;
+struct ExecutionState;
 
 // Set by signal handlers to request graceful shutdown.
 // The build loop checks this and stops dispatching new tasks,
@@ -209,16 +210,7 @@ public:
     // Called by execute() when an EP orchestrator task becomes ready.
     // Returns error message on failure, nullopt on success.
     std::optional<std::string> run_ep_orchestrator(
-        BuildTask& task,
-        const std::string& build_dir,
-        std::unordered_set<BuildTask*>& completed,
-        std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state,
-        std::set<BuildTask*, TaskPtrIdCmp>& ready_set,
-        ProgressBar& progress,
-        std::map<std::string, std::string>& new_cache,
-        bool stdout_is_tty,
-        std::mutex& loop_mutex,
-        std::condition_variable& cv);
+        BuildTask& task, ExecutionState& state);
 
     // Atomically attach entire EP graph to main graph.
     // Unlike inject_tasks(), this attaches ALL tasks (not just dirty ones).
@@ -227,14 +219,7 @@ public:
     // IMPORTANT: Caller must NOT hold loop_mutex; this function acquires it.
     std::expected<int, std::string>
     attach_ep_graph(
-        BuildGraph&& ep_graph,
-        const std::string& ep_binary_dir,
-        std::unordered_set<BuildTask*>& completed,
-        std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state,
-        std::set<BuildTask*, TaskPtrIdCmp>& ready_set,
-        ProgressBar& progress,
-        std::mutex& loop_mutex,
-        std::condition_variable& cv);
+        BuildGraph&& ep_graph, const std::string& ep_binary_dir, ExecutionState& state);
 
     // Access to tasks (needed by EP orchestrator for isolated interpreter)
     const std::vector<std::unique_ptr<BuildTask>>& get_tasks() const { return tasks_; }
