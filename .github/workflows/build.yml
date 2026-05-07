@@ -63,3 +63,6 @@ jobs:
       - name: Test
         working-directory: build
         run: ctest --output-on-failure
+
+      - name: Integration tests
+        run: tests/integration/run_tests.sh build/kiln

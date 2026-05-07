@@ -102,6 +102,8 @@ void register_target_builtins(Interpreter& interp) {
                 interp.get_variable("CMAKE_" + lang_prefix + "_COMPILER"));
             target->capture_compiler_var("CMAKE_" + lang_prefix + "_COMPILER_TARGET",
                 interp.get_variable("CMAKE_" + lang_prefix + "_COMPILER_TARGET"));
+            target->capture_compiler_var("CMAKE_" + lang_prefix + "_COMPILER_ID",
+                interp.get_variable("CMAKE_" + lang_prefix + "_COMPILER_ID"));
         };
 
         configure_lang(Language::CXX, "CXX");
