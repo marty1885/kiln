@@ -27,7 +27,7 @@ rm -rf build
 
 # Build with kiln
 echo "Building modules_basic with kiln..."
-$KILN -j4
+KILN_DEBUG_MODULES=1 $KILN -j4
 
 # Check that output exists
 if [ ! -f build/debug/modules_basic_app ]; then

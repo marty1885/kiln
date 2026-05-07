@@ -804,7 +804,7 @@ void BuildGraph::report_command_failure(ExecutionState& state, std::string_view 
     std::lock_guard<std::mutex> lock(output_mutex_);
     state.progress.erase();
     std::cout.flush();  // erase wrote to cout; flush before cerr
-    if (!captured_output.empty()) std::cerr << captured_output << std::endl;
+    if (!captured_output.empty()) std::cerr << "[t=" << std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count() << "] " << captured_output << std::endl;
 }
 
 std::expected<void, std::string> BuildGraph::execute(const std::string& build_dir, int jobs) {
@@ -1157,6 +1157,12 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                                     obj_source = ddi.source;
                                 }
                                 std::string obj_path = get_obj_path(task.parent_target->get_binary_dir(), task.parent_target->get_name(), obj_source);
+                                if (const char* dbg = std::getenv("KILN_DEBUG_MODULES"); dbg && *dbg) {
+                                    std::cerr << "[mod-collator] ddi.source=" << ddi.source
+                                              << " sdir=" << task.parent_target->get_source_dir()
+                                              << " obj_source=" << obj_source
+                                              << " obj_path=" << obj_path << "\n";
+                                }
 
                                 if (!ddi.provides.empty()) {
                                     module_to_task[ddi.provides] = obj_path;
@@ -1705,6 +1711,9 @@ void BuildGraph::inject_module_dependencies(
             auto* provider = task_it->second;
 
             // Add dependency: this task depends on the provider task
+            if (const char* dbg = std::getenv("KILN_DEBUG_MODULES"); dbg && *dbg) {
+                std::cerr << "[module-dep] " << task_ptr->id << " -> " << provider->id << "\n";
+            }
             txn.dependency(task_ptr.get(), provider);
         }
     }

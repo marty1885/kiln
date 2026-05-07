@@ -163,6 +163,7 @@ This will produce a release binary at `build/release/kiln`.
    - [ ] OpenBSD support
    - [ ] Windows support (MSVC)
    - [ ] Windows support (Cygwin/MSYS2)
+- [ ] C++ module support
 
 Explicitely non-goals:
 
