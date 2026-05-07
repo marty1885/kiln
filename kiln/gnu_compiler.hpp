@@ -2,6 +2,7 @@
 #include "compiler.hpp"
 #include "genex_parser.hpp"
 #include "language.hpp"
+#include "path.hpp"
 #include "parse_number.hpp"
 #include <sstream>
 #include <array>
@@ -117,6 +118,15 @@ public:
             for (const auto& mf : ctx.module_files) {
                 cmd.push_back("-fmodule-file=" + mf);
             }
+        }
+
+        // gcc-14 doesn't recognize .cppm/.ccm/.cxxm/.ixx/.mpp as C++ source; without
+        // -x c++ it silently treats them as linker inputs, "compiles" successfully,
+        // and produces no BMI. Force C++ mode for module-interface extensions.
+        std::string_view ext = Path(ctx.source).extension();
+        if (ext == ".cppm" || ext == ".ccm" || ext == ".cxxm" || ext == ".ixx" || ext == ".mpp") {
+            cmd.push_back("-x");
+            cmd.push_back("c++");
         }
 
         for (const auto& opt : ctx.options) {

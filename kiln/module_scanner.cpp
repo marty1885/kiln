@@ -193,11 +193,7 @@ std::string get_bmi_path(const std::string& binary_dir, const std::string& modul
     std::string safe_name = module_name;
     std::replace(safe_name.begin(), safe_name.end(), ':', '-');
 
-    // Use gcm.cache/ — that's gcc's default BMI directory, so even gcc versions
-    // that only honor the module mapper for input lookups (and pick the default
-    // location on output, e.g. gcc-14 with -fmodules-ts) end up writing to the
-    // path the mapper advertises.
-    std::filesystem::path path = std::filesystem::path(binary_dir) / "gcm.cache" / (safe_name + ".gcm");
+    std::filesystem::path path = std::filesystem::path(binary_dir) / "bmis" / (safe_name + ".gcm");
     return path.lexically_normal().string();
 }
 

@@ -1174,10 +1174,9 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                             }
                             if (!task_error.empty()) return;
 
-                            // Pre-create directories for BMI outputs. GCC writes the .gcm
-                            // alongside the .o without creating intermediate dirs, so an
-                            // absent bmis/ produces a silent BMI write failure while .o
-                            // still succeeds — leaving importers to fail at lookup.
+                            // GCC writes BMIs straight to the mapper-advertised path
+                            // without creating intermediate dirs — so bmis/ must exist
+                            // before any compile reads/writes the mapper.
                             for (const auto& entry : mapper_entries) {
                                 std::error_code dir_ec;
                                 std::filesystem::create_directories(
@@ -1315,40 +1314,9 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                     state.completed.insert(current);
                     state.running.erase(current);
 
-                    bool sched_dbg = false;
-                    if (const char* dbg = std::getenv("KILN_DEBUG_SCHED"); dbg && *dbg) sched_dbg = true;
-                    if (sched_dbg) {
-                        std::cerr << "[sched] completed " << current->id << "\n";
-                    }
-
                     // Check if any dirty/maybe dependents are now ready
                     for (auto* dep_task : get_dependents(current)) {
-                        size_t before_size = state.ready_set.size();
-                        bool was_already_ready = state.ready_set.count(dep_task) > 0;
-                        bool was_running = state.running.count(dep_task) > 0;
-                        bool was_completed = state.completed.count(dep_task) > 0;
-                        bool promoted = try_promote_to_ready(dep_task, state);
-                        if (sched_dbg) {
-                            std::cerr << "[sched]   eval " << dep_task->id << " ";
-                            if (was_already_ready) std::cerr << "ALREADY_READY";
-                            else if (was_running) std::cerr << "ALREADY_RUNNING";
-                            else if (was_completed) std::cerr << "ALREADY_COMPLETED";
-                            else if (promoted) std::cerr << "PROMOTED (deps_done)";
-                            else {
-                                std::cerr << "BLOCKED [";
-                                bool first = true;
-                                for (auto* d : dep_task->dependencies) {
-                                    if (!state.completed.count(d)) {
-                                        if (!first) std::cerr << ", ";
-                                        first = false;
-                                        std::cerr << d->id;
-                                    }
-                                }
-                                std::cerr << "]";
-                            }
-                            std::cerr << "\n";
-                        }
-                        (void)before_size;
+                        try_promote_to_ready(dep_task, state);
                     }
 
                     state.cv.notify_all();
