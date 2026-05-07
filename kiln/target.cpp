@@ -2035,16 +2035,28 @@ void Target::generate_tasks(GraphTransaction& txn, const Toolchain& toolchain, c
     std::string module_mapper_path = has_modules ? get_module_mapper_path() : std::string{};
 
     // PCH: generate per-language precompiled headers (C gets _pch.h, CXX gets _pch.hxx)
-    // CMake only generates PCH for languages the target actually uses in its sources.
-    // Determine which languages this target has source files for.
+    // CMake only generates PCH for languages the target actually uses in its sources,
+    // and only when at least one source of that language participates in PCH (i.e.,
+    // does not have SKIP_PRECOMPILE_HEADERS set).
     std::set<Language> target_source_languages;
     {
+        const auto& source_props = interp.get_source_properties();
         auto srcs = get_property_list("SOURCES", TargetPropertyScope::BUILD);
         for (const auto& src : srcs) {
             auto info = LanguageClassifier::from_path(src);
-            if (info.lang != Language::UNKNOWN && !info.is_header) {
-                target_source_languages.insert(info.lang);
+            if (info.lang == Language::UNKNOWN || info.is_header) continue;
+
+            std::string src_normalized = Path(src).is_absolute()
+                ? Path(src).lexically_normal().str()
+                : Path::make_absolute_and_normal(source_dir_, src);
+            auto sp_it = source_props.find(src_normalized);
+            if (sp_it != source_props.end()) {
+                auto skip_it = sp_it->second.find("SKIP_PRECOMPILE_HEADERS");
+                if (skip_it != sp_it->second.end() && !Interpreter::is_falsy(skip_it->second)) {
+                    continue;
+                }
             }
+            target_source_languages.insert(info.lang);
         }
     }
 

@@ -78,6 +78,8 @@ target_link_libraries(kiln PUBLIC
     pugixml::pugixml
 )
 
+target_precompile_headers(kiln PRIVATE kiln/pch.hpp)
+
 # --- Executable ---
 
 add_executable(kiln_cli kiln-cli/main.cpp)
