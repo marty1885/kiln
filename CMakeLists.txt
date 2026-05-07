@@ -13,8 +13,6 @@ find_package(LibArchive REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
 
-# linenoise has no CMake package; find_library is the only available mechanism
-find_library(LINENOISE_LIBRARY NAMES linenoise REQUIRED)
 
 add_library(kiln
     kiln/cmake-language.cpp
@@ -82,8 +80,14 @@ target_precompile_headers(kiln PRIVATE kiln/pch.hpp)
 
 # --- Executable ---
 
-add_executable(kiln_cli kiln-cli/main.cpp)
-target_link_libraries(kiln_cli PRIVATE kiln CLI11::CLI11 ${LINENOISE_LIBRARY})
+add_executable(kiln_cli
+    kiln-cli/main.cpp
+    kiln-cli/linenoise-ng/src/linenoise.cpp
+    kiln-cli/linenoise-ng/src/ConvertUTF.cpp
+    kiln-cli/linenoise-ng/src/wcwidth.cpp
+)
+target_include_directories(kiln_cli PRIVATE kiln-cli/linenoise-ng/include)
+target_link_libraries(kiln_cli PRIVATE kiln CLI11::CLI11)
 set_target_properties(kiln_cli PROPERTIES OUTPUT_NAME kiln)
 
 # --- Install rules ---
