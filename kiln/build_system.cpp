@@ -889,6 +889,16 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
         if (jobs <= 0) jobs = 2;
     }
 
+    if (const char* dbg = std::getenv("KILN_DEBUG_MODULES"); dbg && *dbg) {
+        std::cerr << "[graph-dump] " << tasks_.size() << " tasks\n";
+        for (auto& t : tasks_) {
+            std::cerr << "  task " << t->id << " deps={";
+            bool first = true;
+            for (auto* d : t->dependencies) { if (!first) std::cerr << ","; first = false; std::cerr << d->id; }
+            std::cerr << "}\n";
+        }
+    }
+
     // Initialize ready_set with dirty/maybe tasks whose deps are all complete.
     for (const auto& [ptr, _] : state.dirty_state) {
         try_promote_to_ready(ptr, state);
