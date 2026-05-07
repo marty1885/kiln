@@ -1145,7 +1145,18 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                                 if (!ddi_result) { task_error = ddi_result.error(); return; }
 
                                 const auto& ddi = *ddi_result;
-                                std::string obj_path = get_obj_path(task.parent_target->get_binary_dir(), task.parent_target->get_name(), ddi.source);
+                                // ddi.source is absolute, but the compile task was created with
+                                // the original (often relative) SOURCES entry. get_obj_path
+                                // produces different paths for relative vs absolute inputs, so
+                                // we re-relativize against the target's source dir to recover
+                                // the same obj path / task id.
+                                std::string obj_source = Path(ddi.source).fs_path()
+                                    .lexically_relative(task.parent_target->get_source_dir())
+                                    .string();
+                                if (obj_source.empty() || obj_source.starts_with("..")) {
+                                    obj_source = ddi.source;
+                                }
+                                std::string obj_path = get_obj_path(task.parent_target->get_binary_dir(), task.parent_target->get_name(), obj_source);
 
                                 if (!ddi.provides.empty()) {
                                     module_to_task[ddi.provides] = obj_path;
