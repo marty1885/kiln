@@ -1,0 +1,78 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      CC: gcc-14
+      CXX: g++-14
+      GLAZE_REF: main
+      LINENOISE_REF: master
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install apt dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 \
+            cmake ninja-build pkg-config git ca-certificates \
+            libpcre2-dev libcurl4-openssl-dev libarchive-dev \
+            libpugixml-dev libcli11-dev catch2
+
+      - name: Cache third-party installs
+        id: cache-thirdparty
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/thirdparty-install
+          key: thirdparty-${{ runner.os }}-glaze-${{ env.GLAZE_REF }}-linenoise-${{ env.LINENOISE_REF }}-v1
+
+      - name: Build & install glaze
+        if: steps.cache-thirdparty.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$GLAZE_REF" https://github.com/stephenberry/glaze.git /tmp/glaze
+          cmake -S /tmp/glaze -B /tmp/glaze/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/thirdparty-install" \
+            -Dglaze_BUILD_EXAMPLES=OFF
+          cmake --install /tmp/glaze/build
+
+      - name: Build & install linenoise
+        if: steps.cache-thirdparty.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://github.com/antirez/linenoise.git /tmp/linenoise
+          cd /tmp/linenoise
+          $CC -c -O2 -fPIC linenoise.c -o linenoise.o
+          ar rcs liblinenoise.a linenoise.o
+          install -d "$GITHUB_WORKSPACE/thirdparty-install/include"
+          install -d "$GITHUB_WORKSPACE/thirdparty-install/lib"
+          install -m 644 linenoise.h "$GITHUB_WORKSPACE/thirdparty-install/include/"
+          install -m 644 liblinenoise.a "$GITHUB_WORKSPACE/thirdparty-install/lib/"
+
+      - name: Configure
+        env:
+          CPATH: ${{ github.workspace }}/thirdparty-install/include
+          LIBRARY_PATH: ${{ github.workspace }}/thirdparty-install/lib
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/thirdparty-install" \
+            -DCMAKE_INCLUDE_PATH="$GITHUB_WORKSPACE/thirdparty-install/include" \
+            -DCMAKE_LIBRARY_PATH="$GITHUB_WORKSPACE/thirdparty-install/lib"
+
+      - name: Build
+        env:
+          CPATH: ${{ github.workspace }}/thirdparty-install/include
+          LIBRARY_PATH: ${{ github.workspace }}/thirdparty-install/lib
+        run: cmake --build build --parallel
+
+      - name: Test
+        working-directory: build
+        run: ctest --output-on-failure
