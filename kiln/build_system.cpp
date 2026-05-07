@@ -889,16 +889,6 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
         if (jobs <= 0) jobs = 2;
     }
 
-    if (const char* dbg = std::getenv("KILN_DEBUG_MODULES"); dbg && *dbg) {
-        std::cerr << "[graph-dump] " << tasks_.size() << " tasks\n";
-        for (auto& t : tasks_) {
-            std::cerr << "  task " << t->id << " deps={";
-            bool first = true;
-            for (auto* d : t->dependencies) { if (!first) std::cerr << ","; first = false; std::cerr << d->id; }
-            std::cerr << "}\n";
-        }
-    }
-
     // Initialize ready_set with dirty/maybe tasks whose deps are all complete.
     for (const auto& [ptr, _] : state.dirty_state) {
         try_promote_to_ready(ptr, state);
@@ -1167,12 +1157,6 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                                     obj_source = ddi.source;
                                 }
                                 std::string obj_path = get_obj_path(task.parent_target->get_binary_dir(), task.parent_target->get_name(), obj_source);
-                                if (const char* dbg = std::getenv("KILN_DEBUG_MODULES"); dbg && *dbg) {
-                                    std::cerr << "[mod-collator] ddi.source=" << ddi.source
-                                              << " sdir=" << task.parent_target->get_source_dir()
-                                              << " obj_source=" << obj_source
-                                              << " obj_path=" << obj_path << "\n";
-                                }
 
                                 if (!ddi.provides.empty()) {
                                     module_to_task[ddi.provides] = obj_path;
@@ -1189,6 +1173,16 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                                 }
                             }
                             if (!task_error.empty()) return;
+
+                            // Pre-create directories for BMI outputs. GCC writes the .gcm
+                            // alongside the .o without creating intermediate dirs, so an
+                            // absent bmis/ produces a silent BMI write failure while .o
+                            // still succeeds — leaving importers to fail at lookup.
+                            for (const auto& entry : mapper_entries) {
+                                std::error_code dir_ec;
+                                std::filesystem::create_directories(
+                                    std::string(Path(entry.bmi_path).parent_path()), dir_ec);
+                            }
 
                             std::string mapper_content = generate_module_mapper_content(mapper_entries);
                             std::ofstream mapper_file(task.outputs[0]);
@@ -1721,9 +1715,6 @@ void BuildGraph::inject_module_dependencies(
             auto* provider = task_it->second;
 
             // Add dependency: this task depends on the provider task
-            if (const char* dbg = std::getenv("KILN_DEBUG_MODULES"); dbg && *dbg) {
-                std::cerr << "[module-dep] " << task_ptr->id << " -> " << provider->id << "\n";
-            }
             txn.dependency(task_ptr.get(), provider);
         }
     }
