@@ -2675,7 +2675,23 @@ bool Target::has_module_sources() const {
 bool Target::generate_module_scanner_tasks(GraphTransaction& txn, const Toolchain& toolchain, int cxx_default_std) {
     std::vector<std::string> scanner_ids;
 
-    for (const auto& src : get_property_list("SOURCES", TargetPropertyScope::BUILD)) {
+    auto sources = get_property_list("SOURCES", TargetPropertyScope::BUILD);
+
+    // First pass: does this target have any module interface units? If not,
+    // skip scanning entirely — paying a scan per .cpp for non-modular targets
+    // would be pure overhead.
+    bool has_interface = false;
+    for (const auto& src : sources) {
+        auto info = LanguageClassifier::from_path(src);
+        if (is_in_cxx_modules_file_set(src)) info.is_module_interface = true;
+        if (info.lang == Language::CXX && info.is_module_interface) {
+            has_interface = true;
+            break;
+        }
+    }
+    if (!has_interface) return false;
+
+    for (const auto& src : sources) {
         auto lang_info = LanguageClassifier::from_path(src);
 
         // Override module interface detection if file is in CXX_MODULES file set
@@ -2683,11 +2699,12 @@ bool Target::generate_module_scanner_tasks(GraphTransaction& txn, const Toolchai
             lang_info.is_module_interface = true;
         }
 
-        // Only scan module interface files (*.ixx, *.cppm, etc.)
-        // Regular .cpp files that might import modules will have their
-        // dependencies resolved through the collator
-        if (!lang_info.is_module_interface) continue;
+        // Scan all CXX sources: interface units to discover what they `provide`,
+        // regular .cpp files to discover what they `import`. Without scanning
+        // importers, the collator can't wire compile-order edges from importer
+        // to producer, leaving correctness up to the scheduler.
         if (lang_info.lang != Language::CXX) continue;
+        if (lang_info.is_header) continue;
 
         const Compiler* compiler = resolve_compiler(lang_info.lang, toolchain);
         if (!compiler) continue;

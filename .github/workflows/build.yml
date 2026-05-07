@@ -25,6 +25,8 @@ jobs:
             cmake ninja-build pkg-config git ca-certificates \
             libpcre2-dev libcurl4-openssl-dev libarchive-dev \
             libpugixml-dev libcli11-dev catch2
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100 \
+                                  --slave   /usr/bin/g++ g++ /usr/bin/g++-14
 
       - name: Cache third-party installs
         id: cache-thirdparty
