@@ -13,7 +13,7 @@ jobs:
       CC: gcc-14
       CXX: g++-14
       GLAZE_REF: main
-      LINENOISE_REF: master
+      LINENOISE_REF: v1.0.1
 
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/thirdparty-install
-          key: thirdparty-${{ runner.os }}-glaze-${{ env.GLAZE_REF }}-linenoise-msteveb-${{ env.LINENOISE_REF }}-v2
+          key: thirdparty-${{ runner.os }}-glaze-${{ env.GLAZE_REF }}-linenoise-ng-${{ env.LINENOISE_REF }}-v3
 
       - name: Build & install glaze
         if: steps.cache-thirdparty.outputs.cache-hit != 'true'
@@ -44,18 +44,16 @@ jobs:
             -Dglaze_BUILD_EXAMPLES=OFF
           cmake --install /tmp/glaze/build
 
-      - name: Build & install linenoise
+      - name: Build & install linenoise-ng
         if: steps.cache-thirdparty.outputs.cache-hit != 'true'
         run: |
-          git clone --depth 1 https://github.com/msteveb/linenoise.git /tmp/linenoise
-          cd /tmp/linenoise
-          $CC -c -O2 -fPIC -DUSE_UTF8 linenoise.c utf8.c
-          ar rcs liblinenoise.a linenoise.o utf8.o
-          install -d "$GITHUB_WORKSPACE/thirdparty-install/include"
-          install -d "$GITHUB_WORKSPACE/thirdparty-install/lib"
-          install -m 644 linenoise.h "$GITHUB_WORKSPACE/thirdparty-install/include/"
-          [ -f utf8.h ] && install -m 644 utf8.h "$GITHUB_WORKSPACE/thirdparty-install/include/" || true
-          install -m 644 liblinenoise.a "$GITHUB_WORKSPACE/thirdparty-install/lib/"
+          git clone --depth 1 --branch "$LINENOISE_REF" https://github.com/arangodb/linenoise-ng.git /tmp/linenoise
+          cmake -S /tmp/linenoise -B /tmp/linenoise/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/thirdparty-install" \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          cmake --build /tmp/linenoise/build
+          cmake --install /tmp/linenoise/build
 
       - name: Configure
         env:
