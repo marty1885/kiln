@@ -14,11 +14,11 @@ TEST_CASE("GnuCompiler: CXX compile command", "[compiler]") {
     ctx.includes = {"include", "/usr/local/include"};
     ctx.definitions = {"DEBUG", "VERSION=1"};
     ctx.is_shared = true;
-    
+
         std::vector<std::string> cmd_vec = compiler.get_compile_command(ctx).argv;
-    
+
         std::string cmd = kiln::join_command(cmd_vec);
-    
+
             CHECK(cmd_vec[0] == "g++");
             CHECK(cmd_vec[1] == "-std=gnu++23");
             CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-Iinclude") != cmd_vec.end());
@@ -30,8 +30,8 @@ TEST_CASE("GnuCompiler: CXX compile command", "[compiler]") {
             CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "main.o") != cmd_vec.end());
             CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "main.cpp") != cmd_vec.end());
         }
-    
-        
+
+
 
 TEST_CASE("GnuCompiler: C compile command", "[compiler]") {
     GnuCompiler compiler("gcc", Language::C);
@@ -39,11 +39,27 @@ TEST_CASE("GnuCompiler: C compile command", "[compiler]") {
     ctx.source = "main.c";
     ctx.output = "main.o";
     ctx.standard = "11";
-    
+
     std::vector<std::string> cmd_vec = compiler.get_compile_command(ctx).argv;
     CHECK(cmd_vec[0] == "gcc");
     CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-std=gnu11") != cmd_vec.end());
     CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "main.c") != cmd_vec.end());
+}
+
+
+TEST_CASE("make_compiler handles Intel ICC with GNU-style driver", "[compiler][icc]") {
+    auto c = make_compiler("Intel", "icc", Language::CXX);
+    REQUIRE(c != nullptr);
+    CompileContext ctx;
+    ctx.source = "main.cpp";
+    ctx.output = "main.o";
+    ctx.standard = "17";
+    ctx.definitions = {"ICC_BUILD"};
+        auto cmd_vec = c->get_compile_command(ctx).argv;
+    CHECK(cmd_vec[0] == "icc");
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-std=gnu++17") != cmd_vec.end());
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-DICC_BUILD") != cmd_vec.end());
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "main.cpp") != cmd_vec.end());
 }
 
 TEST_CASE("GnuCompiler: Link command", "[compiler]") {
