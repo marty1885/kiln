@@ -8349,3 +8349,95 @@ TEST_CASE("legacy combined: uppercase with repeated args", "[interpreter][legacy
     )");
     REQUIRE(output == "1\n2\n3\n");
 }
+
+TEST_CASE("Parser warns on old-style control flow commands", "[parser][warning]") {
+    std::string script = R"(
+        # Case 1: Matching old-style arguments (should NOT warn)
+        if(VAR)
+            message("if")
+        else(VAR)
+            message("else")
+        endif(VAR)
+
+        function(foo x y)
+            message("foo")
+        endfunction(foo)
+
+        macro(bar x y)
+            message("bar")
+        endmacro(bar)
+
+        foreach(i IN LISTS mylist)
+            message("i")
+        endforeach(i)
+
+        while(VAR)
+            message("while")
+        endwhile(VAR)
+
+        # Case 2: Empty arguments (should NOT warn)
+        if(VAR2)
+            message("if2")
+        else()
+            message("else2")
+        endif()
+
+        # Case 3: Non-matching arguments (should WARN)
+        if(VAR_IF)
+            message("if3")
+        else(VAR_OTHER_ELSE)
+            message("else3")
+        endif(VAR_OTHER_ENDIF)
+
+        function(foo2)
+            message("foo2")
+        endfunction(wrong_foo2)
+
+        macro(bar2)
+            message("bar2")
+        endmacro(wrong_bar2)
+
+        foreach(j IN LISTS mylist)
+            message("j")
+        endforeach(wrong_j)
+
+        while(VAR_WHILE)
+            message("while2")
+        endwhile(wrong_while)
+    )";
+
+    // Redirect std::cerr to capture the warnings
+    std::stringstream buffer;
+    std::streambuf* old = std::cerr.rdbuf(buffer.rdbuf());
+
+    kiln::Parser parser(script, "CMakeLists.txt");
+    auto ast_or_error = parser.parse();
+
+    // Restore std::cerr
+    std::cerr.rdbuf(old);
+
+    REQUIRE(ast_or_error.has_value());
+    
+    std::string warnings = buffer.str();
+
+    // Assert that the matching cases did NOT generate warnings
+    CHECK(warnings.find("else(VAR)") == std::string::npos);
+    CHECK(warnings.find("endif(VAR)") == std::string::npos);
+    CHECK(warnings.find("endfunction(foo)") == std::string::npos);
+    CHECK(warnings.find("endmacro(bar)") == std::string::npos);
+    CHECK(warnings.find("endforeach(i)") == std::string::npos);
+    CHECK(warnings.find("endwhile(VAR)") == std::string::npos);
+
+    // Assert that empty cases did NOT generate warnings
+    CHECK(warnings.find("else()") == std::string::npos);
+    CHECK(warnings.find("endif()") == std::string::npos);
+
+    // Assert that non-matching cases DID generate warnings
+    CHECK(warnings.find("old style CMake syntax: 'else(...)' has arguments that do not match the opening command.") != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endif(...)' has arguments that do not match the opening command.") != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endfunction(...)' has arguments that do not match the opening command.") != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endmacro(...)' has arguments that do not match the opening command.") != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endforeach(...)' has arguments that do not match the opening command.") != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endwhile(...)' has arguments that do not match the opening command.") != std::string::npos);
+}
+

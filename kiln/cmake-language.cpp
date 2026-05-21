@@ -191,6 +191,7 @@ std::expected<IfBlock, ParseError> Parser::parse_if_block(const CommandInvocatio
         } else if (ascii_ci_equal(kw, "else")) {
             auto else_command_or_error = parse_command_invocation();
             if (!else_command_or_error) return std::unexpected(else_command_or_error.error());
+            check_old_style(else_command_or_error.value(), if_command.arguments);
 
             auto else_branch_or_error = parse_block({"endif"});
             if (!else_branch_or_error) return std::unexpected(else_branch_or_error.error());
@@ -210,6 +211,7 @@ std::expected<IfBlock, ParseError> Parser::parse_if_block(const CommandInvocatio
     if (!ascii_ci_equal(endif_command_or_error.value().identifier, "endif")) {
         return std::unexpected(ParseError{endif_command_or_error.value().row, endif_command_or_error.value().col, endif_command_or_error.value().offset, endif_command_or_error.value().length, "Expected 'endif'"});
     }
+    check_old_style(endif_command_or_error.value(), if_command.arguments);
 
     if_block.length = pos_ - if_block.offset;
     return if_block;
@@ -266,6 +268,11 @@ std::expected<FunctionBlock, ParseError> Parser::parse_function_block(const Comm
     if (!ascii_ci_equal(endfunction_command_or_error.value().identifier, "endfunction")) {
         return std::unexpected(ParseError{row_, col_, pos_, 11, "Expected 'endfunction'"});
     }
+    std::vector<Argument> expected_endfunction_args;
+    if (!function_command.arguments.empty()) {
+        expected_endfunction_args.push_back(function_command.arguments[0]);
+    }
+    check_old_style(endfunction_command_or_error.value(), expected_endfunction_args);
 
     // Populate definition file metadata
     function_block.definition_file = filename_;
@@ -327,6 +334,11 @@ std::expected<MacroBlock, ParseError> Parser::parse_macro_block(const CommandInv
     if (!ascii_ci_equal(endmacro_command_or_error.value().identifier, "endmacro")) {
         return std::unexpected(ParseError{row_, col_, pos_, 8, "Expected 'endmacro'"});
     }
+    std::vector<Argument> expected_endmacro_args;
+    if (!macro_command.arguments.empty()) {
+        expected_endmacro_args.push_back(macro_command.arguments[0]);
+    }
+    check_old_style(endmacro_command_or_error.value(), expected_endmacro_args);
 
     // Populate definition file metadata
     macro_block.definition_file = filename_;
@@ -531,6 +543,11 @@ std::expected<ForeachBlock, ParseError> Parser::parse_foreach_block(const Comman
     if (!ascii_ci_equal(endforeach_command_or_error.value().identifier, "endforeach")) {
         return std::unexpected(ParseError{row_, col_, pos_, 10, "Expected 'endforeach'"});
     }
+    std::vector<Argument> expected_endforeach_args;
+    if (!foreach_command.arguments.empty()) {
+        expected_endforeach_args.push_back(foreach_command.arguments[0]);
+    }
+    check_old_style(endforeach_command_or_error.value(), expected_endforeach_args);
 
     foreach_block.length = pos_ - foreach_block.offset;
     return foreach_block;
@@ -560,6 +577,7 @@ std::expected<WhileBlock, ParseError> Parser::parse_while_block(const CommandInv
     if (!ascii_ci_equal(endwhile_command_or_error.value().identifier, "endwhile")) {
         return std::unexpected(ParseError{row_, col_, pos_, 8, "Expected 'endwhile'"});
     }
+    check_old_style(endwhile_command_or_error.value(), while_command.arguments);
 
     while_block.length = pos_ - while_block.offset;
     return while_block;
@@ -1441,6 +1459,63 @@ std::expected<VariableReference, ParseError> Parser::parse_variable_reference(bo
     }
 
     return std::unexpected(ParseError{row_, col_, ref_start_pos, pos_ - ref_start_pos, "Unterminated variable reference"});
+}
+
+namespace {
+
+bool operator==(const VariableReference& lhs, const VariableReference& rhs);
+
+bool operator==(const ArgumentPart& lhs, const ArgumentPart& rhs) {
+    if (lhs.index() != rhs.index()) return false;
+    if (std::holds_alternative<std::string>(lhs)) {
+        return std::get<std::string>(lhs) == std::get<std::string>(rhs);
+    } else {
+        return std::get<VariableReference>(lhs) == std::get<VariableReference>(rhs);
+    }
+}
+
+bool operator==(const VariableReference& lhs, const VariableReference& rhs) {
+    if (lhs.namespace_prefix != rhs.namespace_prefix) return false;
+    if (lhs.name_parts.size() != rhs.name_parts.size()) return false;
+    for (size_t i = 0; i < lhs.name_parts.size(); ++i) {
+        if (!(lhs.name_parts[i] == rhs.name_parts[i])) return false;
+    }
+    return true;
+}
+
+bool operator==(const Argument& lhs, const Argument& rhs) {
+    if (lhs.quoted != rhs.quoted) return false;
+    if (lhs.parts.size() != rhs.parts.size()) return false;
+    for (size_t i = 0; i < lhs.parts.size(); ++i) {
+        if (!(lhs.parts[i] == rhs.parts[i])) return false;
+    }
+    return true;
+}
+
+bool arguments_equal(const std::vector<Argument>& lhs, const std::vector<Argument>& rhs) {
+    if (lhs.size() != rhs.size()) return false;
+    for (size_t i = 0; i < lhs.size(); ++i) {
+        if (!(lhs[i] == rhs[i])) return false;
+    }
+    return true;
+}
+
+} // namespace
+
+void Parser::check_old_style(const CommandInvocation& cmd, const std::vector<Argument>& expected_args) {
+    if (ascii_ci_equal(cmd.identifier, "endif") ||
+        ascii_ci_equal(cmd.identifier, "else") ||
+        ascii_ci_equal(cmd.identifier, "endforeach") ||
+        ascii_ci_equal(cmd.identifier, "endwhile") ||
+        ascii_ci_equal(cmd.identifier, "endmacro") ||
+        ascii_ci_equal(cmd.identifier, "endfunction")) {
+        if (!cmd.arguments.empty() && !arguments_equal(cmd.arguments, expected_args)) {
+            std::string msg = "old style CMake syntax: '" + cmd.identifier + "(...)' has arguments that do not match the opening command.";
+            kiln::print_diagnostic(std::cerr, DiagnosticSeverity::Warning,
+                msg, filename_, cmd.row, cmd.col, cmd.offset, cmd.length,
+                {}, std::string(content_), "These arguments are ignored by kiln.");
+        }
+    }
 }
 
 } // namespace kiln

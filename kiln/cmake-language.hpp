@@ -269,6 +269,7 @@ private:
     std::expected<std::vector<ArgumentPart>, ParseError> parse_quoted_argument_value();
     std::expected<std::string, ParseError> parse_bracket_argument();
     std::expected<VariableReference, ParseError> parse_variable_reference(bool inside_quotes);
+    void check_old_style(const CommandInvocation& cmd, const std::vector<Argument>& expected_args);
 };
 
 } // namespace kiln
