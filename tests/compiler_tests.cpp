@@ -15,23 +15,21 @@ TEST_CASE("GnuCompiler: CXX compile command", "[compiler]") {
     ctx.definitions = {"DEBUG", "VERSION=1"};
     ctx.is_shared = true;
 
-        std::vector<std::string> cmd_vec = compiler.get_compile_command(ctx).argv;
+    std::vector<std::string> cmd_vec = compiler.get_compile_command(ctx).argv;
 
-        std::string cmd = kiln::join_command(cmd_vec);
+    std::string cmd = kiln::join_command(cmd_vec);
 
-            CHECK(cmd_vec[0] == "g++");
-            CHECK(cmd_vec[1] == "-std=gnu++23");
-            CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-Iinclude") != cmd_vec.end());
-            CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-I/usr/local/include") != cmd_vec.end());
-            CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-DDEBUG") != cmd_vec.end());
-            CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-DVERSION=1") != cmd_vec.end());
-            CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-fPIC") != cmd_vec.end());
-            CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-c") != cmd_vec.end());
-            CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "main.o") != cmd_vec.end());
-            CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "main.cpp") != cmd_vec.end());
-        }
-
-
+    CHECK(cmd_vec[0] == "g++");
+    CHECK(cmd_vec[1] == "-std=gnu++23");
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-Iinclude") != cmd_vec.end());
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-I/usr/local/include") != cmd_vec.end());
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-DDEBUG") != cmd_vec.end());
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-DVERSION=1") != cmd_vec.end());
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-fPIC") != cmd_vec.end());
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-c") != cmd_vec.end());
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "main.o") != cmd_vec.end());
+    CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "main.cpp") != cmd_vec.end());
+}
 
 TEST_CASE("GnuCompiler: C compile command", "[compiler]") {
     GnuCompiler compiler("gcc", Language::C);
@@ -46,7 +44,6 @@ TEST_CASE("GnuCompiler: C compile command", "[compiler]") {
     CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "main.c") != cmd_vec.end());
 }
 
-
 TEST_CASE("make_compiler handles Intel ICC with GNU-style driver", "[compiler][icc]") {
     auto c = make_compiler("Intel", "icc", Language::CXX);
     REQUIRE(c != nullptr);
@@ -55,7 +52,7 @@ TEST_CASE("make_compiler handles Intel ICC with GNU-style driver", "[compiler][i
     ctx.output = "main.o";
     ctx.standard = "17";
     ctx.definitions = {"ICC_BUILD"};
-        auto cmd_vec = c->get_compile_command(ctx).argv;
+    auto cmd_vec = c->get_compile_command(ctx).argv;
     CHECK(cmd_vec[0] == "icc");
     CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-std=gnu++17") != cmd_vec.end());
     CHECK(std::find(cmd_vec.begin(), cmd_vec.end(), "-DICC_BUILD") != cmd_vec.end());
@@ -89,12 +86,10 @@ TEST_CASE("TccCompiler: C compile command", "[compiler][tcc]") {
     ctx.standard = "11";
     ctx.includes = {"include"};
     ctx.definitions = {"DEBUG"};
-    ctx.color_diagnostics = true;  // user-facing toggle, but TCC ignores
+    ctx.color_diagnostics = true; // user-facing toggle, but TCC ignores
 
     auto cmd_vec = compiler.get_compile_command(ctx).argv;
-    auto has = [&](const std::string& s) {
-        return std::find(cmd_vec.begin(), cmd_vec.end(), s) != cmd_vec.end();
-    };
+    auto has = [&](const std::string& s) { return std::find(cmd_vec.begin(), cmd_vec.end(), s) != cmd_vec.end(); };
 
     CHECK(cmd_vec[0] == "tcc");
     // Driver-internal divergences from GCC: TCC has no color, uses -MD not
@@ -122,9 +117,7 @@ TEST_CASE("TccCompiler: link command has no --start-group", "[compiler][tcc]") {
     ctx.libs = {"m"};
 
     auto cmd_vec = compiler.get_link_command(ctx).argv;
-    auto has = [&](const std::string& s) {
-        return std::find(cmd_vec.begin(), cmd_vec.end(), s) != cmd_vec.end();
-    };
+    auto has = [&](const std::string& s) { return std::find(cmd_vec.begin(), cmd_vec.end(), s) != cmd_vec.end(); };
 
     CHECK_FALSE(has("-Wl,--start-group"));
     CHECK_FALSE(has("-Wl,--end-group"));
@@ -162,13 +155,11 @@ TEST_CASE("TccCompiler: pass-through (translator-not-validator)", "[compiler][tc
     CompileContext ctx;
     ctx.source = "x.c";
     ctx.output = "x.o";
-    ctx.standard = "23";  // TCC accepts the syntax but ~implements C99
-    ctx.visibility_preset = "hidden";  // TCC errors on -fvisibility=
-    ctx.is_shared = true;  // -fPIC works on TCC
+    ctx.standard = "23";              // TCC accepts the syntax but ~implements C99
+    ctx.visibility_preset = "hidden"; // TCC errors on -fvisibility=
+    ctx.is_shared = true;             // -fPIC works on TCC
     auto cmd_vec = compiler.get_compile_command(ctx).argv;
-    auto has = [&](const std::string& s) {
-        return std::find(cmd_vec.begin(), cmd_vec.end(), s) != cmd_vec.end();
-    };
+    auto has = [&](const std::string& s) { return std::find(cmd_vec.begin(), cmd_vec.end(), s) != cmd_vec.end(); };
     CHECK(has("-std=gnu23"));
     CHECK(has("-fvisibility=hidden"));
     CHECK(has("-fPIC"));

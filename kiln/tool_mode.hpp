@@ -1,6 +1,8 @@
 #pragma once
 
-namespace CLI { class App; }
+namespace CLI {
+class App;
+}
 
 namespace kiln {
 

@@ -90,9 +90,7 @@ void CompileFeatures::register_cxx_features() {
     // Only meta-features (cxx_std_XX) are provided for these standards
 
     // Build feature map for fast lookup
-    for (const auto& feat : cxx_features_) {
-        feature_map_[feat.name] = &feat;
-    }
+    for (const auto& feat : cxx_features_) { feature_map_[feat.name] = &feat; }
 }
 
 void CompileFeatures::register_c_features() {
@@ -110,9 +108,7 @@ void CompileFeatures::register_c_features() {
     c_features_.push_back({"c_static_assert", Language::C, 11, false});
 
     // Build feature map for fast lookup
-    for (const auto& feat : c_features_) {
-        feature_map_[feat.name] = &feat;
-    }
+    for (const auto& feat : c_features_) { feature_map_[feat.name] = &feat; }
 }
 
 bool CompileFeatures::is_known_feature(std::string_view feature) const {
@@ -121,9 +117,7 @@ bool CompileFeatures::is_known_feature(std::string_view feature) const {
 
 const CompileFeature* CompileFeatures::get_feature_info(std::string_view feature) const {
     auto it = feature_map_.find(std::string(feature));
-    if (it != feature_map_.end()) {
-        return it->second;
-    }
+    if (it != feature_map_.end()) { return it->second; }
     return nullptr;
 }
 

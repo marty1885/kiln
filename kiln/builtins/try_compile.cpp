@@ -23,9 +23,7 @@ namespace {
 std::expected<int64_t, std::string> get_file_mtime(const std::string& path) {
     std::error_code ec;
     auto ftime = std::filesystem::last_write_time(path, ec);
-    if (ec) {
-        return std::unexpected("Failed to get mtime for " + path + ": " + ec.message());
-    }
+    if (ec) { return std::unexpected("Failed to get mtime for " + path + ": " + ec.message()); }
     return ftime.time_since_epoch().count();
 }
 
@@ -40,7 +38,7 @@ std::string detect_language(const std::string& path) {
     std::string ext = p.extension().string();
     if (ext == ".c") return "C";
     if (ext == ".cpp" || ext == ".cxx" || ext == ".cc" || ext == ".C") return "CXX";
-    return "CXX";  // Default to C++
+    return "CXX"; // Default to C++
 }
 
 // Use kiln::shell_split from utils.hpp
@@ -49,9 +47,7 @@ using kiln::shell_split;
 // Helper: Parse .d file to extract header dependencies
 std::expected<std::vector<std::string>, std::string> parse_deps_file(const std::string& deps_file) {
     std::ifstream file(deps_file);
-    if (!file) {
-        return std::unexpected("Failed to open .d file: " + deps_file);
-    }
+    if (!file) { return std::unexpected("Failed to open .d file: " + deps_file); }
 
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
@@ -59,7 +55,7 @@ std::expected<std::vector<std::string>, std::string> parse_deps_file(const std::
     std::vector<std::string> headers;
     size_t colon_pos = content.find(':');
     if (colon_pos == std::string::npos) {
-        return headers;  // No dependencies
+        return headers; // No dependencies
     }
 
     std::string deps_part = content.substr(colon_pos + 1);
@@ -68,7 +64,7 @@ std::expected<std::vector<std::string>, std::string> parse_deps_file(const std::
     std::string cleaned;
     for (size_t i = 0; i < deps_part.size(); ++i) {
         if (deps_part[i] == '\\' && i + 1 < deps_part.size() && deps_part[i + 1] == '\n') {
-            i++;  // Skip backslash-newline
+            i++; // Skip backslash-newline
             continue;
         }
         if (deps_part[i] != '\n') {
@@ -82,9 +78,7 @@ std::expected<std::vector<std::string>, std::string> parse_deps_file(const std::
     std::istringstream iss(cleaned);
     std::string dep;
     while (iss >> dep) {
-        if (!dep.empty()) {
-            headers.push_back(dep);
-        }
+        if (!dep.empty()) { headers.push_back(dep); }
     }
 
     return headers;
@@ -95,24 +89,16 @@ std::expected<std::vector<std::string>, std::string> parse_deps_file(const std::
 // When true, source files are keyed by content hash — used as a fallback when the
 // mtime-based lookup misses because a file was rewritten with identical content
 // (e.g. DetermineGflagsNamespace.cmake rewrites the same .cxx with file(WRITE) each run).
-std::expected<std::string, std::string> compute_signature(
-    const std::string& compiler_path,
-    const std::string& compiler_version,
-    const std::string& language,
-    const std::string& standard,
-    const std::vector<std::string>& source_files,
-    const std::map<std::string, std::string>& inline_sources,  // name -> content
-    const std::vector<std::string>& compile_defs,
-    const std::vector<std::string>& link_libs,
-    const std::vector<std::string>& link_opts,
-    bool use_content_hash = false,
-    // Toolchain context — must invalidate the cache when changed even if the
-    // compiler binary path stays the same. Default to empty so existing
-    // host-build entries don't churn unnecessarily.
-    const std::string& sysroot = {},
-    const std::string& compiler_target = {},
-    const std::string& global_lang_flags = {}
-) {
+std::expected<std::string, std::string>
+compute_signature(const std::string& compiler_path, const std::string& compiler_version, const std::string& language,
+                  const std::string& standard, const std::vector<std::string>& source_files,
+                  const std::map<std::string, std::string>& inline_sources, // name -> content
+                  const std::vector<std::string>& compile_defs, const std::vector<std::string>& link_libs,
+                  const std::vector<std::string>& link_opts, bool use_content_hash = false,
+                  // Toolchain context — must invalidate the cache when changed even if the
+                  // compiler binary path stays the same. Default to empty so existing
+                  // host-build entries don't churn unnecessarily.
+                  const std::string& sysroot = {}, const std::string& compiler_target = {}, const std::string& global_lang_flags = {}) {
     std::ostringstream oss;
 
     // Compiler info
@@ -120,8 +106,8 @@ std::expected<std::string, std::string> compute_signature(
     oss << "version:" << compiler_version << "|";
     oss << "lang:" << language << "|";
     oss << "std:" << standard << "|";
-    if (!sysroot.empty())          oss << "sysroot:" << sysroot << "|";
-    if (!compiler_target.empty())  oss << "target:" << compiler_target << "|";
+    if (!sysroot.empty()) oss << "sysroot:" << sysroot << "|";
+    if (!compiler_target.empty()) oss << "target:" << compiler_target << "|";
     if (!global_lang_flags.empty()) oss << "lang_flags:" << global_lang_flags << "|";
 
     // Source files: mtime (fast path) or content hash (fallback for rewritten files)
@@ -147,27 +133,20 @@ std::expected<std::string, std::string> compute_signature(
     // Compile definitions (sorted for consistency)
     std::vector<std::string> sorted_defs = compile_defs;
     std::sort(sorted_defs.begin(), sorted_defs.end());
-    for (const auto& def : sorted_defs) {
-        oss << "def:" << def << "|";
-    }
+    for (const auto& def : sorted_defs) { oss << "def:" << def << "|"; }
 
     // Link libraries (sorted)
     std::vector<std::string> sorted_libs = link_libs;
     std::sort(sorted_libs.begin(), sorted_libs.end());
-    for (const auto& lib : sorted_libs) {
-        oss << "lib:" << lib << "|";
-    }
+    for (const auto& lib : sorted_libs) { oss << "lib:" << lib << "|"; }
 
     // Link options (sorted)
     std::vector<std::string> sorted_opts = link_opts;
     std::sort(sorted_opts.begin(), sorted_opts.end());
-    for (const auto& opt : sorted_opts) {
-        oss << "opt:" << opt << "|";
-    }
+    for (const auto& opt : sorted_opts) { oss << "opt:" << opt << "|"; }
 
     return oss.str();
 }
-
 
 // Helper: Validate cached header deps.
 // Check mtime first (cheap). If mtime changed, compare content hash.
@@ -175,17 +154,13 @@ std::expected<std::string, std::string> compute_signature(
 std::string validate_header_deps(const std::map<std::string, HeaderDep>& header_deps) {
     for (const auto& [header, dep] : header_deps) {
         auto current_mtime = get_file_mtime(header);
-        if (!current_mtime) {
-            return "header deleted: " + header;
-        }
+        if (!current_mtime) { return "header deleted: " + header; }
         if (*current_mtime != dep.mtime) {
             // Mtime changed — fall back to content hash
             std::ifstream ifs(header, std::ios::binary);
             if (!ifs) return "header unreadable: " + header;
             std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-            if (blake2b(content).to_string() != dep.hash) {
-                return "header content changed: " + header;
-            }
+            if (blake2b(content).to_string() != dep.hash) { return "header content changed: " + header; }
             // Content identical despite mtime change — still valid
         }
     }
@@ -194,8 +169,7 @@ std::string validate_header_deps(const std::map<std::string, HeaderDep>& header_
 
 // Filter COMPILE_DEFINITIONS in place: items starting with '-' (but not '-D') are compiler flags.
 // CMake modules like CheckCCompilerFlag pass -Wall etc. as COMPILE_DEFINITIONS.
-void filter_compile_definitions(std::vector<std::string>& compile_definitions,
-                                std::vector<std::string>& raw_compile_flags) {
+void filter_compile_definitions(std::vector<std::string>& compile_definitions, std::vector<std::string>& raw_compile_flags) {
     std::vector<std::string> filtered;
     for (const auto& item : compile_definitions) {
         if (item.empty()) continue;
@@ -212,10 +186,8 @@ void filter_compile_definitions(std::vector<std::string>& compile_definitions,
 
 // Process CMAKE_FLAGS list (-DCOMPILE_DEFINITIONS:STRING=..., -DLINK_LIBRARIES=..., etc.)
 // and route into the appropriate output buckets.
-void process_cmake_flags(const std::vector<std::string>& cmake_flags,
-                         std::vector<std::string>& compile_definitions,
-                         std::vector<std::string>& raw_compile_flags,
-                         std::vector<std::string>& link_libraries,
+void process_cmake_flags(const std::vector<std::string>& cmake_flags, std::vector<std::string>& compile_definitions,
+                         std::vector<std::string>& raw_compile_flags, std::vector<std::string>& link_libraries,
                          std::vector<std::string>& link_options) {
     for (const auto& flag : cmake_flags) {
         if (flag.size() < 2 || flag.substr(0, 2) != "-D") continue;
@@ -267,10 +239,8 @@ void process_cmake_flags(const std::vector<std::string>& cmake_flags,
 
 // Pick the first available source name across the various source vectors,
 // for language detection / profiling labels.
-std::string first_source_name(const std::vector<std::string>& sources,
-                              const std::vector<std::string>& source_from_content,
-                              const std::vector<std::string>& source_from_var,
-                              const std::vector<std::string>& source_from_file) {
+std::string first_source_name(const std::vector<std::string>& sources, const std::vector<std::string>& source_from_content,
+                              const std::vector<std::string>& source_from_var, const std::vector<std::string>& source_from_file) {
     if (!sources.empty()) return sources[0];
     if (!source_from_content.empty()) return source_from_content[0];
     if (!source_from_var.empty()) return source_from_var[0];
@@ -283,9 +253,7 @@ std::string first_source_name(const std::vector<std::string>& sources,
 std::expected<std::string, std::string> resolve_bindir(const std::string& bindir, Interpreter& interp) {
     if (!bindir.empty()) return bindir;
     std::string cmake_binary_dir = interp.get_variable("CMAKE_BINARY_DIR");
-    if (cmake_binary_dir.empty()) {
-        return std::unexpected("requires CMAKE_BINARY_DIR to be set");
-    }
+    if (cmake_binary_dir.empty()) { return std::unexpected("requires CMAKE_BINARY_DIR to be set"); }
     return (std::filesystem::path(cmake_binary_dir) / "kiln_scratch_area").string();
 }
 
@@ -303,31 +271,23 @@ struct ToolchainContext {
     std::string global_lang_flags;
 };
 
-std::expected<ToolchainContext, std::string> get_toolchain_context(
-    Interpreter& interp,
-    const std::string& language_str,
-    const std::string& c_standard,
-    const std::string& cxx_standard
-) {
+std::expected<ToolchainContext, std::string> get_toolchain_context(Interpreter& interp, const std::string& language_str,
+                                                                   const std::string& c_standard, const std::string& cxx_standard) {
     ToolchainContext tc;
     tc.language_str = language_str;
     tc.lang = (language_str == "C") ? Language::C : Language::CXX;
     tc.compiler = interp.get_toolchain().get_compiler(tc.lang);
-    if (!tc.compiler) {
-        return std::unexpected("No compiler configured for language: " + language_str);
-    }
+    if (!tc.compiler) { return std::unexpected("No compiler configured for language: " + language_str); }
 
     bool is_c = (tc.lang == Language::C);
     tc.compiler_version = interp.get_variable(is_c ? "CMAKE_C_COMPILER_VERSION" : "CMAKE_CXX_COMPILER_VERSION");
-    tc.compiler_path    = interp.get_variable(is_c ? "CMAKE_C_COMPILER" : "CMAKE_CXX_COMPILER");
-    tc.sysroot          = interp.get_variable("CMAKE_SYSROOT");
-    tc.target           = interp.get_variable(is_c ? "CMAKE_C_COMPILER_TARGET" : "CMAKE_CXX_COMPILER_TARGET");
-    tc.global_lang_flags= interp.get_variable(is_c ? "CMAKE_C_FLAGS" : "CMAKE_CXX_FLAGS");
+    tc.compiler_path = interp.get_variable(is_c ? "CMAKE_C_COMPILER" : "CMAKE_CXX_COMPILER");
+    tc.sysroot = interp.get_variable("CMAKE_SYSROOT");
+    tc.target = interp.get_variable(is_c ? "CMAKE_C_COMPILER_TARGET" : "CMAKE_CXX_COMPILER_TARGET");
+    tc.global_lang_flags = interp.get_variable(is_c ? "CMAKE_C_FLAGS" : "CMAKE_CXX_FLAGS");
 
     const std::string& user_std = is_c ? c_standard : cxx_standard;
-    tc.standard = user_std.empty()
-        ? interp.get_variable(is_c ? "CMAKE_C_STANDARD" : "CMAKE_CXX_STANDARD")
-        : user_std;
+    tc.standard = user_std.empty() ? interp.get_variable(is_c ? "CMAKE_C_STANDARD" : "CMAKE_CXX_STANDARD") : user_std;
 
     std::string ext_value = interp.get_variable(is_c ? "CMAKE_C_EXTENSIONS" : "CMAKE_CXX_EXTENSIONS");
     tc.use_extensions = ext_value.empty() || !Interpreter::is_falsy(ext_value);
@@ -336,26 +296,20 @@ std::expected<ToolchainContext, std::string> get_toolchain_context(
 
 // Process pair-form SOURCE_FROM_* arguments into a name->content map.
 // Sets fatal_error and returns false on failure.
-bool process_inline_sources(Interpreter& interp,
-                            const std::vector<std::string>& source_from_content,
-                            const std::vector<std::string>& source_from_var,
-                            const std::vector<std::string>& source_from_file,
+bool process_inline_sources(Interpreter& interp, const std::vector<std::string>& source_from_content,
+                            const std::vector<std::string>& source_from_var, const std::vector<std::string>& source_from_file,
                             std::map<std::string, std::string>& out) {
     if (source_from_content.size() % 2 != 0) {
         interp.set_fatal_error("SOURCE_FROM_CONTENT requires pairs of (name, content)");
         return false;
     }
-    for (size_t i = 0; i < source_from_content.size(); i += 2) {
-        out[source_from_content[i]] = source_from_content[i + 1];
-    }
+    for (size_t i = 0; i < source_from_content.size(); i += 2) { out[source_from_content[i]] = source_from_content[i + 1]; }
 
     if (source_from_var.size() % 2 != 0) {
         interp.set_fatal_error("SOURCE_FROM_VAR requires pairs of (name, varname)");
         return false;
     }
-    for (size_t i = 0; i < source_from_var.size(); i += 2) {
-        out[source_from_var[i]] = interp.get_variable(source_from_var[i + 1]);
-    }
+    for (size_t i = 0; i < source_from_var.size(); i += 2) { out[source_from_var[i]] = interp.get_variable(source_from_var[i + 1]); }
 
     if (source_from_file.size() % 2 != 0) {
         interp.set_fatal_error("SOURCE_FROM_FILE requires pairs of (name, filepath)");
@@ -382,8 +336,7 @@ struct ResolvedLinks {
     std::vector<std::string> propagated_options;
 };
 
-ResolvedLinks resolve_link_libraries(Interpreter& interp,
-                                     const std::vector<std::string>& link_libraries) {
+ResolvedLinks resolve_link_libraries(Interpreter& interp, const std::vector<std::string>& link_libraries) {
     ResolvedLinks r;
     auto& targets = interp.get_targets();
     for (const auto& lib : link_libraries) {
@@ -415,11 +368,8 @@ ResolvedLinks resolve_link_libraries(Interpreter& interp,
 // Merge propagated properties into compile_definitions / raw_compile_flags,
 // evaluating generator expressions on the way (some imported targets carry
 // $<COMPILE_LANGUAGE:...> etc. on their INTERFACE properties).
-void merge_propagated_into_flags(Interpreter& interp,
-                                 Language lang,
-                                 const ResolvedLinks& links,
-                                 std::vector<std::string>& compile_definitions,
-                                 std::vector<std::string>& raw_compile_flags) {
+void merge_propagated_into_flags(Interpreter& interp, Language lang, const ResolvedLinks& links,
+                                 std::vector<std::string>& compile_definitions, std::vector<std::string>& raw_compile_flags) {
     auto genex_ctx = GenexEvaluationContext::from_interpreter(interp, interp.get_targets());
     genex_ctx.compile_language = lang;
     GenexEvaluator evaluator(genex_ctx);
@@ -450,17 +400,17 @@ void merge_propagated_into_flags(Interpreter& interp,
 
 // Shared structure for compilation parameters
 struct CompileParams {
-    const Compiler* compiler = nullptr;  // Compiler from toolchain (handles extensions, etc.)
-    Language lang = Language::CXX;       // Language enum
-    std::string compiler_path;           // Fallback if no compiler in toolchain
+    const Compiler* compiler = nullptr; // Compiler from toolchain (handles extensions, etc.)
+    Language lang = Language::CXX;      // Language enum
+    std::string compiler_path;          // Fallback if no compiler in toolchain
     std::string compiler_version;
     std::string standard;
-    bool use_extensions = true;  // Whether to use gnu11 vs c11 (default ON like CMake)
+    bool use_extensions = true; // Whether to use gnu11 vs c11 (default ON like CMake)
     std::vector<std::string> sources;
     std::map<std::string, std::string> inline_sources_map;
-    std::vector<std::string> include_dirs;     // Include directories
+    std::vector<std::string> include_dirs; // Include directories
     std::vector<std::string> compile_definitions;
-    std::vector<std::string> raw_compile_flags;  // Flags passed as-is (e.g., -Werror)
+    std::vector<std::string> raw_compile_flags; // Flags passed as-is (e.g., -Werror)
     std::vector<std::string> resolved_link_libs;
     std::vector<std::string> link_options;
     std::filesystem::path temp_dir;
@@ -471,28 +421,21 @@ struct CompileResult {
     bool success = false;
     std::string output;
     std::map<std::string, HeaderDep> header_deps;
-    std::string executable_path;  // For try_run
+    std::string executable_path; // For try_run
 };
 
 // Shared function: compile source files to executable
-std::expected<CompileResult, std::string> compile_sources(
-    const CompileParams& params,
-    bool link_executable = false
-) {
+std::expected<CompileResult, std::string> compile_sources(const CompileParams& params, bool link_executable = false) {
     CompileResult result;
 
-    if (!params.compiler) {
-        return std::unexpected("No compiler available for try_compile");
-    }
+    if (!params.compiler) { return std::unexpected("No compiler available for try_compile"); }
 
     // Write inline sources to files
     std::vector<std::string> all_sources = params.sources;
     for (const auto& [name, content] : params.inline_sources_map) {
         std::filesystem::path src_path = params.temp_dir / name;
         std::ofstream file(src_path);
-        if (!file) {
-            return std::unexpected("Failed to write source file: " + src_path.string());
-        }
+        if (!file) { return std::unexpected("Failed to write source file: " + src_path.string()); }
         file << content;
         file.close();
         all_sources.push_back(src_path.string());
@@ -517,9 +460,7 @@ std::expected<CompileResult, std::string> compile_sources(
         // Filter empty definitions to avoid bare "-D" flags
         for (const auto& def : params.compile_definitions) {
             auto trimmed = strip(def);
-            if (!trimmed.empty()) {
-                ctx.definitions.emplace_back(trimmed);
-            }
+            if (!trimmed.empty()) { ctx.definitions.emplace_back(trimmed); }
         }
         ctx.options = params.raw_compile_flags;
 
@@ -579,9 +520,7 @@ std::expected<CompileResult, std::string> compile_sources(
         // affect both compilation and linking (CMake passes CMAKE_REQUIRED_FLAGS
         // to CMAKE_<LANG>_FLAGS which applies to both stages).
         lctx.linker_flags = params.link_options;
-        lctx.linker_flags.insert(lctx.linker_flags.end(),
-                                 params.raw_compile_flags.begin(),
-                                 params.raw_compile_flags.end());
+        lctx.linker_flags.insert(lctx.linker_flags.end(), params.raw_compile_flags.begin(), params.raw_compile_flags.end());
         lctx.standard = params.standard;
         lctx.extensions_enabled = params.use_extensions;
 
@@ -606,15 +545,15 @@ void register_try_compile_builtins(Interpreter& interp) {
 
         std::string result_var;
         std::string bindir;
-        std::string srcdir_or_srcfile;  // Could be source file (old syntax) or source directory (project mode)
-        std::string project_name;       // For project mode
-        std::string target_name;        // For project mode (optional)
+        std::string srcdir_or_srcfile; // Could be source file (old syntax) or source directory (project mode)
+        std::string project_name;      // For project mode
+        std::string target_name;       // For project mode (optional)
         std::vector<std::string> sources;
-        std::vector<std::string> source_from_content;  // Pairs: name, content, name, content...
-        std::vector<std::string> source_from_var;      // Pairs: name, varname, name, varname...
-        std::vector<std::string> source_from_file;     // Pairs: name, filepath, name, filepath...
+        std::vector<std::string> source_from_content; // Pairs: name, content, name, content...
+        std::vector<std::string> source_from_var;     // Pairs: name, varname, name, varname...
+        std::vector<std::string> source_from_file;    // Pairs: name, filepath, name, filepath...
         std::vector<std::string> compile_definitions;
-        std::vector<std::string> raw_compile_flags;    // Compiler flags passed as-is (from CMAKE_FLAGS)
+        std::vector<std::string> raw_compile_flags; // Compiler flags passed as-is (from CMAKE_FLAGS)
         std::vector<std::string> link_libraries;
         std::vector<std::string> link_options;
         std::string cxx_standard;
@@ -624,16 +563,16 @@ void register_try_compile_builtins(Interpreter& interp) {
         std::string output_variable;
         std::string copy_file;
         std::string copy_file_error;
-        std::string log_description;  // Ignored but must be parsed to avoid polluting other keywords
+        std::string log_description; // Ignored but must be parsed to avoid polluting other keywords
         bool no_cache = false;
         bool no_log = false;
         std::vector<std::string> cmake_flags;
 
         parser.positional(result_var, "result variable");
-        parser.positional(bindir, "binary directory", false);  // Optional
-        parser.positional(srcdir_or_srcfile, "source dir/file", false);  // Optional
-        parser.positional(project_name, "project name", false);  // Optional (project mode)
-        parser.positional(target_name, "target name", false);  // Optional (project mode)
+        parser.positional(bindir, "binary directory", false);           // Optional
+        parser.positional(srcdir_or_srcfile, "source dir/file", false); // Optional
+        parser.positional(project_name, "project name", false);         // Optional (project mode)
+        parser.positional(target_name, "target name", false);           // Optional (project mode)
         parser.list("SOURCES", sources);
         parser.list("SOURCE_FROM_CONTENT", source_from_content);
         parser.list("SOURCE_FROM_VAR", source_from_var);
@@ -662,9 +601,7 @@ void register_try_compile_builtins(Interpreter& interp) {
         if (!srcdir_or_srcfile.empty() && !project_name.empty()) {
             // Project mode: try_compile(result bindir srcdir projectName [targetName])
             std::filesystem::path srcdir_path(srcdir_or_srcfile);
-            if (std::filesystem::is_directory(srcdir_path)) {
-                project_mode = true;
-            }
+            if (std::filesystem::is_directory(srcdir_path)) { project_mode = true; }
         }
 
         if (project_mode) {
@@ -685,9 +622,7 @@ void register_try_compile_builtins(Interpreter& interp) {
             if (!std::filesystem::exists(cmake_file)) {
                 interp.set_variable(result_var, "FALSE");
                 interp.set_cache_variable(result_var, "FALSE");
-                if (!output_variable.empty()) {
-                    interp.set_variable(output_variable, "CMakeLists.txt not found in " + srcdir.string());
-                }
+                if (!output_variable.empty()) { interp.set_variable(output_variable, "CMakeLists.txt not found in " + srcdir.string()); }
                 return;
             }
 
@@ -722,9 +657,7 @@ void register_try_compile_builtins(Interpreter& interp) {
             if (!ast) {
                 interp.set_variable(result_var, "FALSE");
                 interp.set_cache_variable(result_var, "FALSE");
-                if (!output_variable.empty()) {
-                    interp.set_variable(output_variable, "Parse error: " + ast.error().reason);
-                }
+                if (!output_variable.empty()) { interp.set_variable(output_variable, "Parse error: " + ast.error().reason); }
                 return;
             }
 
@@ -736,9 +669,7 @@ void register_try_compile_builtins(Interpreter& interp) {
             if (!interp_result) {
                 interp.set_variable(result_var, "FALSE");
                 interp.set_cache_variable(result_var, "FALSE");
-                if (!output_variable.empty()) {
-                    interp.set_variable(output_variable, full_output + "\n" + interp_result.error().message);
-                }
+                if (!output_variable.empty()) { interp.set_variable(output_variable, full_output + "\n" + interp_result.error().message); }
                 return;
             }
 
@@ -748,18 +679,14 @@ void register_try_compile_builtins(Interpreter& interp) {
 
             // Generate build graph and execute
             std::vector<std::string> build_targets;
-            if (!target_name.empty()) {
-                build_targets.push_back(target_name);
-            }
+            if (!target_name.empty()) { build_targets.push_back(target_name); }
 
             auto graph_result = child_interp.generate_build_graph(build_targets);
             if (!graph_result) {
                 full_output += child_output.str();
                 interp.set_variable(result_var, "FALSE");
                 interp.set_cache_variable(result_var, "FALSE");
-                if (!output_variable.empty()) {
-                    interp.set_variable(output_variable, full_output + "\n" + graph_result.error().message);
-                }
+                if (!output_variable.empty()) { interp.set_variable(output_variable, full_output + "\n" + graph_result.error().message); }
                 return;
             }
 
@@ -791,15 +718,17 @@ void register_try_compile_builtins(Interpreter& interp) {
         }
 
         // Auto-generate bindir if not specified (CMake 3.25+ behavior).
-        if (auto br = resolve_bindir(bindir, interp); br) bindir = *br;
-        else { interp.set_fatal_error("try_compile " + br.error()); return; }
+        if (auto br = resolve_bindir(bindir, interp); br)
+            bindir = *br;
+        else {
+            interp.set_fatal_error("try_compile " + br.error());
+            return;
+        }
 
-        process_cmake_flags(cmake_flags, compile_definitions, raw_compile_flags,
-                            link_libraries, link_options);
+        process_cmake_flags(cmake_flags, compile_definitions, raw_compile_flags, link_libraries, link_options);
 
         // Validate: need at least one source
-        if (sources.empty() && source_from_content.empty() &&
-            source_from_var.empty() && source_from_file.empty()) {
+        if (sources.empty() && source_from_content.empty() && source_from_var.empty() && source_from_file.empty()) {
             interp.set_fatal_error("try_compile requires at least one source");
             return;
         }
@@ -822,13 +751,15 @@ void register_try_compile_builtins(Interpreter& interp) {
         std::string language_str = first_src.empty() ? "CXX" : detect_language(first_src);
 
         auto tc_result = get_toolchain_context(interp, language_str, c_standard, cxx_standard);
-        if (!tc_result) { interp.set_fatal_error(tc_result.error()); return; }
+        if (!tc_result) {
+            interp.set_fatal_error(tc_result.error());
+            return;
+        }
         auto& tc = *tc_result;
 
         // Process inline sources
         std::map<std::string, std::string> inline_sources_map;
-        if (!process_inline_sources(interp, source_from_content, source_from_var,
-                                    source_from_file, inline_sources_map)) return;
+        if (!process_inline_sources(interp, source_from_content, source_from_var, source_from_file, inline_sources_map)) return;
 
         // Resolve LINK_LIBRARIES (convert target names to paths + propagate properties)
         ResolvedLinks links = resolve_link_libraries(interp, link_libraries);
@@ -839,13 +770,9 @@ void register_try_compile_builtins(Interpreter& interp) {
         merge_propagated_into_flags(interp, tc.lang, links, compile_definitions, raw_compile_flags);
 
         // Compute initial signature (without header deps)
-        auto sig_result = compute_signature(
-            tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard,
-            sources, inline_sources_map, compile_definitions,
-            links.resolved_libs, link_options,
-            /*use_content_hash=*/false,
-            tc.sysroot, tc.target, tc.global_lang_flags
-        );
+        auto sig_result = compute_signature(tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard, sources,
+                                            inline_sources_map, compile_definitions, links.resolved_libs, link_options,
+                                            /*use_content_hash=*/false, tc.sysroot, tc.target, tc.global_lang_flags);
         if (!sig_result) {
             interp.set_fatal_error("Failed to compute signature: " + sig_result.error());
             return;
@@ -854,8 +781,8 @@ void register_try_compile_builtins(Interpreter& interp) {
 
         // Check cache: first by mtime-based signature (fast), then by content-hash (handles rewritten files)
         // Track diagnostic info for profiling
-        std::string cache_status;    // "cached", "miss", "invalidated"
-        std::string cache_reason;    // details when invalidated or missed
+        std::string cache_status; // "cached", "miss", "invalidated"
+        std::string cache_reason; // details when invalidated or missed
 
         auto try_cache_hit = [&](const std::string& sig, const char* sig_type) -> bool {
             auto cached = cache.lookup<CacheSubsystem::TryCompile>(sig);
@@ -878,13 +805,12 @@ void register_try_compile_builtins(Interpreter& interp) {
                     {"sig_type", sig_type},
                     {"source", profile_src},
                 };
-                Profiler::instance().add_complete("try_compile " + profile_src + " (cached)", "configure", profile_start, dur, std::move(pargs));
+                Profiler::instance().add_complete("try_compile " + profile_src + " (cached)", "configure", profile_start, dur,
+                                                  std::move(pargs));
             }
             interp.set_variable(result_var, cached->success ? "TRUE" : "FALSE");
             interp.set_cache_variable(result_var, cached->success ? "TRUE" : "FALSE");
-            if (!output_variable.empty()) {
-                interp.set_variable(output_variable, cached->output);
-            }
+            if (!output_variable.empty()) { interp.set_variable(output_variable, cached->output); }
             return true;
         };
 
@@ -892,19 +818,16 @@ void register_try_compile_builtins(Interpreter& interp) {
 
         // Mtime miss — try content-hash signature (source rewritten with same content?)
         if (!sources.empty()) {
-            auto hash_sig = compute_signature(
-                tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard,
-                sources, inline_sources_map, compile_definitions,
-                links.resolved_libs, link_options, /*use_content_hash=*/true,
-                tc.sysroot, tc.target, tc.global_lang_flags
-            );
+            auto hash_sig = compute_signature(tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard, sources,
+                                              inline_sources_map, compile_definitions, links.resolved_libs, link_options,
+                                              /*use_content_hash=*/true, tc.sysroot, tc.target, tc.global_lang_flags);
             if (hash_sig && try_cache_hit(*hash_sig, "content-hash")) return;
         }
 
         // Cache miss - need to compile
         // Create temporary directory
-        std::filesystem::path temp_dir = std::filesystem::path(bindir) / ".kiln_try_compile" /
-                                         std::to_string(std::hash<std::string>{}(base_signature));
+        std::filesystem::path temp_dir =
+            std::filesystem::path(bindir) / ".kiln_try_compile" / std::to_string(std::hash<std::string>{}(base_signature));
         std::error_code ec;
         std::filesystem::create_directories(temp_dir, ec);
         if (ec) {
@@ -988,15 +911,10 @@ void register_try_compile_builtins(Interpreter& interp) {
         cache.insert<CacheSubsystem::TryCompile>(base_signature, entry);
 
         if (!sources.empty()) {
-            auto hash_sig = compute_signature(
-                tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard,
-                sources, inline_sources_map, compile_definitions,
-                links.resolved_libs, link_options, /*use_content_hash=*/true,
-                tc.sysroot, tc.target, tc.global_lang_flags
-            );
-            if (hash_sig && *hash_sig != base_signature) {
-                cache.insert<CacheSubsystem::TryCompile>(*hash_sig, entry);
-            }
+            auto hash_sig = compute_signature(tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard, sources,
+                                              inline_sources_map, compile_definitions, links.resolved_libs, link_options,
+                                              /*use_content_hash=*/true, tc.sysroot, tc.target, tc.global_lang_flags);
+            if (hash_sig && *hash_sig != base_signature) { cache.insert<CacheSubsystem::TryCompile>(*hash_sig, entry); }
         }
 
         // Handle COPY_FILE if specified
@@ -1015,9 +933,7 @@ void register_try_compile_builtins(Interpreter& interp) {
 
             // Copy the file
             if (!copy_ec) {
-                std::filesystem::copy_file(artifact_path, copy_file,
-                                          std::filesystem::copy_options::overwrite_existing,
-                                          copy_ec);
+                std::filesystem::copy_file(artifact_path, copy_file, std::filesystem::copy_options::overwrite_existing, copy_ec);
                 if (copy_ec && !copy_file_error.empty()) {
                     interp.set_variable(copy_file_error, "Failed to copy file: " + copy_ec.message());
                 }
@@ -1027,26 +943,20 @@ void register_try_compile_builtins(Interpreter& interp) {
         // Set result variables (both local and cache, matching CMake behavior)
         interp.set_variable(result_var, compile_success ? "TRUE" : "FALSE");
         interp.set_cache_variable(result_var, compile_success ? "TRUE" : "FALSE");
-        if (!output_variable.empty()) {
-            interp.set_variable(output_variable, output);
-        }
+        if (!output_variable.empty()) { interp.set_variable(output_variable, output); }
 
         if (profiling) {
             auto dur = Profiler::instance().now_us() - profile_start;
             Profiler::Args pargs = std::map<std::string, std::string>{
-                {"status", cache_status},
-                {"reason", cache_reason},
-                {"source", profile_src},
-                {"result", compile_success ? "TRUE" : "FALSE"},
+                {"status", cache_status},      {"reason", cache_reason},
+                {"source", profile_src},       {"result", compile_success ? "TRUE" : "FALSE"},
                 {"signature", base_signature},
             };
             Profiler::instance().add_complete("try_compile " + profile_src, "configure", profile_start, dur, std::move(pargs));
         }
 
         // Clean up temp directory on success (keep on failure for debugging)
-        if (compile_success) {
-            std::filesystem::remove_all(temp_dir, ec);
-        }
+        if (compile_success) { std::filesystem::remove_all(temp_dir, ec); }
     });
 
     interp.add_builtin("try_run", [](Interpreter& interp, const std::vector<std::string>& args) {
@@ -1120,15 +1030,17 @@ void register_try_compile_builtins(Interpreter& interp) {
         }
         ProfileScope try_run_profile("try_run " + profile_src, "configure");
 
-        if (auto br = resolve_bindir(bindir, interp); br) bindir = *br;
-        else { interp.set_fatal_error("try_run " + br.error()); return; }
+        if (auto br = resolve_bindir(bindir, interp); br)
+            bindir = *br;
+        else {
+            interp.set_fatal_error("try_run " + br.error());
+            return;
+        }
 
-        process_cmake_flags(cmake_flags, compile_definitions, raw_compile_flags,
-                            link_libraries, link_options);
+        process_cmake_flags(cmake_flags, compile_definitions, raw_compile_flags, link_libraries, link_options);
 
         // Validate: need at least one source
-        if (sources.empty() && source_from_content.empty() &&
-            source_from_var.empty() && source_from_file.empty()) {
+        if (sources.empty() && source_from_content.empty() && source_from_var.empty() && source_from_file.empty()) {
             interp.set_fatal_error("try_run requires at least one source");
             return;
         }
@@ -1138,13 +1050,15 @@ void register_try_compile_builtins(Interpreter& interp) {
         std::string language_str = first_src.empty() ? "CXX" : detect_language(first_src);
 
         auto tc_result = get_toolchain_context(interp, language_str, c_standard, cxx_standard);
-        if (!tc_result) { interp.set_fatal_error(tc_result.error()); return; }
+        if (!tc_result) {
+            interp.set_fatal_error(tc_result.error());
+            return;
+        }
         auto& tc = *tc_result;
 
         // Process inline sources
         std::map<std::string, std::string> inline_sources_map;
-        if (!process_inline_sources(interp, source_from_content, source_from_var,
-                                    source_from_file, inline_sources_map)) return;
+        if (!process_inline_sources(interp, source_from_content, source_from_var, source_from_file, inline_sources_map)) return;
 
         // Resolve LINK_LIBRARIES (convert target names to paths + propagate properties)
         ResolvedLinks links = resolve_link_libraries(interp, link_libraries);
@@ -1153,13 +1067,9 @@ void register_try_compile_builtins(Interpreter& interp) {
         merge_propagated_into_flags(interp, tc.lang, links, compile_definitions, raw_compile_flags);
 
         // Compute signature for caching (compilation inputs + run args)
-        auto sig_result = compute_signature(
-            tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard,
-            sources, inline_sources_map, compile_definitions,
-            links.resolved_libs, link_options,
-            /*use_content_hash=*/false,
-            tc.sysroot, tc.target, tc.global_lang_flags
-        );
+        auto sig_result = compute_signature(tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard, sources,
+                                            inline_sources_map, compile_definitions, links.resolved_libs, link_options,
+                                            /*use_content_hash=*/false, tc.sysroot, tc.target, tc.global_lang_flags);
         if (!sig_result) {
             interp.set_fatal_error("Failed to compute signature: " + sig_result.error());
             return;
@@ -1167,15 +1077,9 @@ void register_try_compile_builtins(Interpreter& interp) {
         // Extend with run-specific inputs
         std::ostringstream run_sig;
         run_sig << *sig_result;
-        for (const auto& arg : run_args) {
-            run_sig << "arg:" << arg << "|";
-        }
-        if (!working_directory.empty()) {
-            run_sig << "workdir:" << working_directory << "|";
-        }
-        for (const auto& flag : raw_compile_flags) {
-            run_sig << "cflag:" << flag << "|";
-        }
+        for (const auto& arg : run_args) { run_sig << "arg:" << arg << "|"; }
+        if (!working_directory.empty()) { run_sig << "workdir:" << working_directory << "|"; }
+        for (const auto& flag : raw_compile_flags) { run_sig << "cflag:" << flag << "|"; }
         std::string base_signature = run_sig.str();
 
         // Check cache
@@ -1190,22 +1094,14 @@ void register_try_compile_builtins(Interpreter& interp) {
             // Cache hit
             interp.set_variable(compile_result_var, cached->compile_success ? "TRUE" : "FALSE");
             interp.set_cache_variable(compile_result_var, cached->compile_success ? "TRUE" : "FALSE");
-            if (!compile_output_variable.empty()) {
-                interp.set_variable(compile_output_variable, cached->compile_output);
-            }
+            if (!compile_output_variable.empty()) { interp.set_variable(compile_output_variable, cached->compile_output); }
             if (!cached->compile_success) {
                 interp.set_variable(run_result_var, "FAILED_TO_RUN");
             } else {
                 interp.set_variable(run_result_var, std::to_string(cached->exit_code));
-                if (!run_output_variable.empty()) {
-                    interp.set_variable(run_output_variable, cached->run_output);
-                }
-                if (!run_output_stdout_variable.empty()) {
-                    interp.set_variable(run_output_stdout_variable, cached->run_output);
-                }
-                if (!run_output_stderr_variable.empty()) {
-                    interp.set_variable(run_output_stderr_variable, cached->run_output);
-                }
+                if (!run_output_variable.empty()) { interp.set_variable(run_output_variable, cached->run_output); }
+                if (!run_output_stdout_variable.empty()) { interp.set_variable(run_output_stdout_variable, cached->run_output); }
+                if (!run_output_stderr_variable.empty()) { interp.set_variable(run_output_stderr_variable, cached->run_output); }
             }
             return true;
         };
@@ -1216,37 +1112,28 @@ void register_try_compile_builtins(Interpreter& interp) {
         // Compute the content-hash extended signature
         std::string hash_extended_signature;
         if (!sources.empty()) {
-            auto hash_sig = compute_signature(
-                tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard,
-                sources, inline_sources_map, compile_definitions,
-                links.resolved_libs, link_options, /*use_content_hash=*/true,
-                tc.sysroot, tc.target, tc.global_lang_flags
-            );
+            auto hash_sig = compute_signature(tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard, sources,
+                                              inline_sources_map, compile_definitions, links.resolved_libs, link_options,
+                                              /*use_content_hash=*/true, tc.sysroot, tc.target, tc.global_lang_flags);
             if (hash_sig) {
                 std::ostringstream hash_run_sig;
                 hash_run_sig << *hash_sig;
-                for (const auto& arg : run_args) {
-                    hash_run_sig << "arg:" << arg << "|";
-                }
-                if (!working_directory.empty()) {
-                    hash_run_sig << "workdir:" << working_directory << "|";
-                }
-                for (const auto& flag : raw_compile_flags) {
-                    hash_run_sig << "cflag:" << flag << "|";
-                }
+                for (const auto& arg : run_args) { hash_run_sig << "arg:" << arg << "|"; }
+                if (!working_directory.empty()) { hash_run_sig << "workdir:" << working_directory << "|"; }
+                for (const auto& flag : raw_compile_flags) { hash_run_sig << "cflag:" << flag << "|"; }
                 hash_extended_signature = hash_run_sig.str();
                 if (try_cache_hit(hash_extended_signature)) return;
             }
         }
 
         // Check for cross-compilation
-        bool is_cross_compiling = (interp.get_variable("CMAKE_CROSSCOMPILING") == "TRUE" ||
-                                     interp.get_variable("CMAKE_CROSSCOMPILING") == "ON" ||
-                                     interp.get_variable("CMAKE_CROSSCOMPILING") == "1");
+        bool is_cross_compiling =
+            (interp.get_variable("CMAKE_CROSSCOMPILING") == "TRUE" || interp.get_variable("CMAKE_CROSSCOMPILING") == "ON"
+             || interp.get_variable("CMAKE_CROSSCOMPILING") == "1");
 
         // Create temporary directory
-        std::filesystem::path temp_dir = std::filesystem::path(bindir) / ".kiln_try_run" /
-                                         std::to_string(std::hash<std::string>{}(base_signature));
+        std::filesystem::path temp_dir =
+            std::filesystem::path(bindir) / ".kiln_try_run" / std::to_string(std::hash<std::string>{}(base_signature));
         std::error_code ec;
         std::filesystem::create_directories(temp_dir, ec);
         if (ec) {
@@ -1284,9 +1171,7 @@ void register_try_compile_builtins(Interpreter& interp) {
         // Set compile result (both local and cache, matching CMake behavior)
         interp.set_variable(compile_result_var, compile_success ? "TRUE" : "FALSE");
         interp.set_cache_variable(compile_result_var, compile_success ? "TRUE" : "FALSE");
-        if (!compile_output_variable.empty()) {
-            interp.set_variable(compile_output_variable, compile_output);
-        }
+        if (!compile_output_variable.empty()) { interp.set_variable(compile_output_variable, compile_output); }
 
         // If compilation failed, cache the failure and return
         if (!compile_success) {
@@ -1313,15 +1198,13 @@ void register_try_compile_builtins(Interpreter& interp) {
                 std::string cached_output = interp.get_variable(run_result_var + "__TRYRUN_OUTPUT");
 
                 if (cached_exit_code.empty()) {
-                    interp.set_fatal_error("Cross-compiling without emulator - please set " + run_result_var +
-                                           " cache variable to expected exit code");
+                    interp.set_fatal_error("Cross-compiling without emulator - please set " + run_result_var
+                                           + " cache variable to expected exit code");
                     return;
                 }
 
                 // Use cached values
-                if (!run_output_variable.empty() && !cached_output.empty()) {
-                    interp.set_variable(run_output_variable, cached_output);
-                }
+                if (!run_output_variable.empty() && !cached_output.empty()) { interp.set_variable(run_output_variable, cached_output); }
                 // Exit code already set via cache variable
                 return;
             }
@@ -1339,16 +1222,12 @@ void register_try_compile_builtins(Interpreter& interp) {
         if (is_cross_compiling) {
             std::string emulator = interp.get_variable("CMAKE_CROSSCOMPILING_EMULATOR");
             if (!emulator.empty()) {
-                for (auto part : CMakeArrayIterator(emulator)) {
-                    run_cmd.emplace_back(part);
-                }
+                for (auto part : CMakeArrayIterator(emulator)) { run_cmd.emplace_back(part); }
             }
         }
 
         run_cmd.push_back(exe_path);
-        for (const auto& arg : run_args) {
-            run_cmd.push_back(arg);
-        }
+        for (const auto& arg : run_args) { run_cmd.push_back(arg); }
 
         CommandResult run_result = run_command(run_cmd, run_dir);
 
@@ -1356,12 +1235,8 @@ void register_try_compile_builtins(Interpreter& interp) {
         interp.set_variable(run_result_var, std::to_string(run_result.exit_code));
 
         // Set output variables
-        if (!run_output_variable.empty()) {
-            interp.set_variable(run_output_variable, run_result.output);
-        }
-        if (!run_output_stdout_variable.empty()) {
-            interp.set_variable(run_output_stdout_variable, run_result.output);
-        }
+        if (!run_output_variable.empty()) { interp.set_variable(run_output_variable, run_result.output); }
+        if (!run_output_stdout_variable.empty()) { interp.set_variable(run_output_stdout_variable, run_result.output); }
         if (!run_output_stderr_variable.empty()) {
             // Combined output goes to both for now
             interp.set_variable(run_output_stderr_variable, run_result.output);
@@ -1380,9 +1255,7 @@ void register_try_compile_builtins(Interpreter& interp) {
         }
 
         // Clean up temp directory on success
-        if (run_result.exit_code == 0) {
-            std::filesystem::remove_all(temp_dir, ec);
-        }
+        if (run_result.exit_code == 0) { std::filesystem::remove_all(temp_dir, ec); }
     });
 }
 

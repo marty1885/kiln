@@ -17,22 +17,14 @@ struct InstallRule;
 //
 // Called at the end of a successful build; the resulting plan is serialized to
 // <build_dir>/install_plan.json and consumed by `kiln install`.
-std::expected<InstallPlan, std::string> build_install_plan(
-    Interpreter* interp,
-    const std::vector<std::shared_ptr<InstallRule>>& rules,
-    const std::string& default_prefix,
-    const std::string& current_config,
-    const OutputCtx& out = stdout_output_ctx()
-);
+std::expected<InstallPlan, std::string> build_install_plan(Interpreter* interp, const std::vector<std::shared_ptr<InstallRule>>& rules,
+                                                           const std::string& default_prefix, const std::string& current_config,
+                                                           const OutputCtx& out = stdout_output_ctx());
 
 // Execute a resolved plan. No interpreter is needed; writes go only to
 // install_prefix (joined with DESTDIR by the caller if applicable).
-std::expected<void, std::string> execute_install_plan(
-    const InstallPlan& plan,
-    const std::string& install_prefix,
-    const std::string& current_config,
-    const std::string& component_filter = "",
-    const OutputCtx& out = stdout_output_ctx()
-);
+std::expected<void, std::string> execute_install_plan(const InstallPlan& plan, const std::string& install_prefix,
+                                                      const std::string& current_config, const std::string& component_filter = "",
+                                                      const OutputCtx& out = stdout_output_ctx());
 
 } // namespace kiln

@@ -43,16 +43,10 @@ void register_variable_builtins(Interpreter& interp) {
         }
 
         // Check for CACHE keyword (case-insensitive)
-        auto cache_it = std::find_if(args.begin() + 1, args.end(),
-            [](const std::string& s) {
-                return ci_equals(s, "CACHE");
-            });
+        auto cache_it = std::find_if(args.begin() + 1, args.end(), [](const std::string& s) { return ci_equals(s, "CACHE"); });
 
         // Check for PARENT_SCOPE keyword (case-insensitive)
-        auto parent_it = std::find_if(args.begin() + 1, args.end(),
-            [](const std::string& s) {
-                return ci_equals(s, "PARENT_SCOPE");
-            });
+        auto parent_it = std::find_if(args.begin() + 1, args.end(), [](const std::string& s) { return ci_equals(s, "PARENT_SCOPE"); });
 
         // Cannot use both CACHE and PARENT_SCOPE
         if (cache_it != args.end() && parent_it != args.end()) {
@@ -70,9 +64,7 @@ void register_variable_builtins(Interpreter& interp) {
             // Parse TYPE and docstring after CACHE
             auto type_it = cache_it + 1;
             std::string cache_type;
-            if (type_it != args.end()) {
-                cache_type = *type_it;
-            }
+            if (type_it != args.end()) { cache_type = *type_it; }
 
             // Check for FORCE keyword
             bool force = false;
@@ -84,17 +76,13 @@ void register_variable_builtins(Interpreter& interp) {
             }
 
             // INTERNAL type always implies FORCE
-            if (ci_equals(cache_type, "INTERNAL")) {
-                force = true;
-            }
+            if (ci_equals(cache_type, "INTERNAL")) { force = true; }
 
             auto* root = interp.get_root();
 
             // Only set cache if entry doesn't exist or FORCE is given
             bool cache_existed = root->cache_variables_.find(var_name) != root->cache_variables_.end();
-            if (force || !cache_existed) {
-                root->cache_variables_[var_name] = value;
-            }
+            if (force || !cache_existed) { root->cache_variables_[var_name] = value; }
 
             // CMP0126 OLD behavior: remove the normal variable of the
             // same name ONLY when the cache entry was just created, or
@@ -102,9 +90,7 @@ void register_variable_builtins(Interpreter& interp) {
             // existed (and no FORCE), the normal variable is preserved.
             KILN_POLICY_OLD(CMP0126);
             if (interp.get_policy(CMakePolicy::CMP0126) == PolicyState::OLD) {
-                if (force || !cache_existed) {
-                    interp.unset_variable(var_name);
-                }
+                if (force || !cache_existed) { interp.unset_variable(var_name); }
             }
 
             return;
@@ -121,8 +107,7 @@ void register_variable_builtins(Interpreter& interp) {
             auto result = interp.set_variable_parent_scope(var_name, value);
             if (!result) {
                 // CMake issues a dev warning (not fatal error) when no parent scope exists
-                interp.print_message("AUTHOR_WARNING",
-                    "Cannot set \"" + var_name + "\": current scope has no parent.", false);
+                interp.print_message("AUTHOR_WARNING", "Cannot set \"" + var_name + "\": current scope has no parent.", false);
             }
             return;
         }
@@ -130,17 +115,17 @@ void register_variable_builtins(Interpreter& interp) {
         // Warn if trying to modify CMAKE_BUILD_TYPE during script execution
         if (var_name == "CMAKE_BUILD_TYPE") {
             interp.print_message("WARN",
-                "Modifying CMAKE_BUILD_TYPE in CMakeLists.txt is NOT RECOMMENDED. "
-                "Use --config flag to set the build configuration.",
-                false);
+                                 "Modifying CMAKE_BUILD_TYPE in CMakeLists.txt is NOT RECOMMENDED. "
+                                 "Use --config flag to set the build configuration.",
+                                 false);
         }
 
         // Validate CMAKE_LINKER_TYPE
         if (var_name == "CMAKE_LINKER_TYPE" && args.size() > 1) {
             const auto& linker_type = args[1];
 
-            if (!ci_equals(linker_type, "BFD") && !ci_equals(linker_type, "GOLD") &&
-                !ci_equals(linker_type, "MOLD") && !ci_equals(linker_type, "LLD")) {
+            if (!ci_equals(linker_type, "BFD") && !ci_equals(linker_type, "GOLD") && !ci_equals(linker_type, "MOLD")
+                && !ci_equals(linker_type, "LLD")) {
                 interp.set_fatal_error("Invalid CMAKE_LINKER_TYPE: " + linker_type + ". Must be one of: BFD, GOLD, MOLD, LLD");
                 return;
             }
@@ -183,16 +168,10 @@ void register_variable_builtins(Interpreter& interp) {
         }
 
         // Check for CACHE keyword (case-insensitive)
-        auto cache_it = std::find_if(args.begin() + 1, args.end(),
-            [](const std::string& s) {
-                return ci_equals(s, "CACHE");
-            });
+        auto cache_it = std::find_if(args.begin() + 1, args.end(), [](const std::string& s) { return ci_equals(s, "CACHE"); });
 
         // Check for PARENT_SCOPE keyword (case-insensitive)
-        auto parent_it = std::find_if(args.begin() + 1, args.end(),
-            [](const std::string& s) {
-                return ci_equals(s, "PARENT_SCOPE");
-            });
+        auto parent_it = std::find_if(args.begin() + 1, args.end(), [](const std::string& s) { return ci_equals(s, "PARENT_SCOPE"); });
 
         // Cannot use both CACHE and PARENT_SCOPE
         if (cache_it != args.end() && parent_it != args.end()) {
@@ -211,8 +190,7 @@ void register_variable_builtins(Interpreter& interp) {
             auto result = interp.unset_variable_parent_scope(var_name);
             if (!result) {
                 // CMake issues a dev warning (not fatal error) when no parent scope exists
-                interp.print_message("AUTHOR_WARNING",
-                    "Cannot unset \"" + var_name + "\": current scope has no parent.", false);
+                interp.print_message("AUTHOR_WARNING", "Cannot unset \"" + var_name + "\": current scope has no parent.", false);
             }
             return;
         }
@@ -286,9 +264,7 @@ void register_variable_builtins(Interpreter& interp) {
             // Read arguments from ARGV variables
             std::string argc_str = interp.get_variable("ARGC");
             int argc = 0;
-            if (!argc_str.empty()) {
-                argc = parse_number<int>(argc_str).value_or(0);
-            }
+            if (!argc_str.empty()) { argc = parse_number<int>(argc_str).value_or(0); }
 
             // Collect arguments from ARGV{start_idx} to ARGV{argc-1}
             for (int i = start_idx; i < argc; ++i) {
@@ -326,23 +302,17 @@ void register_variable_builtins(Interpreter& interp) {
 
         // Initialize all option variables to FALSE
         for (const auto& opt : options) {
-            if (!opt.empty()) {
-                interp.set_variable(prefix + "_" + opt, "FALSE");
-            }
+            if (!opt.empty()) { interp.set_variable(prefix + "_" + opt, "FALSE"); }
         }
 
         // Unset all one-value keyword variables (undefined if not provided)
         for (const auto& kw : one_value_keywords) {
-            if (!kw.empty()) {
-                interp.unset_variable(prefix + "_" + kw);
-            }
+            if (!kw.empty()) { interp.unset_variable(prefix + "_" + kw); }
         }
 
         // Unset all multi-value keyword variables (undefined if not provided)
         for (const auto& kw : multi_value_keywords) {
-            if (!kw.empty()) {
-                interp.unset_variable(prefix + "_" + kw);
-            }
+            if (!kw.empty()) { interp.unset_variable(prefix + "_" + kw); }
         }
 
         // Track unparsed arguments and keywords missing values
@@ -350,7 +320,7 @@ void register_variable_builtins(Interpreter& interp) {
         std::vector<std::string> keywords_missing_values;
 
         // Parse the arguments
-        for (size_t i = 0; i < to_parse.size(); ) {
+        for (size_t i = 0; i < to_parse.size();) {
             std::string arg = to_parse[i];
 
             // Check if it's an option (boolean flag)
@@ -365,9 +335,7 @@ void register_variable_builtins(Interpreter& interp) {
                 if (i + 1 < to_parse.size()) {
                     // Check if next argument is also a keyword - if so, this keyword has no value
                     const std::string& next_arg = to_parse[i + 1];
-                    if (options.contains(next_arg) ||
-                        one_value_keywords.contains(next_arg) ||
-                        multi_value_keywords.contains(next_arg)) {
+                    if (options.contains(next_arg) || one_value_keywords.contains(next_arg) || multi_value_keywords.contains(next_arg)) {
                         // Next arg is a keyword, so this one-value keyword has no value
                         interp.set_variable(prefix + "_" + arg, "");
                         keywords_missing_values.push_back(arg);
@@ -393,10 +361,8 @@ void register_variable_builtins(Interpreter& interp) {
 
                 std::vector<std::string> values;
                 // Collect values until we hit another keyword or end
-                while (i < to_parse.size() &&
-                       !options.contains(to_parse[i]) &&
-                       !one_value_keywords.contains(to_parse[i]) &&
-                       !multi_value_keywords.contains(to_parse[i])) {
+                while (i < to_parse.size() && !options.contains(to_parse[i]) && !one_value_keywords.contains(to_parse[i])
+                       && !multi_value_keywords.contains(to_parse[i])) {
                     values.push_back(to_parse[i]);
                     i++;
                 }
@@ -447,9 +413,7 @@ void register_variable_builtins(Interpreter& interp) {
         }
 
         std::optional<std::string> callback;
-        if (args.size() == 2) {
-            callback = args[1];
-        }
+        if (args.size() == 2) { callback = args[1]; }
         interp.add_variable_watch(args[0], std::move(callback));
     });
 
@@ -472,9 +436,7 @@ void register_variable_builtins(Interpreter& interp) {
             hostname = buffer;
         } else {
             // Fallback: try HOSTNAME environment variable
-            if (const char* env_hostname = std::getenv("HOSTNAME")) {
-                hostname = env_hostname;
-            }
+            if (const char* env_hostname = std::getenv("HOSTNAME")) { hostname = env_hostname; }
             // If both fail, hostname remains empty
         }
 

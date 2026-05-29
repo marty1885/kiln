@@ -9,9 +9,8 @@ namespace kiln {
 static size_t root_prefix_len(std::string_view path) noexcept {
     if (path.empty()) return 0;
     // Windows drive: X:/
-    if (path.size() >= 3
-        && ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'))
-        && path[1] == ':' && path[2] == '/') {
+    if (path.size() >= 3 && ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) && path[1] == ':'
+        && path[2] == '/') {
         return 3;
     }
     // UNC: //server (at least //x)
@@ -30,9 +29,9 @@ static size_t root_prefix_len(std::string_view path) noexcept {
 bool Path::is_absolute() const noexcept {
     if (path_.empty()) return false;
     if (path_[0] == '/') return true;
-    if (path_.size() >= 3
-        && ((path_[0] >= 'A' && path_[0] <= 'Z') || (path_[0] >= 'a' && path_[0] <= 'z'))
-        && path_[1] == ':' && path_[2] == '/') return true;
+    if (path_.size() >= 3 && ((path_[0] >= 'A' && path_[0] <= 'Z') || (path_[0] >= 'a' && path_[0] <= 'z')) && path_[1] == ':'
+        && path_[2] == '/')
+        return true;
     return false;
 }
 
@@ -112,19 +111,26 @@ Path Path::lexically_normal() const {
     // Fast path: if the path has no . or .. components and no double slashes
     // or trailing slash, it's already normal — return as-is without allocating.
     {
-        bool dominated_by_slash = false;  // previous char was '/'
+        bool dominated_by_slash = false; // previous char was '/'
         bool clean = true;
         for (size_t i = 0, n = path_.size(); i < n; ++i) {
             char c = path_[i];
             if (c == '/') {
-                if (dominated_by_slash) { clean = false; break; }  // "//"
+                if (dominated_by_slash) {
+                    clean = false;
+                    break;
+                } // "//"
                 dominated_by_slash = true;
             } else if (c == '.' && dominated_by_slash) {
                 // Check for "/." or "/.."
                 size_t next = i + 1;
-                if (next == n || path_[next] == '/') { clean = false; break; }        // "/." at end or "/./"
+                if (next == n || path_[next] == '/') {
+                    clean = false;
+                    break;
+                } // "/." at end or "/./"
                 if (path_[next] == '.' && (next + 1 == n || path_[next + 1] == '/')) { // "/.."
-                    clean = false; break;
+                    clean = false;
+                    break;
                 }
                 dominated_by_slash = false;
             } else {
@@ -140,7 +146,9 @@ Path Path::lexically_normal() const {
     std::string_view root = std::string_view(path_).substr(0, root_len);
     std::string_view rest = std::string_view(path_).substr(root_len);
 
-    struct Component { std::string_view sv; };
+    struct Component {
+        std::string_view sv;
+    };
     Component stack[256];
     size_t stack_size = 0;
 
@@ -174,8 +182,7 @@ Path Path::lexically_normal() const {
 
     for (size_t i = 0; i < stack_size; ++i) {
         if (i > 0 || root_len > 0) {
-            if (i > 0 || (root_len > 0 && !root.empty() && root.back() != '/'))
-                result += '/';
+            if (i > 0 || (root_len > 0 && !root.empty() && root.back() != '/')) result += '/';
         }
         result.append(stack[i].sv);
     }
@@ -214,9 +221,8 @@ std::string Path::join(std::string_view base, std::string_view rel) {
     // Check if rel is absolute
     if (!rel.empty()) {
         if (rel[0] == '/') return std::string(rel);
-        if (rel.size() >= 3
-            && ((rel[0] >= 'A' && rel[0] <= 'Z') || (rel[0] >= 'a' && rel[0] <= 'z'))
-            && rel[1] == ':' && rel[2] == '/') return std::string(rel);
+        if (rel.size() >= 3 && ((rel[0] >= 'A' && rel[0] <= 'Z') || (rel[0] >= 'a' && rel[0] <= 'z')) && rel[1] == ':' && rel[2] == '/')
+            return std::string(rel);
     }
 
     std::string result;

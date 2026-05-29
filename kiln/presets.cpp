@@ -17,37 +17,32 @@ namespace {
 struct RawPreset {
     // The file that contained this preset definition; used as ${fileDir}.
     std::filesystem::path source_file;
-    glz::generic data;  // The original JSON object node, for field lookups
+    glz::generic data; // The original JSON object node, for field lookups
 };
 
 struct PresetIndex {
     // Flat map of preset name -> raw definition. Hidden presets are included
     // here so inherits can resolve to them.
     std::unordered_map<std::string, RawPreset> presets;
-    std::filesystem::path root_dir;  // dir of root CMakePresets.json
+    std::filesystem::path root_dir; // dir of root CMakePresets.json
 };
 
-std::string expand_fully(const std::string& s,
-                         const std::filesystem::path& source_dir,
-                         const std::filesystem::path& file_dir,
-                         const std::string& preset_name,
-                         const std::map<std::string, std::string>& local_env);
+std::string expand_fully(const std::string& s, const std::filesystem::path& source_dir, const std::filesystem::path& file_dir,
+                         const std::string& preset_name, const std::map<std::string, std::string>& local_env);
 
 std::string read_file(const std::filesystem::path& p) {
     std::ifstream f(p);
-    std::stringstream ss; ss << f.rdbuf();
+    std::stringstream ss;
+    ss << f.rdbuf();
     return ss.str();
 }
 
-std::expected<void, std::string>
-load_file_into_index(const std::filesystem::path& file, PresetIndex& idx,
-                     std::unordered_set<std::string>& visited) {
+std::expected<void, std::string> load_file_into_index(const std::filesystem::path& file, PresetIndex& idx,
+                                                      std::unordered_set<std::string>& visited) {
     auto canon = std::filesystem::weakly_canonical(file).string();
-    if (!visited.insert(canon).second) return {};  // already loaded
+    if (!visited.insert(canon).second) return {}; // already loaded
 
-    if (!std::filesystem::exists(file)) {
-        return std::unexpected("preset file not found: " + file.string());
-    }
+    if (!std::filesystem::exists(file)) { return std::unexpected("preset file not found: " + file.string()); }
 
     std::string content = read_file(file);
     glz::generic root;
@@ -55,9 +50,7 @@ load_file_into_index(const std::filesystem::path& file, PresetIndex& idx,
         return std::unexpected("parse error in " + file.string() + ": " + glz::format_error(ec, content));
     }
 
-    if (!root.is_object()) {
-        return std::unexpected(file.string() + ": top-level must be a JSON object");
-    }
+    if (!root.is_object()) { return std::unexpected(file.string() + ": top-level must be a JSON object"); }
     auto& obj = root.get<glz::generic::object_t>();
 
     // Recurse into includes first so that local definitions can override.
@@ -96,24 +89,20 @@ load_file_into_index(const std::filesystem::path& file, PresetIndex& idx,
 // And the preset itself overrides anything from inherits.
 // We produce a list in *application order*: ancestors first, self last, so
 // later writes win.
-std::expected<std::vector<const RawPreset*>, std::string>
-flatten_inherits(const PresetIndex& idx, const std::string& name,
-                 std::unordered_set<std::string>& on_stack,
-                 std::unordered_set<std::string>& seen) {
-    if (on_stack.count(name)) {
-        return std::unexpected("inherits cycle involving preset '" + name + "'");
-    }
+std::expected<std::vector<const RawPreset*>, std::string> flatten_inherits(const PresetIndex& idx, const std::string& name,
+                                                                           std::unordered_set<std::string>& on_stack,
+                                                                           std::unordered_set<std::string>& seen) {
+    if (on_stack.count(name)) { return std::unexpected("inherits cycle involving preset '" + name + "'"); }
     auto it = idx.presets.find(name);
-    if (it == idx.presets.end()) {
-        return std::unexpected("preset not found: '" + name + "'");
-    }
+    if (it == idx.presets.end()) { return std::unexpected("preset not found: '" + name + "'"); }
     on_stack.insert(name);
     std::vector<const RawPreset*> out;
     const auto& obj = it->second.data.get<glz::generic::object_t>();
     if (auto iit = obj.find("inherits"); iit != obj.end()) {
         // inherits may be a string or array of strings.
         std::vector<std::string> parents;
-        if (iit->second.is_string()) parents.push_back(iit->second.get<std::string>());
+        if (iit->second.is_string())
+            parents.push_back(iit->second.get<std::string>());
         else if (iit->second.is_array()) {
             for (const auto& v : iit->second.get<glz::generic::array_t>()) {
                 if (v.is_string()) parents.push_back(v.get<std::string>());
@@ -128,9 +117,7 @@ flatten_inherits(const PresetIndex& idx, const std::string& name,
         }
     }
     on_stack.erase(name);
-    if (seen.insert(name).second) {
-        out.push_back(&it->second);
-    }
+    if (seen.insert(name).second) { out.push_back(&it->second); }
     return out;
 }
 
@@ -143,11 +130,8 @@ std::string host_system_name() {
 // Expand ${var} / $env{VAR} / $penv{VAR} in s.
 // `local_env` is the merged environment from the preset chain (so $env{} can
 // see preset-defined vars even before they're exported).
-std::string expand_macros(const std::string& s,
-                          const std::filesystem::path& source_dir,
-                          const std::filesystem::path& file_dir,
-                          const std::string& preset_name,
-                          const std::map<std::string, std::string>& local_env) {
+std::string expand_macros(const std::string& s, const std::filesystem::path& source_dir, const std::filesystem::path& file_dir,
+                          const std::string& preset_name, const std::map<std::string, std::string>& local_env) {
     std::string out;
     out.reserve(s.size());
     size_t i = 0;
@@ -155,20 +139,28 @@ std::string expand_macros(const std::string& s,
         char c = s[i];
         if (c == '$' && i + 1 < s.size()) {
             // ${var}
-            if (s[i+1] == '{') {
-                size_t end = s.find('}', i+2);
+            if (s[i + 1] == '{') {
+                size_t end = s.find('}', i + 2);
                 if (end != std::string::npos) {
-                    std::string var = s.substr(i+2, end - (i+2));
-                    if (var == "sourceDir") out += source_dir.string();
-                    else if (var == "sourceParentDir") out += source_dir.parent_path().string();
-                    else if (var == "sourceDirName") out += source_dir.filename().string();
-                    else if (var == "fileDir") out += file_dir.string();
-                    else if (var == "presetName") out += preset_name;
-                    else if (var == "hostSystemName") out += host_system_name();
-                    else if (var == "dollar") out += '$';
-                    else if (var == "pathListSep") out += ':';
-                    else if (var == "generator") { /* unknown here, leave empty */ }
-                    else {
+                    std::string var = s.substr(i + 2, end - (i + 2));
+                    if (var == "sourceDir")
+                        out += source_dir.string();
+                    else if (var == "sourceParentDir")
+                        out += source_dir.parent_path().string();
+                    else if (var == "sourceDirName")
+                        out += source_dir.filename().string();
+                    else if (var == "fileDir")
+                        out += file_dir.string();
+                    else if (var == "presetName")
+                        out += preset_name;
+                    else if (var == "hostSystemName")
+                        out += host_system_name();
+                    else if (var == "dollar")
+                        out += '$';
+                    else if (var == "pathListSep")
+                        out += ':';
+                    else if (var == "generator") { /* unknown here, leave empty */
+                    } else {
                         // Unknown ${var} — leave as-is for visibility.
                         out.append(s, i, end - i + 1);
                     }
@@ -178,9 +170,9 @@ std::string expand_macros(const std::string& s,
             }
             // $env{VAR} — preset-defined env first, then process env
             else if (s.compare(i, 5, "$env{") == 0) {
-                size_t end = s.find('}', i+5);
+                size_t end = s.find('}', i + 5);
                 if (end != std::string::npos) {
-                    std::string var = s.substr(i+5, end - (i+5));
+                    std::string var = s.substr(i + 5, end - (i + 5));
                     if (auto it = local_env.find(var); it != local_env.end()) {
                         out += it->second;
                     } else if (const char* v = std::getenv(var.c_str())) {
@@ -192,9 +184,9 @@ std::string expand_macros(const std::string& s,
             }
             // $penv{VAR} — only process env, never preset-defined
             else if (s.compare(i, 6, "$penv{") == 0) {
-                size_t end = s.find('}', i+6);
+                size_t end = s.find('}', i + 6);
                 if (end != std::string::npos) {
-                    std::string var = s.substr(i+6, end - (i+6));
+                    std::string var = s.substr(i + 6, end - (i + 6));
                     if (const char* v = std::getenv(var.c_str())) out += v;
                     i = end + 1;
                     continue;
@@ -209,11 +201,8 @@ std::string expand_macros(const std::string& s,
 
 // Recursively expand until fixed point (env vars may reference each other,
 // e.g. VCPKG_ROOT references LADYBIRD_SOURCE_DIR).
-std::string expand_fully(const std::string& s,
-                         const std::filesystem::path& source_dir,
-                         const std::filesystem::path& file_dir,
-                         const std::string& preset_name,
-                         const std::map<std::string, std::string>& local_env) {
+std::string expand_fully(const std::string& s, const std::filesystem::path& source_dir, const std::filesystem::path& file_dir,
+                         const std::string& preset_name, const std::map<std::string, std::string>& local_env) {
     std::string cur = s;
     for (int i = 0; i < 16; ++i) {
         std::string next = expand_macros(cur, source_dir, file_dir, preset_name, local_env);
@@ -226,12 +215,9 @@ std::string expand_fully(const std::string& s,
 // Evaluate a preset condition object. CMake supports many operators; we
 // implement the common subset Ladybird uses (equals/notEquals).
 // Returns true (condition met / no condition), false (skip), or error.
-std::expected<bool, std::string>
-eval_condition(const glz::generic& cond,
-               const std::filesystem::path& source_dir,
-               const std::filesystem::path& file_dir,
-               const std::string& preset_name,
-               const std::map<std::string, std::string>& local_env) {
+std::expected<bool, std::string> eval_condition(const glz::generic& cond, const std::filesystem::path& source_dir,
+                                                const std::filesystem::path& file_dir, const std::string& preset_name,
+                                                const std::map<std::string, std::string>& local_env) {
     if (cond.holds<std::nullptr_t>()) return true;
     if (cond.holds<bool>()) return cond.get<bool>();
     if (!cond.is_object()) return true;
@@ -260,9 +246,9 @@ eval_condition(const glz::generic& cond,
         bool found = false;
         if (lit != o.end() && lit->second.is_array()) {
             for (const auto& v : lit->second.get<glz::generic::array_t>()) {
-                if (v.is_string() &&
-                    expand_fully(v.get<std::string>(), source_dir, file_dir, preset_name, local_env) == s) {
-                    found = true; break;
+                if (v.is_string() && expand_fully(v.get<std::string>(), source_dir, file_dir, preset_name, local_env) == s) {
+                    found = true;
+                    break;
                 }
             }
         }
@@ -294,8 +280,7 @@ eval_condition(const glz::generic& cond,
     return true;
 }
 
-std::expected<PresetIndex, std::string>
-build_index(const std::filesystem::path& project_dir) {
+std::expected<PresetIndex, std::string> build_index(const std::filesystem::path& project_dir) {
     PresetIndex idx;
     idx.root_dir = project_dir;
     std::unordered_set<std::string> visited;
@@ -304,16 +289,13 @@ build_index(const std::filesystem::path& project_dir) {
         if (!std::filesystem::exists(path)) continue;
         if (auto r = load_file_into_index(path, idx, visited); !r) return std::unexpected(r.error());
     }
-    if (idx.presets.empty()) {
-        return std::unexpected("no CMakePresets.json found in " + project_dir.string());
-    }
+    if (idx.presets.empty()) { return std::unexpected("no CMakePresets.json found in " + project_dir.string()); }
     return idx;
 }
 
 } // namespace
 
-std::expected<ResolvedPreset, std::string>
-load_configure_preset(const std::filesystem::path& project_dir, const std::string& preset_name) {
+std::expected<ResolvedPreset, std::string> load_configure_preset(const std::filesystem::path& project_dir, const std::string& preset_name) {
     auto idx_or = build_index(project_dir);
     if (!idx_or) return std::unexpected(idx_or.error());
     auto& idx = *idx_or;
@@ -338,23 +320,23 @@ load_configure_preset(const std::filesystem::path& project_dir, const std::strin
     // Merge fields with last-write-wins semantics.
     ResolvedPreset r;
     r.name = preset_name;
-    std::filesystem::path file_dir;  // ${fileDir} = directory of the preset itself
+    std::filesystem::path file_dir; // ${fileDir} = directory of the preset itself
 
     for (const auto* rp : *chain_or) {
         const auto& obj = rp->data.get<glz::generic::object_t>();
         file_dir = rp->source_file.parent_path();
 
-        if (auto it = obj.find("generator"); it != obj.end() && it->second.is_string())
-            r.generator = it->second.get<std::string>();
-        if (auto it = obj.find("binaryDir"); it != obj.end() && it->second.is_string())
-            r.binary_dir = it->second.get<std::string>();
+        if (auto it = obj.find("generator"); it != obj.end() && it->second.is_string()) r.generator = it->second.get<std::string>();
+        if (auto it = obj.find("binaryDir"); it != obj.end() && it->second.is_string()) r.binary_dir = it->second.get<std::string>();
         if (auto it = obj.find("toolchainFile"); it != obj.end() && it->second.is_string())
             r.toolchain_file = it->second.get<std::string>();
 
         if (auto it = obj.find("environment"); it != obj.end() && it->second.is_object()) {
             for (const auto& [k, v] : it->second.get<glz::generic::object_t>()) {
-                if (v.is_string()) r.environment[k] = v.get<std::string>();
-                else if (v.holds<std::nullptr_t>()) r.environment.erase(k);
+                if (v.is_string())
+                    r.environment[k] = v.get<std::string>();
+                else if (v.holds<std::nullptr_t>())
+                    r.environment.erase(k);
             }
         }
         if (auto it = obj.find("cacheVariables"); it != obj.end() && it->second.is_object()) {
@@ -368,8 +350,10 @@ load_configure_preset(const std::filesystem::path& project_dir, const std::strin
                     const auto& vo = v.get<glz::generic::object_t>();
                     auto vv = vo.find("value");
                     if (vv != vo.end()) {
-                        if (vv->second.is_string()) r.cache_variables[k] = vv->second.get<std::string>();
-                        else if (vv->second.holds<bool>()) r.cache_variables[k] = vv->second.get<bool>() ? "ON" : "OFF";
+                        if (vv->second.is_string())
+                            r.cache_variables[k] = vv->second.get<std::string>();
+                        else if (vv->second.holds<bool>())
+                            r.cache_variables[k] = vv->second.get<bool>() ? "ON" : "OFF";
                     }
                 } else if (v.holds<std::nullptr_t>()) {
                     r.cache_variables.erase(k);
@@ -384,13 +368,14 @@ load_configure_preset(const std::filesystem::path& project_dir, const std::strin
         bool changed = false;
         for (auto& [k, v] : r.environment) {
             auto nv = expand_fully(v, source_dir, file_dir, preset_name, r.environment);
-            if (nv != v) { v = std::move(nv); changed = true; }
+            if (nv != v) {
+                v = std::move(nv);
+                changed = true;
+            }
         }
         if (!changed) break;
     }
-    for (auto& [k, v] : r.cache_variables) {
-        v = expand_fully(v, source_dir, file_dir, preset_name, r.environment);
-    }
+    for (auto& [k, v] : r.cache_variables) { v = expand_fully(v, source_dir, file_dir, preset_name, r.environment); }
     r.binary_dir = expand_fully(r.binary_dir, source_dir, file_dir, preset_name, r.environment);
     r.toolchain_file = expand_fully(r.toolchain_file, source_dir, file_dir, preset_name, r.environment);
 
@@ -402,15 +387,12 @@ load_configure_preset(const std::filesystem::path& project_dir, const std::strin
         if (!*cr) return std::unexpected("preset '" + preset_name + "' condition is false on this host");
     }
 
-    if (auto it = r.cache_variables.find("CMAKE_BUILD_TYPE"); it != r.cache_variables.end()) {
-        r.build_type = it->second;
-    }
+    if (auto it = r.cache_variables.find("CMAKE_BUILD_TYPE"); it != r.cache_variables.end()) { r.build_type = it->second; }
 
     return r;
 }
 
-std::expected<std::vector<std::string>, std::string>
-list_configure_presets(const std::filesystem::path& project_dir) {
+std::expected<std::vector<std::string>, std::string> list_configure_presets(const std::filesystem::path& project_dir) {
     auto idx_or = build_index(project_dir);
     if (!idx_or) return std::unexpected(idx_or.error());
     std::vector<std::string> names;

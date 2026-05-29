@@ -111,12 +111,12 @@ private:
     std::vector<std::string>* unparsed_ = nullptr;
 };
 
-#define PARSE_OR_RETURN(parser, interp, args) \
-    if (auto res = (parser).parse(args); !res) { \
-        (interp).set_fatal_error(res.error() + "\nExpected syntax: " + (parser).get_syntax()); \
-        return; \
-    } else { \
-        for (const auto& w : *res) (interp).print_message("WARNING", w); \
+#define PARSE_OR_RETURN(parser, interp, args)                                                                                              \
+    if (auto res = (parser).parse(args); !res) {                                                                                           \
+        (interp).set_fatal_error(res.error() + "\nExpected syntax: " + (parser).get_syntax());                                             \
+        return;                                                                                                                            \
+    } else {                                                                                                                               \
+        for (const auto& w : *res) (interp).print_message("WARNING", w);                                                                   \
     }
 
 } // namespace kiln

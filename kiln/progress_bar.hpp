@@ -60,7 +60,7 @@ private:
     std::atomic<int> completed_{0};
 
     mutable std::mutex mutex_;
-    std::vector<std::string> active_tasks_;  // filenames currently being built
+    std::vector<std::string> active_tasks_; // filenames currently being built
     int last_rendered_width_ = 0;
     bool bar_visible_ = false;
 

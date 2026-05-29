@@ -7,12 +7,7 @@
 namespace kiln {
 
 ProgressBar::ProgressBar(int total_tasks, bool is_tty)
-    : is_tty_(is_tty)
-    , total_(total_tasks)
-    , start_time_(std::chrono::steady_clock::now())
-    , last_draw_time_(start_time_)
-{
-}
+    : is_tty_(is_tty), total_(total_tasks), start_time_(std::chrono::steady_clock::now()), last_draw_time_(start_time_) {}
 
 // Build the escape sequence to erase the current bar content.
 // Must be called with mutex_ held.
@@ -24,7 +19,7 @@ std::string ProgressBar::build_erase_locked() const {
     if (last_rendered_width_ > term_width && term_width > 0) {
         int extra_lines = (last_rendered_width_ - 1) / term_width;
         for (int i = 0; i < extra_lines; i++) {
-            seq += "\x1B[A\x1B[2K";  // cursor up, erase line
+            seq += "\x1B[A\x1B[2K"; // cursor up, erase line
         }
     }
     seq += "\r\x1B[K";
@@ -39,9 +34,7 @@ std::string ProgressBar::build_bar_locked() {
 
     int term_width = get_terminal_width();
     std::string line = build_progress_line(term_width);
-    if (static_cast<int>(line.size()) >= term_width) {
-        line.resize(term_width - 1);
-    }
+    if (static_cast<int>(line.size()) >= term_width) { line.resize(term_width - 1); }
 
     std::string output;
     output += "\r\x1B[K";
@@ -126,12 +119,8 @@ void ProgressBar::task_started(std::string_view filename) {
 void ProgressBar::task_finished(std::string_view filename) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = std::find(active_tasks_.begin(), active_tasks_.end(), filename);
-    if (it != active_tasks_.end()) {
-        active_tasks_.erase(it);
-    }
-    if (is_tty_ && bar_visible_) {
-        draw_locked();
-    }
+    if (it != active_tasks_.end()) { active_tasks_.erase(it); }
+    if (is_tty_ && bar_visible_) { draw_locked(); }
 }
 
 int ProgressBar::mark_completed() {
@@ -159,9 +148,7 @@ void ProgressBar::finish() {
 
 int ProgressBar::get_terminal_width() const {
     struct winsize ws;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0) {
-        return ws.ws_col;
-    }
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0) { return ws.ws_col; }
     return 80;
 }
 
@@ -169,17 +156,13 @@ void ProgressBar::draw_locked() {
     int term_width = get_terminal_width();
     std::string line = build_progress_line(term_width);
 
-    if (static_cast<int>(line.size()) >= term_width) {
-        line.resize(term_width - 1);
-    }
+    if (static_cast<int>(line.size()) >= term_width) { line.resize(term_width - 1); }
 
     // Build the entire output: erase previous + new content + title.
     std::string output;
     if (bar_visible_ && last_rendered_width_ > term_width && term_width > 0) {
         int extra_lines = (last_rendered_width_ - 1) / term_width;
-        for (int i = 0; i < extra_lines; i++) {
-            output += "\x1B[A\x1B[2K";
-        }
+        for (int i = 0; i < extra_lines; i++) { output += "\x1B[A\x1B[2K"; }
     }
 
     output += "\r\x1B[K";
@@ -214,19 +197,15 @@ std::string ProgressBar::build_progress_line(int width) const {
     }
 
     // Ultra-narrow: just the ratio
-    if (width < 40) {
-        return ratio;
-    }
+    if (width < 40) { return ratio; }
 
-    std::string label = "    Building ";  // 13 chars, right-aligned to 12 + space
+    std::string label = "    Building "; // 13 chars, right-aligned to 12 + space
 
     // Narrow: no visual bar
     if (width < 60) {
         // "    Building 3/42 (32 active)"
         std::string line = label + ratio;
-        if (num_active > 0) {
-            line += " (" + std::to_string(num_active) + " active)";
-        }
+        if (num_active > 0) { line += " (" + std::to_string(num_active) + " active)"; }
         return line;
     }
 
@@ -253,7 +232,7 @@ std::string ProgressBar::build_progress_line(int width) const {
 
         // Try to fit task names
         std::string names_part = ": ";
-        int budget = width - static_cast<int>(line.size()) - 2;  // -2 for ": "
+        int budget = width - static_cast<int>(line.size()) - 2; // -2 for ": "
 
         for (int i = 0; i < num_active && budget > 0; i++) {
             std::string name = active_tasks_[i];
@@ -261,9 +240,7 @@ std::string ProgressBar::build_progress_line(int width) const {
 
             // Calculate space needed for "(+N more)" if we stop after this name
             std::string remaining_str;
-            if (remaining > 0) {
-                remaining_str = " (+" + std::to_string(remaining) + " more)";
-            }
+            if (remaining > 0) { remaining_str = " (+" + std::to_string(remaining) + " more)"; }
 
             std::string separator = (i > 0) ? ", " : "";
             int needed = static_cast<int>(separator.size() + name.size() + remaining_str.size());

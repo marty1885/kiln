@@ -18,48 +18,65 @@
 #include <array>
 #include <sys/types.h>
 #if defined(__linux__)
-#  include <sys/prctl.h>
+#include <sys/prctl.h>
 #elif defined(__FreeBSD__)
-#  include <sys/procctl.h>
+#include <sys/procctl.h>
 #endif
 #include "utils.hpp"
 #include "language.hpp"
 
 namespace kiln {
 
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template <class... Ts> struct overloaded : Ts... {
+    using Ts::operator()...;
+};
 
-struct CompileTask        { std::string source_file; std::optional<Language> compile_language; };
-struct PCHTask            { std::string source_file; };
-struct LinkTask           {};
-struct CustomCommandTask  {};
-struct CustomTargetTask   {};
-struct PreBuildTask       {};
-struct PostBuildTask      {};
-struct ModuleScannerTask  { std::string source_file; };
+struct CompileTask {
+    std::string source_file;
+    std::optional<Language> compile_language;
+};
+struct PCHTask {
+    std::string source_file;
+};
+struct LinkTask {};
+struct CustomCommandTask {};
+struct CustomTargetTask {};
+struct PreBuildTask {};
+struct PostBuildTask {};
+struct ModuleScannerTask {
+    std::string source_file;
+};
 struct ModuleCollatorTask {
     // Compiler used to build header units this target imports. Nullable
     // (e.g. when modules are off, or when the target only consumes named
     // modules and doesn't end up importing any header unit). Owned by the
     // Toolchain, which outlives the build graph.
     const class Compiler* cxx_compiler = nullptr;
-    std::string cxx_standard;       // numeric form, e.g. "20", "23"
+    std::string cxx_standard; // numeric form, e.g. "20", "23"
     bool cxx_extensions_enabled = true;
 };
-struct EPOrchestratorTask { std::string ep_name; };
-struct EPSentinelTask     { std::string ep_name; };
-struct EPInstallTask      { std::string ep_name; };
-struct MocTask            { std::string source_file; };
-struct UicTask            { std::string source_file; };
-struct RccTask            { std::string source_file; };
+struct EPOrchestratorTask {
+    std::string ep_name;
+};
+struct EPSentinelTask {
+    std::string ep_name;
+};
+struct EPInstallTask {
+    std::string ep_name;
+};
+struct MocTask {
+    std::string source_file;
+};
+struct UicTask {
+    std::string source_file;
+};
+struct RccTask {
+    std::string source_file;
+};
 
-using TaskKind = std::variant<
-    CompileTask, PCHTask, LinkTask,
-    CustomCommandTask, CustomTargetTask, PreBuildTask, PostBuildTask,
-    ModuleScannerTask, ModuleCollatorTask,
-    EPOrchestratorTask, EPSentinelTask, EPInstallTask,
-    MocTask, UicTask, RccTask
->;
+using TaskKind =
+    std::variant<CompileTask, PCHTask, LinkTask, CustomCommandTask, CustomTargetTask, PreBuildTask, PostBuildTask, ModuleScannerTask,
+                 ModuleCollatorTask, EPOrchestratorTask, EPSentinelTask, EPInstallTask, MocTask, UicTask, RccTask>;
 
 // Forward declarations
 class ProgressBar;
@@ -108,7 +125,7 @@ inline void set_parent_death_signal(int sig) {
     // macOS, OpenBSD, NetBSD: no kernel primitive. Children orphan on parent
     // crash; they typically die soon after via SIGPIPE on the closed stdout
     // pipe. Matches CMake/ninja/make behavior on these platforms.
-    (void)sig;
+    (void) sig;
 #endif
 }
 
@@ -119,8 +136,8 @@ class Toolchain;
 struct GenexEvaluationContext;
 
 struct BuildTask {
-    std::string id;              // Unique identifier (usually the primary output file)
-    TaskKind kind{LinkTask{}};   // Variant-based task type
+    std::string id;            // Unique identifier (usually the primary output file)
+    TaskKind kind{LinkTask{}}; // Variant-based task type
     std::vector<std::vector<std::string>> commands;
     // Parallel to commands, but with cosmetic flags (e.g. -fdiagnostics-color)
     // omitted. Used for cache-signature hashing so toggling presentation
@@ -132,7 +149,7 @@ struct BuildTask {
     Target* parent_target = nullptr;
     bool always_run = false;
     std::string working_dir;
-    std::string ep_binary_dir;   // EP binary dir for cache routing (empty = use main cache)
+    std::string ep_binary_dir; // EP binary dir for cache routing (empty = use main cache)
 
     // Dependency edges (resolved pointers, set by graph)
     std::vector<BuildTask*> dependencies;
@@ -141,58 +158,48 @@ struct BuildTask {
     std::vector<std::string> explicit_deps;
 
     // Filled during execution for critical path computation
-    double execution_time_s = 0.0;    // wall time for this task
-    double critical_path_s = 0.0;     // longest chain ending at this task
+    double execution_time_s = 0.0; // wall time for this task
+    double critical_path_s = 0.0;  // longest chain ending at this task
 
     // --- Convenience query methods ---
 
-    bool is_compilation() const {
-        return std::holds_alternative<CompileTask>(kind) || std::holds_alternative<PCHTask>(kind);
-    }
+    bool is_compilation() const { return std::holds_alternative<CompileTask>(kind) || std::holds_alternative<PCHTask>(kind); }
 
     bool is_shell_command() const {
-        return std::holds_alternative<CustomCommandTask>(kind)
-            || std::holds_alternative<CustomTargetTask>(kind)
-            || std::holds_alternative<PostBuildTask>(kind)
-            || std::holds_alternative<MocTask>(kind)
-            || std::holds_alternative<UicTask>(kind)
-            || std::holds_alternative<RccTask>(kind);
+        return std::holds_alternative<CustomCommandTask>(kind) || std::holds_alternative<CustomTargetTask>(kind)
+               || std::holds_alternative<PostBuildTask>(kind) || std::holds_alternative<MocTask>(kind)
+               || std::holds_alternative<UicTask>(kind) || std::holds_alternative<RccTask>(kind);
     }
 
     bool is_ep_task() const {
-        return std::holds_alternative<EPOrchestratorTask>(kind)
-            || std::holds_alternative<EPSentinelTask>(kind)
-            || std::holds_alternative<EPInstallTask>(kind);
+        return std::holds_alternative<EPOrchestratorTask>(kind) || std::holds_alternative<EPSentinelTask>(kind)
+               || std::holds_alternative<EPInstallTask>(kind);
     }
 
     bool is_marker_task() const {
-        if (outputs.empty() && commands.empty()
-            && !std::holds_alternative<ModuleCollatorTask>(kind)
-            && !std::holds_alternative<EPOrchestratorTask>(kind)
-            && !std::holds_alternative<EPSentinelTask>(kind))
+        if (outputs.empty() && commands.empty() && !std::holds_alternative<ModuleCollatorTask>(kind)
+            && !std::holds_alternative<EPOrchestratorTask>(kind) && !std::holds_alternative<EPSentinelTask>(kind))
             return true;
         return false;
     }
 
     std::string_view get_source_file() const {
-        return std::visit(overloaded{
-            [](const CompileTask& t) -> std::string_view { return t.source_file; },
-            [](const PCHTask& t) -> std::string_view { return t.source_file; },
-            [](const ModuleScannerTask& t) -> std::string_view { return t.source_file; },
-            [](const MocTask& t) -> std::string_view { return t.source_file; },
-            [](const UicTask& t) -> std::string_view { return t.source_file; },
-            [](const RccTask& t) -> std::string_view { return t.source_file; },
-            [](const auto&) -> std::string_view { return {}; }
-        }, kind);
+        return std::visit(overloaded{[](const CompileTask& t) -> std::string_view { return t.source_file; },
+                                     [](const PCHTask& t) -> std::string_view { return t.source_file; },
+                                     [](const ModuleScannerTask& t) -> std::string_view { return t.source_file; },
+                                     [](const MocTask& t) -> std::string_view { return t.source_file; },
+                                     [](const UicTask& t) -> std::string_view { return t.source_file; },
+                                     [](const RccTask& t) -> std::string_view { return t.source_file; },
+                                     [](const auto&) -> std::string_view { return {}; }},
+                          kind);
     }
 
     std::string_view get_ep_name() const {
-        return std::visit(overloaded{
-            [](const EPOrchestratorTask& t) -> std::string_view { return t.ep_name; },
-            [](const EPSentinelTask& t) -> std::string_view { return t.ep_name; },
-            [](const EPInstallTask& t) -> std::string_view { return t.ep_name; },
-            [](const auto&) -> std::string_view { return {}; }
-        }, kind);
+        return std::visit(overloaded{[](const EPOrchestratorTask& t) -> std::string_view { return t.ep_name; },
+                                     [](const EPSentinelTask& t) -> std::string_view { return t.ep_name; },
+                                     [](const EPInstallTask& t) -> std::string_view { return t.ep_name; },
+                                     [](const auto&) -> std::string_view { return {}; }},
+                          kind);
     }
 
     std::optional<Language> get_compile_language() const {
@@ -203,9 +210,7 @@ struct BuildTask {
 
 // Comparator for deterministic ordering of BuildTask pointers (by task ID)
 struct TaskPtrIdCmp {
-    bool operator()(const BuildTask* a, const BuildTask* b) const {
-        return a->id < b->id;
-    }
+    bool operator()(const BuildTask* a, const BuildTask* b) const { return a->id < b->id; }
 };
 
 class BuildGraph {
@@ -214,15 +219,10 @@ public:
 
     // Move constructor/assignment - needed because mutexes aren't movable
     BuildGraph(BuildGraph&& other) noexcept
-        : tasks_(std::move(other.tasks_)),
-          task_by_id_(std::move(other.task_by_id_)),
-          output_to_task_(std::move(other.output_to_task_)),
-          pending_file_deps_(std::move(other.pending_file_deps_)),
-          dependents_(std::move(other.dependents_)),
-          ep_target_owners_(std::move(other.ep_target_owners_)),
-          stat_cache_(std::move(other.stat_cache_)),
-          deps_cache_(std::move(other.deps_cache_)),
-          toolchain_(other.toolchain_) {}
+        : tasks_(std::move(other.tasks_)), task_by_id_(std::move(other.task_by_id_)), output_to_task_(std::move(other.output_to_task_)),
+          pending_file_deps_(std::move(other.pending_file_deps_)), dependents_(std::move(other.dependents_)),
+          ep_target_owners_(std::move(other.ep_target_owners_)), stat_cache_(std::move(other.stat_cache_)),
+          deps_cache_(std::move(other.deps_cache_)), toolchain_(other.toolchain_) {}
 
     BuildGraph& operator=(BuildGraph&& other) noexcept {
         if (this != &other) {
@@ -250,8 +250,7 @@ public:
     // If output_capture is non-null, command stdout/stderr that would normally
     // be printed to the terminal is appended there instead (used by
     // try_compile to populate OUTPUT_VARIABLE).
-    std::expected<void, std::string> execute(const std::string& build_dir, int jobs = 0,
-                                             std::string* output_capture = nullptr);
+    std::expected<void, std::string> execute(const std::string& build_dir, int jobs = 0, std::string* output_capture = nullptr);
 
     std::expected<void, std::string> generate_compile_commands(const std::string& build_dir);
 
@@ -265,15 +264,11 @@ public:
         std::vector<std::string> missing;
         for (const auto& task_ptr : tasks_) {
             for (const auto& dep : task_ptr->explicit_deps) {
-                if (!task_by_id_.count(dep)) {
-                    missing.push_back(dep);
-                }
+                if (!task_by_id_.count(dep)) { missing.push_back(dep); }
             }
             // Also report file inputs not yet produced by any task
             for (const auto& in : task_ptr->inputs) {
-                if (!output_to_task_.count(in)) {
-                    missing.push_back(in);
-                }
+                if (!output_to_task_.count(in)) { missing.push_back(in); }
             }
         }
         return missing;
@@ -287,9 +282,8 @@ public:
 
     // C++20 modules support: inject dependencies after collator runs
     // Called by collator task to update compile task dependencies based on module imports
-    void inject_module_dependencies(
-        const std::map<std::string, std::string>& module_to_task,  // Module name -> provider task ID
-        const std::map<std::string, std::vector<std::string>>& task_requires  // Task ID -> required modules
+    void inject_module_dependencies(const std::map<std::string, std::string>& module_to_task,            // Module name -> provider task ID
+                                    const std::map<std::string, std::vector<std::string>>& task_requires // Task ID -> required modules
     );
 
     // Header-unit support: spawn header-unit compile tasks and wire
@@ -297,32 +291,23 @@ public:
     // the mapper has been written, so GCC can read it on the spawned
     // compiles. header_units is keyed by the resolved header path; the
     // is_system flag selects -fmodule-header=system vs =user.
-    void inject_header_unit_tasks(
-        Target& parent_target,
-        const class Compiler* cxx_compiler,
-        const std::string& cxx_standard,
-        bool cxx_extensions_enabled,
-        const std::string& mapper_path,
-        const std::map<std::string, HeaderUnitInfo>& header_units,
-        const std::map<std::string, std::string>& header_unit_to_bmi,
-        const std::map<std::string, std::vector<std::string>>& task_header_units,
-        std::string& task_error
-    );
+    void inject_header_unit_tasks(Target& parent_target, const class Compiler* cxx_compiler, const std::string& cxx_standard,
+                                  bool cxx_extensions_enabled, const std::string& mapper_path,
+                                  const std::map<std::string, HeaderUnitInfo>& header_units,
+                                  const std::map<std::string, std::string>& header_unit_to_bmi,
+                                  const std::map<std::string, std::vector<std::string>>& task_header_units, std::string& task_error);
 
     // ExternalProject support: run EP orchestrator task in-process
     // Called by execute() when an EP orchestrator task becomes ready.
     // Returns error message on failure, nullopt on success.
-    std::optional<std::string> run_ep_orchestrator(
-        BuildTask& task, ExecutionState& state);
+    std::optional<std::string> run_ep_orchestrator(BuildTask& task, ExecutionState& state);
 
     // Atomically attach entire EP graph to main graph.
     // Unlike inject_tasks(), this attaches ALL tasks (not just dirty ones).
     // Clean tasks are added to completed immediately; dirty tasks execute normally.
     // Returns dirty_count for progress reporting.
     // IMPORTANT: Caller must NOT hold loop_mutex; this function acquires it.
-    std::expected<int, std::string>
-    attach_ep_graph(
-        BuildGraph&& ep_graph, const std::string& ep_binary_dir, ExecutionState& state);
+    std::expected<int, std::string> attach_ep_graph(BuildGraph&& ep_graph, const std::string& ep_binary_dir, ExecutionState& state);
 
     // Access to tasks (needed by EP orchestrator for isolated interpreter)
     const std::vector<std::unique_ptr<BuildTask>>& get_tasks() const { return tasks_; }
@@ -365,7 +350,7 @@ private:
 
     mutable std::mutex output_mutex_;
     mutable std::mutex state_mutex_;
-    mutable std::mutex graph_mutation_mutex_;  // For thread-safe module dependency injection
+    mutable std::mutex graph_mutation_mutex_; // For thread-safe module dependency injection
 
     // Single point of edge creation — always bidirectional
     void add_dependency(BuildTask* from, BuildTask* to);
@@ -379,7 +364,6 @@ private:
     void drain_pending_deps(std::span<BuildTask*> batch);
 
     // Resolve explicit_deps (string IDs) to pointer-based dependencies.
-
 
     // Keeps EP child interpreter targets alive while injected tasks hold raw parent_target pointers
     std::vector<std::shared_ptr<Target>> ep_target_owners_;
@@ -396,16 +380,13 @@ private:
     // If the task is clean (outputs exist, not always_run, sig matches cache),
     // returns the matching signature; else nullopt. Used by both the pre-scan
     // (skip clean tasks) and the worker's "maybe dirty" runtime re-check.
-    std::optional<std::string> clean_signature(
-        const BuildTask& task,
-        const std::map<std::string, std::string>& cache);
+    std::optional<std::string> clean_signature(const BuildTask& task, const std::map<std::string, std::string>& cache);
 
     // Tri-state BFS over reverse edges. Seeds from every entry already in
     // dirty_state. Definitely-dirty propagates as definite; maybe-dirty
     // propagates as maybe; an existing maybe entry reached by a definite
     // parent is upgraded to definite.
-    void propagate_dirty_bfs(
-        std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state);
+    void propagate_dirty_bfs(std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state);
 
     // Atomically erase the progress bar and dump captured output to stderr.
     // Caller must NOT hold output_mutex_.
@@ -449,9 +430,7 @@ public:
     ~GraphTransaction() noexcept(false) {
         if (!committed_) {
             auto result = commit();
-            if (!result) {
-                throw std::runtime_error("GraphTransaction commit failed in destructor: " + result.error());
-            }
+            if (!result) { throw std::runtime_error("GraphTransaction commit failed in destructor: " + result.error()); }
         }
     }
 
@@ -489,8 +468,7 @@ protected:
 
 class LockedGraphTransaction : public GraphTransaction {
 public:
-    LockedGraphTransaction(BuildGraph& g, std::mutex& mtx)
-        : GraphTransaction(g), lock_(mtx) {}
+    LockedGraphTransaction(BuildGraph& g, std::mutex& mtx) : GraphTransaction(g), lock_(mtx) {}
 
     // Lock held for lifetime. Destructor: commit (via base), then release lock.
 

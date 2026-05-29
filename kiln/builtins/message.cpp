@@ -15,13 +15,13 @@ namespace {
 
 // Message log levels (higher number = more verbose)
 enum class LogLevel {
-    ERROR = 0,      // FATAL_ERROR, SEND_ERROR
-    WARNING = 1,    // WARNING, AUTHOR_WARNING
-    NOTICE = 2,     // NOTICE, (none)
-    STATUS = 3,     // STATUS
-    VERBOSE = 4,    // VERBOSE
-    DEBUG = 5,      // DEBUG
-    TRACE = 6       // TRACE
+    ERROR = 0,   // FATAL_ERROR, SEND_ERROR
+    WARNING = 1, // WARNING, AUTHOR_WARNING
+    NOTICE = 2,  // NOTICE, (none)
+    STATUS = 3,  // STATUS
+    VERBOSE = 4, // VERBOSE
+    DEBUG = 5,   // DEBUG
+    TRACE = 6    // TRACE
 };
 
 LogLevel parse_log_level(const std::string& level_str) {
@@ -137,9 +137,7 @@ void register_message_builtins(Interpreter& interp) {
         }
 
         std::ostringstream oss;
-        for (size_t i = 0; i < message_args.size(); i++) {
-            oss << message_args[i];
-        }
+        for (size_t i = 0; i < message_args.size(); i++) { oss << message_args[i]; }
         std::string content = oss.str();
 
         // Handle FATAL_ERROR specially
@@ -176,8 +174,8 @@ void register_message_builtins(Interpreter& interp) {
         // Normal message output
         // In CMake, NOTICE (and no-mode) goes to stderr, same as WARNING etc.
         // Only STATUS/VERBOSE/DEBUG/TRACE go to stdout.
-        bool is_error = (mode == "NOTICE" || mode == "WARNING" || mode == "AUTHOR_WARNING" ||
-                        mode == "DEPRECATION" || mode == "DEPRECATION_ERROR");
+        bool is_error =
+            (mode == "NOTICE" || mode == "WARNING" || mode == "AUTHOR_WARNING" || mode == "DEPRECATION" || mode == "DEPRECATION_ERROR");
 
         interp.print_message(mode, content, is_error);
     });
@@ -198,9 +196,12 @@ void register_message_builtins(Interpreter& interp) {
         for (size_t i = 1; i < args.size(); ++i) {
             if (args[i] == "LANGUAGE" && i + 1 < args.size()) {
                 std::string lang = args[++i];
-                if (lang == "C") compile_lang = Language::C;
-                else if (lang == "CXX") compile_lang = Language::CXX;
-                else if (lang == "CUDA") compile_lang = Language::CUDA;
+                if (lang == "C")
+                    compile_lang = Language::C;
+                else if (lang == "CXX")
+                    compile_lang = Language::CXX;
+                else if (lang == "CUDA")
+                    compile_lang = Language::CUDA;
             } else if (args[i] == "DEFERRED") {
                 allow_deferred = true;
             }
@@ -209,9 +210,7 @@ void register_message_builtins(Interpreter& interp) {
         // Set up context
         auto ctx = GenexEvaluationContext::from_interpreter(interp, interp.get_targets());
         ctx.allow_deferred_compile_language = allow_deferred;
-        if (compile_lang) {
-            ctx.compile_language = *compile_lang;
-        }
+        if (compile_lang) { ctx.compile_language = *compile_lang; }
 
         GenexEvaluator evaluator(ctx);
 

@@ -38,20 +38,15 @@ namespace kiln {
 // compiler_default:  compiler's default standard (e.g. 17, or 0 if unknown)
 //
 // Returns the standard string to use (e.g. "17"), or "" if no flag needed.
-static std::string compute_effective_standard(
-    const std::string& explicit_standard,
-    int features_required,
-    int compiler_default)
-{
+static std::string compute_effective_standard(const std::string& explicit_standard, int features_required, int compiler_default) {
     int explicit_val = explicit_standard.empty() ? 0 : parse_number<int>(explicit_standard).value_or(0);
     int effective = std::max(explicit_val, features_required);
 
-    if (effective <= 0) return explicit_standard;  // nothing required
+    if (effective <= 0) return explicit_standard; // nothing required
 
     // If no explicit standard was set (only features drove the requirement),
     // and the compiler default already meets it, don't add a flag.
-    if (explicit_val == 0 && compiler_default > 0 && effective <= compiler_default)
-        return "";
+    if (explicit_val == 0 && compiler_default > 0 && effective <= compiler_default) return "";
 
     return std::to_string(effective);
 }
@@ -60,16 +55,12 @@ static std::string compute_effective_standard(
 // (semicolon list) overrides the corresponding CMAKE_<LANG>_..._LAUNCHER cache
 // variable. Tokens are prepended verbatim to the compiler/linker argv. Empty
 // result = no launcher.
-static std::vector<std::string> resolve_launcher(
-    const Target& target, const Interpreter& interp,
-    Language lang, const std::string& kind /* "COMPILER" or "LINKER" */)
-{
+static std::vector<std::string> resolve_launcher(const Target& target, const Interpreter& interp, Language lang,
+                                                 const std::string& kind /* "COMPILER" or "LINKER" */) {
     std::string lang_str(language_name(lang));
     std::string prop = lang_str + "_" + kind + "_LAUNCHER";
     std::string val = target.get_property(prop);
-    if (val.empty()) {
-        val = interp.get_variable("CMAKE_" + prop);
-    }
+    if (val.empty()) { val = interp.get_variable("CMAKE_" + prop); }
     std::vector<std::string> out;
     if (val.empty()) return out;
     for (auto sv : CMakeArrayIterator(val)) {
@@ -99,9 +90,7 @@ void Target::set_property(const std::string& name, const std::string& value) {
 }
 
 std::string Target::get_property(const std::string& name) const {
-    if (properties_.contains(name)) {
-        return properties_.at(name);
-    }
+    if (properties_.contains(name)) { return properties_.at(name); }
     return "";
 }
 
@@ -115,7 +104,7 @@ void Target::append_property(const std::string& name, const std::vector<std::str
 }
 
 void Target::append_property_from_string(const std::string& name, const std::string& value, PropertyVisibility visibility) {
-    CMakeArray list(value);  // Always split by semicolons
+    CMakeArray list(value); // Always split by semicolons
     append_property(name, list.to_vector(), visibility);
 }
 
@@ -198,8 +187,7 @@ std::string Target::get_property_combined(const std::string& name) const {
     //   INTERFACE_X → X[PUBLIC] + X[INTERFACE]
     // This is how CMake exposes visibility-scoped properties via genex like
     // $<TARGET_PROPERTY:tgt,INTERFACE_INCLUDE_DIRECTORIES>
-    auto try_visibility_prefix = [&](std::string_view prefix,
-                                     std::initializer_list<PropertyVisibility> scopes) -> std::string {
+    auto try_visibility_prefix = [&](std::string_view prefix, std::initializer_list<PropertyVisibility> scopes) -> std::string {
         if (!name.starts_with(prefix)) return {};
         std::string base_name(name.substr(prefix.size()));
         auto base_it = list_properties_.find(base_name);
@@ -217,9 +205,7 @@ std::string Target::get_property_combined(const std::string& name) const {
         return result;
     };
 
-    if (auto r = try_visibility_prefix("INTERFACE_",
-            {PropertyVisibility::PUBLIC, PropertyVisibility::INTERFACE}); !r.empty())
-        return r;
+    if (auto r = try_visibility_prefix("INTERFACE_", {PropertyVisibility::PUBLIC, PropertyVisibility::INTERFACE}); !r.empty()) return r;
 
     // Fall back to generic properties
     return get_property(name);
@@ -237,17 +223,13 @@ const std::vector<std::string>& Target::get_resolved_interface_property(const st
     return (it != resolved_interface_properties_.end()) ? it->second : empty;
 }
 
-std::vector<std::string> Target::get_resolved_property_for_language(
-    const std::string& name,
-    Language lang,
-    const Interpreter& interp,
-    const TargetMap& all_targets) const
-{
+std::vector<std::string> Target::get_resolved_property_for_language(const std::string& name, Language lang, const Interpreter& interp,
+                                                                    const TargetMap& all_targets) const {
     const auto& base = get_resolved_property(name);
 
     // Fast path: nothing depends on language.
-    bool needs_lang = std::any_of(base.begin(), base.end(),
-        [](const std::string& v) { return v.find("$<COMPILE_LANG") != std::string::npos; });
+    bool needs_lang =
+        std::any_of(base.begin(), base.end(), [](const std::string& v) { return v.find("$<COMPILE_LANG") != std::string::npos; });
     if (!needs_lang) return base;
 
     GenexEvaluationContext ctx = GenexEvaluationContext::from_interpreter(interp, all_targets);
@@ -265,9 +247,7 @@ std::vector<std::string> Target::get_resolved_property_for_language(
         auto r = evaluator.evaluate(val);
         if (!r || r->empty()) continue;
         // Result may be a CMake list — split on top-level ';'
-        for (auto sv : CMakeArrayIterator(*r)) {
-            out.emplace_back(sv);
-        }
+        for (auto sv : CMakeArrayIterator(*r)) { out.emplace_back(sv); }
     }
     return out;
 }
@@ -280,8 +260,10 @@ Language Target::get_linker_language() const {
         std::string explicit_lang = get_property("LINKER_LANGUAGE");
         if (!explicit_lang.empty()) {
             Language lang = Language::CXX;
-            if (explicit_lang == "C") lang = Language::C;
-            else if (explicit_lang == "ASM") lang = Language::ASM;
+            if (explicit_lang == "C")
+                lang = Language::C;
+            else if (explicit_lang == "ASM")
+                lang = Language::ASM;
             // Fall back to CXX for unknown — keeps us linking with the most
             // permissive driver instead of erroring.
             cached_linker_language_ = lang;
@@ -294,12 +276,18 @@ Language Target::get_linker_language() const {
     auto sources = get_property_list("SOURCES", TargetPropertyScope::BUILD);
     for (const auto& src : sources) {
         auto info = LanguageClassifier::from_path(src);
-        if (info.lang == Language::CXX) { lang = Language::CXX; break; }
+        if (info.lang == Language::CXX) {
+            lang = Language::CXX;
+            break;
+        }
         if (info.lang == Language::UNKNOWN) {
             // Extensionless source: probe filesystem for a C++ companion
             std::string abs = Path::make_absolute_and_normal(source_dir_, src);
             for (auto ext : {".cpp", ".cc", ".cxx", ".C", ".c++"}) {
-                if (std::filesystem::exists(abs + ext)) { lang = Language::CXX; break; }
+                if (std::filesystem::exists(abs + ext)) {
+                    lang = Language::CXX;
+                    break;
+                }
             }
             if (lang == Language::CXX) break;
         }
@@ -312,21 +300,26 @@ std::string Target::generate_dump_info() const {
     // Helper to print a vector
     auto print_vec = [](const std::string& indent, const std::vector<std::string>& vec) -> std::string {
         if (vec.empty()) return indent + "(empty)";
-        return join(vec, "", [&](const std::string& item) {
-            return indent + "- " + item + "\n";
-        });
+        return join(vec, "", [&](const std::string& item) { return indent + "- " + item + "\n"; });
     };
 
     // Helper to get type name
     auto type_name = [](TargetType type) -> std::string {
-        switch(type) {
-            case TargetType::EXECUTABLE: return "EXECUTABLE";
-            case TargetType::SHARED_LIBRARY: return "SHARED_LIBRARY";
-            case TargetType::STATIC_LIBRARY: return "STATIC_LIBRARY";
-            case TargetType::OBJECT_LIBRARY: return "OBJECT_LIBRARY";
-            case TargetType::INTERFACE_LIBRARY: return "INTERFACE_LIBRARY";
-            case TargetType::CUSTOM: return "CUSTOM";
-            default: return "UNKNOWN";
+        switch (type) {
+        case TargetType::EXECUTABLE:
+            return "EXECUTABLE";
+        case TargetType::SHARED_LIBRARY:
+            return "SHARED_LIBRARY";
+        case TargetType::STATIC_LIBRARY:
+            return "STATIC_LIBRARY";
+        case TargetType::OBJECT_LIBRARY:
+            return "OBJECT_LIBRARY";
+        case TargetType::INTERFACE_LIBRARY:
+            return "INTERFACE_LIBRARY";
+        case TargetType::CUSTOM:
+            return "CUSTOM";
+        default:
+            return "UNKNOWN";
         }
     };
 
@@ -338,16 +331,12 @@ std::string Target::generate_dump_info() const {
     output += "Binary Dir: " + binary_dir_ + "\n";
     output += "Output Path: " + get_output_path() + "\n";
     output += "Imported: " + std::string(is_imported_ ? "yes" : "no") + "\n";
-    if (is_imported_) {
-        output += "Imported Location: " + imported_location_ + "\n";
-    }
+    if (is_imported_) { output += "Imported Location: " + imported_location_ + "\n"; }
     output += "\n";
 
     // Print unresolved properties (derived from shared metadata table)
     std::vector<std::string> prop_names;
-    for (const auto& meta : kListProperties) {
-        prop_names.emplace_back(meta.name);
-    }
+    for (const auto& meta : kListProperties) { prop_names.emplace_back(meta.name); }
 
     output += "--- Unresolved Properties ---\n";
     for (const auto& prop : prop_names) {
@@ -405,8 +394,7 @@ bool Target::is_in_cxx_modules_file_set(const std::string& source) const {
     return file_set_visibility_for_source(source).has_value();
 }
 
-std::optional<PropertyVisibility>
-Target::file_set_visibility_for_source(const std::string& source) const {
+std::optional<PropertyVisibility> Target::file_set_visibility_for_source(const std::string& source) const {
     for (const auto& fs : file_sets_) {
         if (fs.type != "CXX_MODULES") continue;
         for (const auto& file : fs.files) {
@@ -464,9 +452,7 @@ const std::vector<std::string>& Target::get_language_flags(Language lang) const 
 }
 
 const Compiler* Target::resolve_compiler(Language lang, const Toolchain& toolchain) const {
-    if (!language_has_compiler(lang)) {
-        return toolchain.get_compiler_ptr(lang);
-    }
+    if (!language_has_compiler(lang)) { return toolchain.get_compiler_ptr(lang); }
     std::string_view name = language_name(lang);
     std::string binary_var = "CMAKE_" + std::string(name) + "_COMPILER";
     const std::string& captured_binary = captured_compiler_var(binary_var);
@@ -479,8 +465,7 @@ const Compiler* Target::resolve_compiler(Language lang, const Toolchain& toolcha
         // CMAKE_<LANG>_COMPILER_TARGET only makes sense for drivers that
         // honor --target= (real CMake's Clang Compiler module is what turns
         // it into --target=). GCC errors on the flag.
-        const std::string effective_target = compiler_honors_target_flag(captured_id)
-            ? captured_target : std::string{};
+        const std::string effective_target = compiler_honors_target_flag(captured_id) ? captured_target : std::string{};
         // The default compiler is also in the registry (registered via
         // enable_language). If the captured tuple matches it, get_or_register
         // returns the same pointer; otherwise it lazily registers a fresh one.
@@ -491,13 +476,8 @@ const Compiler* Target::resolve_compiler(Language lang, const Toolchain& toolcha
 
 // --- Resolution Logic ---
 
-GenexEvaluationContext Target::make_genex_context(
-    const Target* current_target,
-    const Interpreter& interp,
-    const TargetMap& all_targets,
-    std::optional<Language> compile_language,
-    bool allow_deferred)
-{
+GenexEvaluationContext Target::make_genex_context(const Target* current_target, const Interpreter& interp, const TargetMap& all_targets,
+                                                  std::optional<Language> compile_language, bool allow_deferred) {
     auto ctx = GenexEvaluationContext::from_interpreter(interp, all_targets);
     ctx.current_target = current_target;
     ctx.compile_language = compile_language;
@@ -508,13 +488,10 @@ GenexEvaluationContext Target::make_genex_context(
 // Order-preserving dedup merge: append items from source into target,
 // skipping duplicates already present in target.
 namespace {
-void merge_dedup(std::vector<std::string>& target,
-                 const std::vector<std::string>& source) {
+void merge_dedup(std::vector<std::string>& target, const std::vector<std::string>& source) {
     std::unordered_set<std::string> seen(target.begin(), target.end());
     for (const auto& s : source) {
-        if (seen.insert(s).second) {
-            target.push_back(s);
-        }
+        if (seen.insert(s).second) { target.push_back(s); }
     }
 }
 // Detect if a string contains genex that can only be resolved in a per-consumer,
@@ -565,9 +542,7 @@ const std::vector<Target::PropInfo>& Target::build_props_to_resolve() {
     static const std::vector<PropInfo> instance = [] {
         std::vector<PropInfo> result;
         for (const auto& meta : kListProperties) {
-            if (meta.transitive && meta.name != "LINK_LIBRARIES") {
-                result.push_back({std::string(meta.name), meta.is_path});
-            }
+            if (meta.transitive && meta.name != "LINK_LIBRARIES") { result.push_back({std::string(meta.name), meta.is_path}); }
         }
         return result;
     }();
@@ -582,10 +557,7 @@ std::string Target::resolve_to_absolute_path(const std::string& p) const {
     return (Path(source_dir_) / sv).lexically_normal().str();
 }
 
-void Target::initialize_local_properties(
-    const std::vector<PropInfo>& props_to_resolve,
-    GenexEvaluator& evaluator)
-{
+void Target::initialize_local_properties(const std::vector<PropInfo>& props_to_resolve, GenexEvaluator& evaluator) {
     for (const auto& info : props_to_resolve) {
         auto& res = resolved_properties_[info.name];
         auto& res_iface = resolved_interface_properties_[info.name];
@@ -604,9 +576,7 @@ void Target::initialize_local_properties(
             }
             if (info.is_path) {
                 for (const auto& p : *eval_result) {
-                    if (!p.empty()) {
-                        out.push_back(resolve_to_absolute_path(p));
-                    }
+                    if (!p.empty()) { out.push_back(resolve_to_absolute_path(p)); }
                 }
             } else {
                 out.insert(out.end(), eval_result->begin(), eval_result->end());
@@ -648,26 +618,19 @@ void Target::initialize_local_properties(
 }
 
 const std::vector<std::string>& Target::collect_link_deps(const Target& dep) {
-    if (dep.get_type() == TargetType::STATIC_LIBRARY && !dep.is_imported()) {
-        return dep.get_resolved_property("LINK_LIBRARIES");
-    }
+    if (dep.get_type() == TargetType::STATIC_LIBRARY && !dep.is_imported()) { return dep.get_resolved_property("LINK_LIBRARIES"); }
     return dep.get_resolved_interface_property("LINK_LIBRARIES");
 }
 
-void Target::propagate_from_dependency(
-    const Target& dep,
-    const std::vector<PropInfo>& props_to_resolve,
-    std::map<std::string, std::vector<std::string>>& output_props,
-    bool skip_non_link,
-    GenexEvaluator& evaluator)
-{
+void Target::propagate_from_dependency(const Target& dep, const std::vector<PropInfo>& props_to_resolve,
+                                       std::map<std::string, std::vector<std::string>>& output_props, bool skip_non_link,
+                                       GenexEvaluator& evaluator) {
     // 1. Append non-link interface properties (includes, definitions, options, etc.)
     // Deduplication is deferred to Phase 3 of resolve() via remove_duplicates().
     if (!skip_non_link) {
         for (const auto& info : props_to_resolve) {
-            auto& dest = (dep.is_imported() && info.name == "INCLUDE_DIRECTORIES")
-                ? output_props["SYSTEM_INCLUDE_DIRECTORIES"]
-                : output_props[info.name];
+            auto& dest = (dep.is_imported() && info.name == "INCLUDE_DIRECTORIES") ? output_props["SYSTEM_INCLUDE_DIRECTORIES"]
+                                                                                   : output_props[info.name];
 
             // Re-evaluate deferred genex with the consumer's context.
             // If *this* target is also just an interface library propagating
@@ -675,14 +638,11 @@ void Target::propagate_from_dependency(
             // properties of the ultimate consuming target, not intermediaries.
             auto deferred_it = dep.deferred_interface_genex_.find(info.name);
             if (deferred_it != dep.deferred_interface_genex_.end()) {
-                bool is_interface_passthrough =
-                    (type_ == TargetType::INTERFACE_LIBRARY);
+                bool is_interface_passthrough = (type_ == TargetType::INTERFACE_LIBRARY);
                 if (is_interface_passthrough) {
                     // Forward raw genex to our own deferred set
                     auto& our_deferred = deferred_interface_genex_[info.name];
-                    our_deferred.insert(our_deferred.end(),
-                                        deferred_it->second.begin(),
-                                        deferred_it->second.end());
+                    our_deferred.insert(our_deferred.end(), deferred_it->second.begin(), deferred_it->second.end());
                 } else {
                     // Split deferred values into:
                     //   - per-source genex (COMPILE_LANGUAGE / COMPILE_LANG_AND_ID):
@@ -696,8 +656,7 @@ void Target::propagate_from_dependency(
                     //     consumer as current_target.
                     std::vector<std::string> needs_eval;
                     for (const auto& v : deferred_it->second) {
-                        if (v.find("$<COMPILE_LANGUAGE:") != std::string::npos ||
-                            v.find("$<COMPILE_LANG_AND_ID:") != std::string::npos) {
+                        if (v.find("$<COMPILE_LANGUAGE:") != std::string::npos || v.find("$<COMPILE_LANG_AND_ID:") != std::string::npos) {
                             dest.push_back(v);
                         } else {
                             needs_eval.push_back(v);
@@ -719,35 +678,25 @@ void Target::propagate_from_dependency(
             }
 
             const auto& dep_iface = dep.get_resolved_interface_property(info.name);
-            if (!dep_iface.empty()) {
-                dest.insert(dest.end(), dep_iface.begin(), dep_iface.end());
-            }
+            if (!dep_iface.empty()) { dest.insert(dest.end(), dep_iface.begin(), dep_iface.end()); }
         }
     }
 
     // 2. Add dependency's own artifact + transitive link deps to LINK_LIBRARIES
     auto& output_libs = output_props["LINK_LIBRARIES"];
     std::string dep_path = dep.get_output_path();
-    if (!dep_path.empty()) {
-        output_libs.push_back(std::move(dep_path));
-    }
+    if (!dep_path.empty()) { output_libs.push_back(std::move(dep_path)); }
     merge_dedup(output_libs, collect_link_deps(dep));
 }
 
-void Target::handle_circular_dep(
-    const Target& dep,
-    bool is_public, bool is_interface_only,
-    std::vector<std::string>& res_libs,
-    std::vector<std::string>& res_iface_libs)
-{
-    if (dep.get_type() != TargetType::STATIC_LIBRARY &&
-        dep.get_type() != TargetType::OBJECT_LIBRARY) {
-        throw std::runtime_error(
-            "Circular dependency: " + name_ + " -> " + dep.get_name());
+void Target::handle_circular_dep(const Target& dep, bool is_public, bool is_interface_only, std::vector<std::string>& res_libs,
+                                 std::vector<std::string>& res_iface_libs) {
+    if (dep.get_type() != TargetType::STATIC_LIBRARY && dep.get_type() != TargetType::OBJECT_LIBRARY) {
+        throw std::runtime_error("Circular dependency: " + name_ + " -> " + dep.get_name());
     }
     kiln::print_message(std::cerr, "WARNING",
-        "Circular dependency between static libraries '" + name_ +
-        "' and '" + dep.get_name() + "'. Consider restructuring.");
+                        "Circular dependency between static libraries '" + name_ + "' and '" + dep.get_name()
+                            + "'. Consider restructuring.");
     std::string dep_path = dep.get_output_path();
     if (!dep_path.empty()) {
         if (!is_interface_only) res_libs.push_back(dep_path);
@@ -756,9 +705,7 @@ void Target::handle_circular_dep(
     deferred_circular_deps_.push_back(dep.get_name());
 }
 
-void Target::resolve_deferred_circular_deps(
-    const TargetMap& all_targets)
-{
+void Target::resolve_deferred_circular_deps(const TargetMap& all_targets) {
     if (deferred_circular_deps_.empty()) return;
 
     auto props = build_props_to_resolve();
@@ -795,9 +742,7 @@ void Target::resolve(const TargetMap& all_targets, const Interpreter& interp) {
     auto& res_libs = resolved_properties_["LINK_LIBRARIES"];
     auto& res_iface_libs = resolved_interface_properties_["LINK_LIBRARIES"];
 
-    auto process_one_dep = [&](const std::string& raw_lib_name,
-                               bool is_public, bool is_interface_only,
-                               bool link_only) {
+    auto process_one_dep = [&](const std::string& raw_lib_name, bool is_public, bool is_interface_only, bool link_only) {
         std::string lib_name = interp.resolve_target_alias(raw_lib_name);
         auto dep_it = all_targets.find(lib_name);
 
@@ -817,8 +762,7 @@ void Target::resolve(const TargetMap& all_targets, const Interpreter& interp) {
         resolved_target_deps_.push_back(lib_name);
 
         if (dep->is_visiting()) {
-            handle_circular_dep(*dep, is_public, is_interface_only,
-                                res_libs, res_iface_libs);
+            handle_circular_dep(*dep, is_public, is_interface_only, res_libs, res_iface_libs);
             return;
         }
 
@@ -838,15 +782,13 @@ void Target::resolve(const TargetMap& all_targets, const Interpreter& interp) {
 
         // For building THIS target (PRIVATE or PUBLIC dep)
         if (!is_interface_only) {
-            propagate_from_dependency(*dep, props_to_resolve,
-                resolved_properties_, /*skip_non_link=*/link_only, evaluator);
+            propagate_from_dependency(*dep, props_to_resolve, resolved_properties_, /*skip_non_link=*/link_only, evaluator);
             // CMake 3.21+: OBJECT libraries on the right side of
             // target_link_libraries() have "their object files included in
             // the link too" (cmake.org docs).  But OBJECT libraries on the
             // LEFT side only receive usage requirements — there is no link
             // step to include objects in.
-            if (dep->get_type() == TargetType::OBJECT_LIBRARY &&
-                type_ != TargetType::OBJECT_LIBRARY) {
+            if (dep->get_type() == TargetType::OBJECT_LIBRARY && type_ != TargetType::OBJECT_LIBRARY) {
                 resolved_object_lib_deps_.push_back(lib_name);
             }
             // Don't merge resolved_object_lib_deps_ from STATIC library deps:
@@ -858,8 +800,7 @@ void Target::resolve(const TargetMap& all_targets, const Interpreter& interp) {
 
         // For propagating to OUR dependents (PUBLIC or INTERFACE dep)
         if (is_public || is_interface_only) {
-            propagate_from_dependency(*dep, props_to_resolve,
-                resolved_interface_properties_, /*skip_non_link=*/link_only, evaluator);
+            propagate_from_dependency(*dep, props_to_resolve, resolved_interface_properties_, /*skip_non_link=*/link_only, evaluator);
         }
     };
 
@@ -892,21 +833,17 @@ void Target::resolve(const TargetMap& all_targets, const Interpreter& interp) {
                 pending.clear();
             }
         }
-        if (!pending.empty()) {
-            libs.push_back(std::move(pending));
-        }
+        if (!pending.empty()) { libs.push_back(std::move(pending)); }
 
         for (const auto& lib : libs) {
             auto eval_result = evaluator.evaluate_link_library(lib);
             if (!eval_result) {
-                throw std::runtime_error("Error evaluating LINK_LIBRARIES for target '"
-                    + name_ + "': " + eval_result.error()
-                    + "\n  Value: " + lib);
+                throw std::runtime_error("Error evaluating LINK_LIBRARIES for target '" + name_ + "': " + eval_result.error()
+                                         + "\n  Value: " + lib);
             }
             if (!eval_result->value.empty()) {
                 for (auto part : CMakeArrayIterator(eval_result->value)) {
-                    process_one_dep(std::string(part), is_public,
-                                   is_interface_only, eval_result->link_only);
+                    process_one_dep(std::string(part), is_public, is_interface_only, eval_result->link_only);
                 }
             }
         }
@@ -959,13 +896,9 @@ void Target::resolve(const TargetMap& all_targets, const Interpreter& interp) {
 
 std::string Target::get_output_path(GenexEvaluator* evaluator) const {
     // Interface libraries have no linkable output - they only propagate properties
-    if (type_ == TargetType::INTERFACE_LIBRARY) {
-        return "";
-    }
+    if (type_ == TargetType::INTERFACE_LIBRARY) { return ""; }
 
-    if (is_imported_ && !imported_location_.empty()) {
-        return imported_location_;
-    }
+    if (is_imported_ && !imported_location_.empty()) { return imported_location_; }
 
     // Helper: read a property, evaluating genex if an evaluator is available
     auto eval_prop = [&](const std::string& prop) -> std::string {
@@ -976,9 +909,12 @@ std::string Target::get_output_path(GenexEvaluator* evaluator) const {
     // precedence over OUTPUT_NAME, which itself overrides target name.
     std::string out_name;
     const char* per_type_name_prop = nullptr;
-    if (type_ == TargetType::EXECUTABLE) per_type_name_prop = "RUNTIME_OUTPUT_NAME";
-    else if (type_ == TargetType::STATIC_LIBRARY) per_type_name_prop = "ARCHIVE_OUTPUT_NAME";
-    else if (type_ == TargetType::SHARED_LIBRARY) per_type_name_prop = "LIBRARY_OUTPUT_NAME";
+    if (type_ == TargetType::EXECUTABLE)
+        per_type_name_prop = "RUNTIME_OUTPUT_NAME";
+    else if (type_ == TargetType::STATIC_LIBRARY)
+        per_type_name_prop = "ARCHIVE_OUTPUT_NAME";
+    else if (type_ == TargetType::SHARED_LIBRARY)
+        per_type_name_prop = "LIBRARY_OUTPUT_NAME";
     if (per_type_name_prop) out_name = eval_prop(per_type_name_prop);
     if (out_name.empty()) out_name = get_output_name();
 
@@ -988,7 +924,7 @@ std::string Target::get_output_path(GenexEvaluator* evaluator) const {
         if (!build_type_.empty()) {
             std::string upper;
             upper.reserve(build_type_.size());
-            for (char c : build_type_) upper.push_back(std::toupper((unsigned char)c));
+            for (char c : build_type_) upper.push_back(std::toupper((unsigned char) c));
             std::string postfix = eval_prop(upper + "_POSTFIX");
             if (!postfix.empty()) out_name += postfix;
         }
@@ -1046,9 +982,7 @@ std::string Target::get_output_path(GenexEvaluator* evaluator) const {
 void Target::inject_autogen_include(const std::string& dir) {
     // Prepend to resolved INCLUDE_DIRECTORIES so autogen headers are found first
     auto& resolved = resolved_properties_["INCLUDE_DIRECTORIES"];
-    if (std::find(resolved.begin(), resolved.end(), dir) == resolved.end()) {
-        resolved.insert(resolved.begin(), dir);
-    }
+    if (std::find(resolved.begin(), resolved.end(), dir) == resolved.end()) { resolved.insert(resolved.begin(), dir); }
 }
 
 void Target::inject_autogen_dep(const std::string& task_id) {
@@ -1098,7 +1032,7 @@ std::string get_obj_path(const std::string& binary_dir, const std::string& targe
     // walk out of the per-target objs/<target> directory after normalization
     // and collide with other targets compiling the same source.
     std::string sanitized(obj_suffix);
-    for (size_t i = 0; i < sanitized.size(); ) {
+    for (size_t i = 0; i < sanitized.size();) {
         size_t end = sanitized.find('/', i);
         size_t len = (end == std::string::npos ? sanitized.size() : end) - i;
         if (len == 2 && sanitized[i] == '.' && sanitized[i + 1] == '.') {
@@ -1116,12 +1050,9 @@ std::string get_obj_path(const std::string& binary_dir, const std::string& targe
 
 // Resolve executable target names in the first argument of COMMAND clauses.
 // CMake replaces bare target names with the built binary path and adds an implicit dependency.
-static void resolve_command_target_references(
-    std::vector<std::vector<std::string>>& commands,
-    BuildTask& task,
-    const TargetMap& all_targets,
-    const std::unordered_map<std::string, std::string>& target_aliases = {})
-{
+static void resolve_command_target_references(std::vector<std::vector<std::string>>& commands, BuildTask& task,
+                                              const TargetMap& all_targets,
+                                              const std::unordered_map<std::string, std::string>& target_aliases = {}) {
     for (auto& cmd : commands) {
         if (cmd.empty()) continue;
 
@@ -1135,9 +1066,7 @@ static void resolve_command_target_references(
 
         // Direct target name lookup (executables only)
         auto it = all_targets.find(cmd_name);
-        if (it != all_targets.end() && it->second->get_type() == TargetType::EXECUTABLE) {
-            resolved = it->second;
-        }
+        if (it != all_targets.end() && it->second->get_type() == TargetType::EXECUTABLE) { resolved = it->second; }
 
         // Fall back: executable whose OUTPUT_NAME or output path matches the command
         if (!resolved) {
@@ -1159,12 +1088,10 @@ static void resolve_command_target_references(
                 }
             }
             auto oit = output_name_map.find(cmd[0]);
-            if (oit != output_name_map.end())
-                resolved = oit->second;
+            if (oit != output_name_map.end()) resolved = oit->second;
             if (!resolved) {
                 auto pit = output_path_map.find(cmd[0]);
-                if (pit != output_path_map.end())
-                    resolved = pit->second;
+                if (pit != output_path_map.end()) resolved = pit->second;
             }
         }
 
@@ -1180,28 +1107,24 @@ static void resolve_command_target_references(
 
 // Helper to generate a task for a custom command rule.
 // Recursively generates tasks for any deps that are themselves custom command outputs.
-static std::expected<void, std::string> generate_custom_command_task(GraphTransaction& txn, const CustomCommandRule& rule,
-                                         const TargetMap& all_targets,
-                                         const std::map<std::string, std::shared_ptr<CustomCommandRule>>& custom_rules,
-                                         std::set<std::string>& generated,
-                                         const std::unordered_map<std::string, std::string>& target_aliases);
+static std::expected<void, std::string>
+generate_custom_command_task(GraphTransaction& txn, const CustomCommandRule& rule, const TargetMap& all_targets,
+                             const std::map<std::string, std::shared_ptr<CustomCommandRule>>& custom_rules,
+                             std::set<std::string>& generated, const std::unordered_map<std::string, std::string>& target_aliases);
 
-std::expected<void, std::string> generate_custom_command_task_for_rule(
-    GraphTransaction& txn, const CustomCommandRule& rule,
-    const TargetMap& all_targets,
-    const std::map<std::string, std::shared_ptr<CustomCommandRule>>& custom_rules,
-    std::set<std::string>& generated,
-    const std::unordered_map<std::string, std::string>& target_aliases) {
+std::expected<void, std::string>
+generate_custom_command_task_for_rule(GraphTransaction& txn, const CustomCommandRule& rule, const TargetMap& all_targets,
+                                      const std::map<std::string, std::shared_ptr<CustomCommandRule>>& custom_rules,
+                                      std::set<std::string>& generated,
+                                      const std::unordered_map<std::string, std::string>& target_aliases) {
     return generate_custom_command_task(txn, rule, all_targets, custom_rules, generated, target_aliases);
 }
 
-static std::expected<void, std::string> generate_custom_command_task(GraphTransaction& txn, const CustomCommandRule& rule,
-                                         const TargetMap& all_targets,
-                                         const std::map<std::string, std::shared_ptr<CustomCommandRule>>& custom_rules,
-                                         std::set<std::string>& generated,
-                                         const std::unordered_map<std::string, std::string>& target_aliases) {
-    if (generated.count(rule.outputs[0]) || txn.has_task(rule.outputs[0]))
-        return {};
+static std::expected<void, std::string>
+generate_custom_command_task(GraphTransaction& txn, const CustomCommandRule& rule, const TargetMap& all_targets,
+                             const std::map<std::string, std::shared_ptr<CustomCommandRule>>& custom_rules,
+                             std::set<std::string>& generated, const std::unordered_map<std::string, std::string>& target_aliases) {
+    if (generated.count(rule.outputs[0]) || txn.has_task(rule.outputs[0])) return {};
     generated.insert(rule.outputs[0]);
 
     BuildTask task;
@@ -1209,15 +1132,11 @@ static std::expected<void, std::string> generate_custom_command_task(GraphTransa
     task.kind = CustomCommandTask{};
     task.working_dir = rule.working_dir;
 
-    for (const auto& cmd : rule.commands) {
-        task.commands.push_back(cmd);
-    }
+    for (const auto& cmd : rule.commands) { task.commands.push_back(cmd); }
 
     resolve_command_target_references(task.commands, task, all_targets, target_aliases);
 
-    for (const auto& out : rule.outputs) {
-        task.outputs.push_back(out);
-    }
+    for (const auto& out : rule.outputs) { task.outputs.push_back(out); }
 
     for (const auto& dep : rule.depends) {
         // If dependency contains genex, store raw for evaluation at graph gen time
@@ -1254,9 +1173,7 @@ static std::expected<void, std::string> generate_custom_command_task(GraphTransa
                 // Fallback: check binary dir (custom command outputs are registered there)
                 auto bin_normalized = Path::make_absolute_and_normal(rule.binary_dir, dep);
                 cc_it = custom_rules.find(bin_normalized);
-                if (cc_it != custom_rules.end()) {
-                    normalized = bin_normalized;
-                }
+                if (cc_it != custom_rules.end()) { normalized = bin_normalized; }
             }
             if (cc_it != custom_rules.end()) {
                 if (auto r = generate_custom_command_task(txn, *cc_it->second, all_targets, custom_rules, generated, target_aliases); !r)
@@ -1271,17 +1188,16 @@ static std::expected<void, std::string> generate_custom_command_task(GraphTransa
     return {};
 }
 
-struct ResolvedDep { std::string id; };
+struct ResolvedDep {
+    std::string id;
+};
 
-std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction& txn, const Toolchain& toolchain, std::vector<std::string>& obj_files,
-                                      const std::map<Language, PchInfo>& pch_per_lang,
-                                      bool is_shared, bool is_pie, const TargetMap& all_targets,
-                                      GenexEvaluator& evaluator, const Interpreter& interp,
-                                      const std::string& pre_build_task_id,
-                                      const std::string& module_mapper_path,
-                                      std::set<std::string>& generated_custom_tasks,
-                                      const std::set<std::string>& implicit_includes,
-                                      std::vector<ResolvedDep> resolved_manual_deps) {
+std::expected<void, std::string>
+Target::generate_object_tasks(GraphTransaction& txn, const Toolchain& toolchain, std::vector<std::string>& obj_files,
+                              const std::map<Language, PchInfo>& pch_per_lang, bool is_shared, bool is_pie, const TargetMap& all_targets,
+                              GenexEvaluator& evaluator, const Interpreter& interp, const std::string& pre_build_task_id,
+                              const std::string& module_mapper_path, std::set<std::string>& generated_custom_tasks,
+                              const std::set<std::string>& implicit_includes, std::vector<ResolvedDep> resolved_manual_deps) {
     // --- Hoist all loop-invariant computations ---
 
     // True when this target needs the module compile pipeline. Includes the
@@ -1323,7 +1239,6 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
         return compute_effective_standard(get_language_standard(lang), required, compiler_default);
     };
 
-
     // Pre-build CXX_MODULES file set for O(1) lookups instead of O(N*M) per-source
     std::unordered_set<std::string> cxx_module_files;
     for (const auto& fs : file_sets_) {
@@ -1345,14 +1260,10 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
     const auto& resolved_options = get_resolved_property("COMPILE_OPTIONS");
 
     auto has_deferred_genex = [](const std::vector<std::string>& vals) {
-        return std::any_of(vals.begin(), vals.end(), [](const std::string& v) {
-            return v.find("$<COMPILE_LANG") != std::string::npos;
-        });
+        return std::any_of(vals.begin(), vals.end(), [](const std::string& v) { return v.find("$<COMPILE_LANG") != std::string::npos; });
     };
-    bool needs_per_lang_eval = has_deferred_genex(resolved_includes) ||
-                               has_deferred_genex(resolved_sys_includes) ||
-                               has_deferred_genex(resolved_definitions) ||
-                               has_deferred_genex(resolved_options);
+    bool needs_per_lang_eval = has_deferred_genex(resolved_includes) || has_deferred_genex(resolved_sys_includes)
+                               || has_deferred_genex(resolved_definitions) || has_deferred_genex(resolved_options);
 
     // If we have COMPILE_LANG genex, pre-evaluate for C and CXX once (not per-source)
     struct PerLangProperties {
@@ -1374,9 +1285,7 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
                     auto eval_result = lang_eval.evaluate(val);
                     if (eval_result && !eval_result->empty()) {
                         // Genex may produce semicolon-separated lists
-                        for (auto sv : CMakeArrayIterator(*eval_result)) {
-                            result.emplace_back(sv);
-                        }
+                        for (auto sv : CMakeArrayIterator(*eval_result)) { result.emplace_back(sv); }
                     }
                 } else {
                     result.push_back(val);
@@ -1443,7 +1352,9 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
         if (cc_it == custom_rules.end()) cc_it = custom_rules.find(norm_bin);
         if (cc_it != custom_rules.end()) {
             if (!generated_custom_tasks.count(cc_it->second->outputs[0])) {
-                if (auto r = generate_custom_command_task(txn, *cc_it->second, all_targets, custom_rules, generated_custom_tasks, interp.get_target_aliases()); !r)
+                if (auto r = generate_custom_command_task(txn, *cc_it->second, all_targets, custom_rules, generated_custom_tasks,
+                                                          interp.get_target_aliases());
+                    !r)
                     return std::unexpected(std::move(r.error()));
             }
             resolved_manual_deps.push_back({cc_it->second->outputs[0]});
@@ -1493,13 +1404,9 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
                         norm = Path::make_absolute_and_normal(target->get_binary_dir(), src);
                         cc_it = custom_rules.find(norm);
                     }
-                    if (cc_it != custom_rules.end()) {
-                        cc_keys.push_back(cc_it->second->outputs[0]);
-                    }
+                    if (cc_it != custom_rules.end()) { cc_keys.push_back(cc_it->second->outputs[0]); }
                 }
-                if (!cc_keys.empty()) {
-                    target_cc_outputs[target.get()] = std::move(cc_keys);
-                }
+                if (!cc_keys.empty()) { target_cc_outputs[target.get()] = std::move(cc_keys); }
             }
         }
 
@@ -1517,8 +1424,9 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
                     // Look up the rule by its primary output to generate the task
                     auto rule_it = custom_rules.find(key);
                     if (rule_it != custom_rules.end()) {
-                        if (auto r = generate_custom_command_task(txn, *rule_it->second, all_targets,
-                            custom_rules, generated_custom_tasks, interp.get_target_aliases()); !r)
+                        if (auto r = generate_custom_command_task(txn, *rule_it->second, all_targets, custom_rules, generated_custom_tasks,
+                                                                  interp.get_target_aliases());
+                            !r)
                             return std::unexpected(std::move(r.error()));
                     }
                 }
@@ -1540,9 +1448,7 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
         auto li = LanguageClassifier::from_path(src);
         if (!li.is_header) continue;
         Path sp(src);
-        std::string norm = sp.is_absolute()
-            ? sp.lexically_normal().str()
-            : Path::make_absolute_and_normal(binary_dir_, src);
+        std::string norm = sp.is_absolute() ? sp.lexically_normal().str() : Path::make_absolute_and_normal(binary_dir_, src);
         auto sp_it2 = source_props.find(norm);
         if (sp_it2 == source_props.end()) continue;
         auto g_it = sp_it2->second.find("GENERATED");
@@ -1595,9 +1501,7 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
         // Check HEADER_FILE_ONLY
         if (sp_it != source_props.end()) {
             auto hfo_it = sp_it->second.find("HEADER_FILE_ONLY");
-            if (hfo_it != sp_it->second.end() && !Interpreter::is_falsy(hfo_it->second)) {
-                continue;
-            }
+            if (hfo_it != sp_it->second.end() && !Interpreter::is_falsy(hfo_it->second)) { continue; }
         }
 
         auto lang_info = LanguageClassifier::from_path(src);
@@ -1624,10 +1528,7 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
         // Try appending known source extensions to find the actual file.
         if (lang_info.lang == Language::UNKNOWN) {
             static constexpr std::string_view try_extensions[] = {
-                ".cpp", ".cc", ".cxx", ".C", ".c++",
-                ".c",
-                ".cu",
-                ".s", ".S", ".asm",
+                ".cpp", ".cc", ".cxx", ".C", ".c++", ".c", ".cu", ".s", ".S", ".asm",
             };
             bool resolved = false;
             for (auto try_ext : try_extensions) {
@@ -1644,8 +1545,7 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
 
         // Check CXX_MODULES using pre-built set (O(1) vs O(N*M))
         if (!cxx_module_files.empty()) {
-            if (cxx_module_files.count(src_normalized) ||
-                cxx_module_files.count(std::string(src_path.filename()))) {
+            if (cxx_module_files.count(src_normalized) || cxx_module_files.count(std::string(src_path.filename()))) {
                 lang_info.is_module_interface = true;
             }
         }
@@ -1671,8 +1571,7 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
         bool skip_pch = (pch_it == pch_per_lang.end());
         if (!skip_pch && sp_it != source_props.end()) {
             auto skip_it = sp_it->second.find("SKIP_PRECOMPILE_HEADERS");
-            if (skip_it != sp_it->second.end() && !Interpreter::is_falsy(skip_it->second))
-                skip_pch = true;
+            if (skip_it != sp_it->second.end() && !Interpreter::is_falsy(skip_it->second)) skip_pch = true;
         }
         ctx.pch_include = skip_pch ? "" : pch_it->second.include_arg;
         ctx.standard = effective_standard(lang_info.lang);
@@ -1731,9 +1630,7 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
             if (!target_cf.empty()) {
                 std::istringstream iss(target_cf);
                 std::string flag;
-                while (iss >> flag) {
-                    ctx.options.push_back(flag);
-                }
+                while (iss >> flag) { ctx.options.push_back(flag); }
             }
         }
 
@@ -1743,9 +1640,7 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
             if (cf_it != sp_it->second.end()) {
                 std::istringstream iss(cf_it->second);
                 std::string flag;
-                while (iss >> flag) {
-                    ctx.options.push_back(flag);
-                }
+                while (iss >> flag) { ctx.options.push_back(flag); }
             }
 
             auto co_it = sp_it->second.find("COMPILE_OPTIONS");
@@ -1763,9 +1658,7 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
                         auto result = src_eval_storage->evaluate(opt);
                         if (result && !result->empty()) {
                             // Genex may produce semicolon-separated lists
-                            for (auto sv : CMakeArrayIterator(*result)) {
-                                ctx.options.emplace_back(sv);
-                            }
+                            for (auto sv : CMakeArrayIterator(*result)) { ctx.options.emplace_back(sv); }
                         }
                     } else {
                         ctx.options.push_back(std::move(opt));
@@ -1775,16 +1668,12 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
 
             auto cd_it = sp_it->second.find("COMPILE_DEFINITIONS");
             if (cd_it != sp_it->second.end()) {
-                for (auto sv : CMakeArrayIterator(cd_it->second)) {
-                    ctx.definitions.emplace_back(sv);
-                }
+                for (auto sv : CMakeArrayIterator(cd_it->second)) { ctx.definitions.emplace_back(sv); }
             }
 
             auto id_it = sp_it->second.find("INCLUDE_DIRECTORIES");
             if (id_it != sp_it->second.end()) {
-                for (auto sv : CMakeArrayIterator(id_it->second)) {
-                    ctx.includes.emplace_back(sv);
-                }
+                for (auto sv : CMakeArrayIterator(id_it->second)) { ctx.includes.emplace_back(sv); }
             }
         }
 
@@ -1808,22 +1697,16 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
         }
 
         // Pre-resolved manual dependencies (hoisted)
-        for (const auto& dep : resolved_manual_deps) {
-            task.explicit_deps.push_back(dep.id);
-        }
+        for (const auto& dep : resolved_manual_deps) { task.explicit_deps.push_back(dep.id); }
 
         // Autogen deps (UIC outputs): ui_*.h can be included transitively via headers
-        for (const auto& dep : autogen_deps_) {
-            task.explicit_deps.push_back(dep);
-        }
+        for (const auto& dep : autogen_deps_) { task.explicit_deps.push_back(dep); }
 
         // GENERATED headers listed in target sources: route through task.inputs
         // so the file-dep resolver maps them to the producing custom target's
         // task (via output_to_task_). Putting them in explicit_deps would only
         // resolve task IDs, not file paths.
-        for (const auto& gh : generated_header_inputs) {
-            task.inputs.push_back(gh);
-        }
+        for (const auto& gh : generated_header_inputs) { task.inputs.push_back(gh); }
 
         // OBJECT_DEPENDS
         if (sp_it != source_props.end()) {
@@ -1838,7 +1721,9 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
                     auto od_cc_it = custom_rules.find(dep_normalized);
                     if (od_cc_it != custom_rules.end()) {
                         if (!generated_custom_tasks.count(od_cc_it->second->outputs[0])) {
-                            if (auto r = generate_custom_command_task(txn, *od_cc_it->second, all_targets, custom_rules, generated_custom_tasks, interp.get_target_aliases()); !r)
+                            if (auto r = generate_custom_command_task(txn, *od_cc_it->second, all_targets, custom_rules,
+                                                                      generated_custom_tasks, interp.get_target_aliases());
+                                !r)
                                 return std::unexpected(std::move(r.error()));
                         }
                         task.explicit_deps.push_back(od_cc_it->second->outputs[0]);
@@ -1850,9 +1735,7 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
         // --- Dependency wiring (merged from generate_tasks) ---
 
         // Depend on PRE_BUILD task
-        if (!pre_build_task_id.empty()) {
-            task.explicit_deps.push_back(pre_build_task_id);
-        }
+        if (!pre_build_task_id.empty()) { task.explicit_deps.push_back(pre_build_task_id); }
 
         // Depend on custom command that generates this source
         {
@@ -1874,27 +1757,18 @@ std::expected<void, std::string> Target::generate_object_tasks(GraphTransaction&
     return {};
 }
 
-static std::expected<PchInfo, std::string> generate_pch_task(
-    GraphTransaction& txn,
-    const Toolchain& toolchain,
-    const Target* target,
-    const Interpreter& interp,
-    Language pch_lang,
-    const std::vector<std::string>& pch_headers,
-    bool is_shared,
-    const std::vector<std::string>& includes,
-    const std::vector<std::string>& system_includes,
-    const std::vector<std::string>& definitions,
-    const std::vector<std::string>& options,
-    int compiler_default_standard,
-    const std::vector<ResolvedDep>& manual_deps = {}) {
+static std::expected<PchInfo, std::string>
+generate_pch_task(GraphTransaction& txn, const Toolchain& toolchain, const Target* target, const Interpreter& interp, Language pch_lang,
+                  const std::vector<std::string>& pch_headers, bool is_shared, const std::vector<std::string>& includes,
+                  const std::vector<std::string>& system_includes, const std::vector<std::string>& definitions,
+                  const std::vector<std::string>& options, int compiler_default_standard,
+                  const std::vector<ResolvedDep>& manual_deps = {}) {
 
     const Compiler* compiler = target->resolve_compiler(pch_lang, toolchain);
     if (!compiler) {
         std::string lang_name = (pch_lang == Language::C) ? "C" : "CXX";
-        throw std::runtime_error("No " + lang_name + " compiler available for PCH generation in target '"
-            + target->get_name() + "' (target has PRECOMPILE_HEADERS for " + lang_name
-            + " but project() does not enable that language)");
+        throw std::runtime_error("No " + lang_name + " compiler available for PCH generation in target '" + target->get_name()
+                                 + "' (target has PRECOMPILE_HEADERS for " + lang_name + " but project() does not enable that language)");
     }
 
     // CMake uses cmake_pch.h for C and cmake_pch.hxx for CXX; we use similar naming
@@ -1904,9 +1778,7 @@ static std::expected<PchInfo, std::string> generate_pch_task(
     std::string pch_gch_path = pch_wrapper + ".gch";
     std::string pch_include_arg = " -include " + pch_wrapper;
 
-    auto is_angle_bracketed = [](const std::string& h) {
-        return h.size() >= 2 && h.front() == '<' && h.back() == '>';
-    };
+    auto is_angle_bracketed = [](const std::string& h) { return h.size() >= 2 && h.front() == '<' && h.back() == '>'; };
     auto strip_quotes = [](const std::string& h) {
         if (h.size() >= 2 && h.front() == '"' && h.back() == '"') return h.substr(1, h.size() - 2);
         return h;
@@ -1927,18 +1799,14 @@ static std::expected<PchInfo, std::string> generate_pch_task(
         std::ifstream existing(pch_wrapper);
         if (existing) {
             std::string existing_content((std::istreambuf_iterator<char>(existing)), std::istreambuf_iterator<char>());
-            if (existing_content == content) {
-                needs_write = false;
-            }
+            if (existing_content == content) { needs_write = false; }
         }
     }
 
     if (needs_write) {
         std::filesystem::create_directories(std::string(Path(pch_wrapper).parent_path()));
         std::ofstream wrapper_file(pch_wrapper);
-        if (!wrapper_file) {
-            throw std::runtime_error("Failed to create PCH wrapper file: " + pch_wrapper);
-        }
+        if (!wrapper_file) { throw std::runtime_error("Failed to create PCH wrapper file: " + pch_wrapper); }
         wrapper_file << content;
     }
 
@@ -1956,11 +1824,8 @@ static std::expected<PchInfo, std::string> generate_pch_task(
     {
         int required_std = 0;
         const auto& cf = target->get_resolved_property("COMPILE_FEATURES");
-        if (!cf.empty()) {
-            required_std = CompileFeatures::instance().get_required_standard(cf, pch_lang);
-        }
-        ctx.standard = compute_effective_standard(
-            target->get_language_standard(pch_lang), required_std, compiler_default_standard);
+        if (!cf.empty()) { required_std = CompileFeatures::instance().get_required_standard(cf, pch_lang); }
+        ctx.standard = compute_effective_standard(target->get_language_standard(pch_lang), required_std, compiler_default_standard);
     }
     ctx.extensions_enabled = target->get_language_extensions(pch_lang);
     ctx.color_diagnostics = isatty(STDOUT_FILENO);
@@ -1974,10 +1839,8 @@ static std::expected<PchInfo, std::string> generate_pch_task(
     // PCH wrapper includes headers relative to source_dir, so we need source_dir in the include path
     ctx.includes.push_back(target->get_source_dir());
 
-    for (const auto& dir : includes)
-        ctx.includes.push_back(dir);
-    for (const auto& dir : system_includes)
-        ctx.system_includes.push_back(dir);
+    for (const auto& dir : includes) ctx.includes.push_back(dir);
+    for (const auto& dir : system_includes) ctx.system_includes.push_back(dir);
 
     {
         auto cc = compiler->get_compile_command(ctx);
@@ -2000,16 +1863,16 @@ static std::expected<PchInfo, std::string> generate_pch_task(
 
     pch_task.outputs.push_back(pch_gch_path);
 
-    for (const auto& dep : manual_deps) {
-        pch_task.explicit_deps.push_back(dep.id);
-    }
+    for (const auto& dep : manual_deps) { pch_task.explicit_deps.push_back(dep.id); }
 
     if (auto r = txn.add(std::move(pch_task)); !r) return std::unexpected(std::move(r.error()));
 
     return PchInfo{pch_gch_path, pch_include_arg};
 }
 
-std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, const Toolchain& toolchain, const TargetMap& all_targets, const Interpreter& interp, const std::vector<std::string>& exe_linker_flags, const std::vector<std::string>& shared_linker_flags) {
+std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, const Toolchain& toolchain, const TargetMap& all_targets,
+                                                        const Interpreter& interp, const std::vector<std::string>& exe_linker_flags,
+                                                        const std::vector<std::string>& shared_linker_flags) {
     if (type_ == TargetType::INTERFACE_LIBRARY || is_imported_) return {};
 
     resolve(all_targets, interp);
@@ -2036,7 +1899,7 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
     std::string pic_prop = get_property("POSITION_INDEPENDENT_CODE");
     if (!pic_prop.empty() && !Interpreter::is_falsy(pic_prop)) {
         if (type_ == TargetType::EXECUTABLE) {
-            is_pie = true;   // Executables use -fPIE
+            is_pie = true; // Executables use -fPIE
         } else {
             is_shared = true; // Libraries use -fPIC
         }
@@ -2058,9 +1921,7 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
 
         for (const auto& cmd : pre_build_commands_) {
             pre_build.commands.push_back(cmd.command);
-            if (!cmd.working_dir.empty()) {
-                pre_build.working_dir = cmd.working_dir;
-            }
+            if (!cmd.working_dir.empty()) { pre_build.working_dir = cmd.working_dir; }
         }
 
         resolve_command_target_references(pre_build.commands, pre_build, all_targets, interp.get_target_aliases());
@@ -2079,9 +1940,7 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
                 if (it != all_targets.end()) {
                     std::string dep_out = it->second->get_output_path();
                     std::string id = dep_out.empty() ? dep_name : std::move(dep_out);
-                    if (seen_dep_outputs.insert(id).second) {
-                        resolved_manual_deps.push_back({id});
-                    }
+                    if (seen_dep_outputs.insert(id).second) { resolved_manual_deps.push_back({id}); }
                 }
             }
         };
@@ -2107,13 +1966,13 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
     // Qt autogen: generate moc/uic/rcc tasks before compilation.
     // This scans sources/headers for Qt macros, creates moc/uic/rcc tasks,
     // injects generated sources into SOURCES, and adds the autogen include dir.
-    if (!Interpreter::is_falsy(get_property("AUTOMOC")) ||
-        !Interpreter::is_falsy(get_property("AUTOUIC")) ||
-        !Interpreter::is_falsy(get_property("AUTORCC"))) {
+    if (!Interpreter::is_falsy(get_property("AUTOMOC")) || !Interpreter::is_falsy(get_property("AUTOUIC"))
+        || !Interpreter::is_falsy(get_property("AUTORCC"))) {
         std::vector<std::string> manual_dep_ids;
         manual_dep_ids.reserve(resolved_manual_deps.size());
         for (const auto& d : resolved_manual_deps) manual_dep_ids.push_back(d.id);
-        if (auto r = generate_autogen_tasks(*this, txn, const_cast<Interpreter&>(interp), all_targets, pre_build_task_id, manual_dep_ids); !r)
+        if (auto r = generate_autogen_tasks(*this, txn, const_cast<Interpreter&>(interp), all_targets, pre_build_task_id, manual_dep_ids);
+            !r)
             return std::unexpected(std::move(r.error()));
     }
 
@@ -2145,15 +2004,12 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
             auto info = LanguageClassifier::from_path(src);
             if (info.lang == Language::UNKNOWN || info.is_header) continue;
 
-            std::string src_normalized = Path(src).is_absolute()
-                ? Path(src).lexically_normal().str()
-                : Path::make_absolute_and_normal(source_dir_, src);
+            std::string src_normalized =
+                Path(src).is_absolute() ? Path(src).lexically_normal().str() : Path::make_absolute_and_normal(source_dir_, src);
             auto sp_it = source_props.find(src_normalized);
             if (sp_it != source_props.end()) {
                 auto skip_it = sp_it->second.find("SKIP_PRECOMPILE_HEADERS");
-                if (skip_it != sp_it->second.end() && !Interpreter::is_falsy(skip_it->second)) {
-                    continue;
-                }
+                if (skip_it != sp_it->second.end() && !Interpreter::is_falsy(skip_it->second)) { continue; }
             }
             target_source_languages.insert(info.lang);
         }
@@ -2195,7 +2051,8 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
             if (result && !result->empty()) {
                 std::string ext = (lang == Language::C) ? "_pch.h" : "_pch.hxx";
                 Path provider_pch_path = (Path(provider->get_binary_dir()) / "objs") / (provider->get_name() + ext);
-                std::string pch_wrapper = provider->get_binary_dir().empty() ? provider_pch_path.str() : provider_pch_path.lexically_normal().str();
+                std::string pch_wrapper =
+                    provider->get_binary_dir().empty() ? provider_pch_path.str() : provider_pch_path.lexically_normal().str();
                 pch_per_lang[lang] = {pch_wrapper + ".gch", " -include " + pch_wrapper};
             }
         }
@@ -2246,9 +2103,7 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
                         if (val.find("$<COMPILE_LANG") != std::string::npos) {
                             auto eval_result = lang_eval.evaluate(val);
                             if (eval_result && !eval_result->empty()) {
-                                for (auto sv : CMakeArrayIterator(*eval_result)) {
-                                    out.emplace_back(sv);
-                                }
+                                for (auto sv : CMakeArrayIterator(*eval_result)) { out.emplace_back(sv); }
                             }
                         } else {
                             out.push_back(val);
@@ -2259,15 +2114,12 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
 
                 int default_std = (lang == Language::C) ? c_default_std : cxx_default_std;
                 auto pch_defs = evaluate_for_pch(get_resolved_property("COMPILE_DEFINITIONS"));
-                if (!pch_exports_define.empty()) {
-                    pch_defs.push_back(pch_exports_define);
-                }
-                auto info = generate_pch_task(txn, toolchain, this, interp, lang, *result, is_shared,
-                    filter_implicit(evaluate_for_pch(get_resolved_property("INCLUDE_DIRECTORIES"))),
-                    filter_implicit(evaluate_for_pch(get_resolved_property("SYSTEM_INCLUDE_DIRECTORIES"))),
-                    pch_defs,
-                    evaluate_for_pch(get_resolved_property("COMPILE_OPTIONS")),
-                    default_std, resolved_manual_deps);
+                if (!pch_exports_define.empty()) { pch_defs.push_back(pch_exports_define); }
+                auto info =
+                    generate_pch_task(txn, toolchain, this, interp, lang, *result, is_shared,
+                                      filter_implicit(evaluate_for_pch(get_resolved_property("INCLUDE_DIRECTORIES"))),
+                                      filter_implicit(evaluate_for_pch(get_resolved_property("SYSTEM_INCLUDE_DIRECTORIES"))), pch_defs,
+                                      evaluate_for_pch(get_resolved_property("COMPILE_OPTIONS")), default_std, resolved_manual_deps);
                 if (!info) return std::unexpected(std::move(info.error()));
                 pch_per_lang[lang] = std::move(*info);
             }
@@ -2276,10 +2128,10 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
 
     // Single pass: evaluates sources, discovers custom commands, generates compile tasks,
     // and wires dependencies (PRE_BUILD, custom commands, module mapper) inline.
-    if (auto r = generate_object_tasks(txn, toolchain, obj_files, pch_per_lang, is_shared, is_pie,
-                          all_targets, evaluator, interp,
-                          pre_build_task_id, module_mapper_path, generated_custom_tasks,
-                          implicit_includes, resolved_manual_deps); !r)
+    if (auto r =
+            generate_object_tasks(txn, toolchain, obj_files, pch_per_lang, is_shared, is_pie, all_targets, evaluator, interp,
+                                  pre_build_task_id, module_mapper_path, generated_custom_tasks, implicit_includes, resolved_manual_deps);
+        !r)
         return std::unexpected(std::move(r.error()));
 
     if (type_ == TargetType::OBJECT_LIBRARY) return {};
@@ -2304,9 +2156,7 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
                     auto sp_it = source_props.find(abs);
                     if (sp_it != source_props.end()) {
                         auto hfo = sp_it->second.find("HEADER_FILE_ONLY");
-                        if (hfo != sp_it->second.end() && !Interpreter::is_falsy(hfo->second)) {
-                            continue;
-                        }
+                        if (hfo != sp_it->second.end() && !Interpreter::is_falsy(hfo->second)) { continue; }
                     }
                     obj_files.push_back(get_obj_path(dep->get_binary_dir(), dep->get_name(), src));
                 }
@@ -2320,15 +2170,14 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
     {
         std::unordered_set<std::string> seen;
         auto before = obj_files.size();
-        std::erase_if(obj_files, [&](const std::string& o) {
-            return !seen.insert(o).second;
-        });
+        std::erase_if(obj_files, [&](const std::string& o) { return !seen.insert(o).second; });
         if (obj_files.size() < before) {
-            kiln::print_message(std::cerr, "WARNING", "target '" + name_ + "' has " + std::to_string(before - obj_files.size())
-                      + " duplicate object file(s), likely from the same OBJECT library "
-                      + "appearing in both $<TARGET_OBJECTS:> and target_link_libraries(). "
-                      + "Duplicates were removed automatically for compatibility. "
-                      + "Consider removing the redundant reference to clean this up.");
+            kiln::print_message(std::cerr, "WARNING",
+                                "target '" + name_ + "' has " + std::to_string(before - obj_files.size())
+                                    + " duplicate object file(s), likely from the same OBJECT library "
+                                    + "appearing in both $<TARGET_OBJECTS:> and target_link_libraries(). "
+                                    + "Duplicates were removed automatically for compatibility. "
+                                    + "Consider removing the redundant reference to clean this up.");
         }
     }
 
@@ -2338,7 +2187,10 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
     Language linker_lang = Language::C;
     for (const auto& src : sources_list) {
         auto info = LanguageClassifier::from_path(src);
-        if (info.lang == Language::CXX) { linker_lang = Language::CXX; break; }
+        if (info.lang == Language::CXX) {
+            linker_lang = Language::CXX;
+            break;
+        }
         if (info.lang == Language::UNKNOWN) {
             // Try resolving extensionless source (CMake compat)
             std::string abs = Path::make_absolute_and_normal(source_dir_, src);
@@ -2373,13 +2225,10 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
         std::unordered_set<std::string> seen;
         for (const auto& lib : get_resolved_property("LINK_LIBRARIES")) {
             if (lib.ends_with("-NOTFOUND")) {
-                kiln::print_message(std::cerr, "WARNING",
-                    "target '" + name_ + "' links '" + lib + "' which was not found - skipping");
+                kiln::print_message(std::cerr, "WARNING", "target '" + name_ + "' links '" + lib + "' which was not found - skipping");
                 continue;
             }
-            if (seen.insert(lib).second) {
-                full_link_libs.push_back(lib);
-            }
+            if (seen.insert(lib).second) { full_link_libs.push_back(lib); }
         }
 
         // If the target is C but links against libraries containing C++ code,
@@ -2417,9 +2266,7 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
     }
 
     const Compiler* linker = resolve_compiler(linker_lang, toolchain);
-    if (!linker) {
-        throw std::runtime_error("No linker available for language in target '" + name_ + "'");
-    }
+    if (!linker) { throw std::runtime_error("No linker available for language in target '" + name_ + "'"); }
 
     if (type_ == TargetType::STATIC_LIBRARY) {
         auto archive_cmd = linker->get_archive_command(output_path, obj_files);
@@ -2437,12 +2284,9 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
         {
             int required_std = 0;
             const auto& cf = get_resolved_property("COMPILE_FEATURES");
-            if (!cf.empty()) {
-                required_std = CompileFeatures::instance().get_required_standard(cf, linker_lang);
-            }
+            if (!cf.empty()) { required_std = CompileFeatures::instance().get_required_standard(cf, linker_lang); }
             int compiler_default = (linker_lang == Language::CXX) ? cxx_default_std : c_default_std;
-            ctx.standard = compute_effective_standard(
-                get_language_standard(linker_lang), required_std, compiler_default);
+            ctx.standard = compute_effective_standard(get_language_standard(linker_lang), required_std, compiler_default);
         }
         ctx.extensions_enabled = get_language_extensions(linker_lang);
         ctx.color_diagnostics = isatty(STDOUT_FILENO);
@@ -2450,57 +2294,45 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
 
         // CMake passes CMAKE_<LANG>_FLAGS to both compile AND link commands.
         // Flags like -fsanitize=address require this to work correctly.
-        for (const auto& opt : get_language_flags(linker_lang)) {
-            ctx.linker_flags.push_back(opt);
-        }
+        for (const auto& opt : get_language_flags(linker_lang)) { ctx.linker_flags.push_back(opt); }
 
         // Add target-specific link options (from target_link_options)
-        for (const auto& opt : get_resolved_property("LINK_OPTIONS")) {
-            ctx.linker_flags.push_back(opt);
-        }
+        for (const auto& opt : get_resolved_property("LINK_OPTIONS")) { ctx.linker_flags.push_back(opt); }
 
         // Apply LINK_FLAGS property (deprecated but still used by many projects)
         {
             std::string link_flags = get_property("LINK_FLAGS");
             if (!link_flags.empty()) {
-                for (auto& flag : kiln::shell_split(link_flags)) {
-                    ctx.linker_flags.push_back(std::move(flag));
-                }
+                for (auto& flag : kiln::shell_split(link_flags)) { ctx.linker_flags.push_back(std::move(flag)); }
             }
         }
 
         for (const auto& lib : full_link_libs) {
-             // Some Find modules set LIBRARIES as a space-separated string of
-             // flags (e.g. "-L/usr/lib -lmbedtls -lmbedx509"). Split these into
-             // individual arguments so they don't get passed as one quoted token.
-             if (lib.find(' ') != std::string::npos) {
-                 for (auto& part : kiln::shell_split(lib)) {
-                     if (part.starts_with("-L")) {
-                         ctx.lib_dirs.push_back(part.substr(2));
-                     } else {
-                         ctx.libs.push_back(std::move(part));
-                     }
-                 }
-             } else if (lib.starts_with("/") || lib.starts_with("./") || lib.starts_with("../") ||
-                 lib.find(".so") != std::string::npos ||
-                 lib.find(".a") != std::string::npos) {
-                 ctx.objects.push_back(lib);
-             } else {
-                 ctx.libs.push_back(lib);
-             }
+            // Some Find modules set LIBRARIES as a space-separated string of
+            // flags (e.g. "-L/usr/lib -lmbedtls -lmbedx509"). Split these into
+            // individual arguments so they don't get passed as one quoted token.
+            if (lib.find(' ') != std::string::npos) {
+                for (auto& part : kiln::shell_split(lib)) {
+                    if (part.starts_with("-L")) {
+                        ctx.lib_dirs.push_back(part.substr(2));
+                    } else {
+                        ctx.libs.push_back(std::move(part));
+                    }
+                }
+            } else if (lib.starts_with("/") || lib.starts_with("./") || lib.starts_with("../") || lib.find(".so") != std::string::npos
+                       || lib.find(".a") != std::string::npos) {
+                ctx.objects.push_back(lib);
+            } else {
+                ctx.libs.push_back(lib);
+            }
         }
 
-        for (const auto& dir : get_resolved_property("LINK_DIRECTORIES")) {
-            ctx.lib_dirs.push_back(dir);
-        }
+        for (const auto& dir : get_resolved_property("LINK_DIRECTORIES")) { ctx.lib_dirs.push_back(dir); }
 
         {
-            const char* implicit_var = (linker_lang == Language::C)
-                ? "CMAKE_C_IMPLICIT_LINK_DIRECTORIES"
-                : "CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES";
-            for (const auto& dir : CMakeArray(interp.get_variable(implicit_var))) {
-                ctx.implicit_link_dirs.push_back(dir);
-            }
+            const char* implicit_var =
+                (linker_lang == Language::C) ? "CMAKE_C_IMPLICIT_LINK_DIRECTORIES" : "CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES";
+            for (const auto& dir : CMakeArray(interp.get_variable(implicit_var))) { ctx.implicit_link_dirs.push_back(dir); }
         }
 
         // SKIP_BUILD_RPATH: per-target property overrides the variable default.
@@ -2538,9 +2370,7 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
         if (type_ == TargetType::SHARED_LIBRARY) {
             std::string soversion = get_property("SOVERSION");
             if (soversion.empty()) soversion = get_property("VERSION");
-            if (!soversion.empty()) {
-                ctx.soname = "lib" + get_output_name() + ".so." + soversion;
-            }
+            if (!soversion.empty()) { ctx.soname = "lib" + get_output_name() + ".so." + soversion; }
         }
 
         {
@@ -2582,14 +2412,12 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
         }
 
         for (const auto& lib : full_link_libs) {
-             if (lib.starts_with("/") || lib.starts_with("./") || lib.starts_with("../")) {
-                 link.inputs.push_back(lib);
+            if (lib.starts_with("/") || lib.starts_with("./") || lib.starts_with("../")) {
+                link.inputs.push_back(lib);
 
-                 // Only add to dependencies if a non-imported target produces this.
-                 if (non_imported_outputs.count(lib)) {
-                     link.explicit_deps.push_back(lib);
-                 }
-             }
+                // Only add to dependencies if a non-imported target produces this.
+                if (non_imported_outputs.count(lib)) { link.explicit_deps.push_back(lib); }
+            }
         }
 
         // Propagate imported library dependencies to consumer link task.
@@ -2633,16 +2461,12 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
         link.commands.clear();
 
         // Add PRE_LINK commands first
-        for (const auto& cmd : pre_link_commands_) {
-            link.commands.push_back(cmd.command);
-        }
+        for (const auto& cmd : pre_link_commands_) { link.commands.push_back(cmd.command); }
 
         resolve_command_target_references(link.commands, link, all_targets, interp.get_target_aliases());
 
         // Then add the actual link command(s)
-        for (auto& cmd : link_cmds) {
-            link.commands.push_back(std::move(cmd));
-        }
+        for (auto& cmd : link_cmds) { link.commands.push_back(std::move(cmd)); }
     }
 
     link.outputs.push_back(output_path);
@@ -2673,9 +2497,7 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
             };
 
             add_symlink(real_name, soversion_name);
-            if (unversioned_name != soversion_name) {
-                add_symlink(soversion_name, unversioned_name);
-            }
+            if (unversioned_name != soversion_name) { add_symlink(soversion_name, unversioned_name); }
         }
     }
 
@@ -2690,9 +2512,7 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
             for (auto& raw : linker->get_link_side_effect_outputs(cmd)) {
                 if (raw.empty()) continue;
                 Path pp(raw);
-                link.outputs.push_back(pp.is_absolute()
-                    ? pp.lexically_normal().str()
-                    : Path::make_absolute_and_normal(wd, raw));
+                link.outputs.push_back(pp.is_absolute() ? pp.lexically_normal().str() : Path::make_absolute_and_normal(wd, raw));
             }
         }
     }
@@ -2709,9 +2529,7 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
 
         for (const auto& cmd : post_build_commands_) {
             post_build.commands.push_back(cmd.command);
-            if (!cmd.working_dir.empty()) {
-                post_build.working_dir = cmd.working_dir;
-            }
+            if (!cmd.working_dir.empty()) { post_build.working_dir = cmd.working_dir; }
         }
 
         resolve_command_target_references(post_build.commands, post_build, all_targets, interp.get_target_aliases());
@@ -2725,7 +2543,9 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
     return {};
 }
 
-std::expected<void, std::string> CustomTarget::generate_tasks(GraphTransaction& txn, const Toolchain&, const TargetMap& all_targets, const Interpreter& interp, const std::vector<std::string>&, const std::vector<std::string>&) {
+std::expected<void, std::string> CustomTarget::generate_tasks(GraphTransaction& txn, const Toolchain&, const TargetMap& all_targets,
+                                                              const Interpreter& interp, const std::vector<std::string>&,
+                                                              const std::vector<std::string>&) {
     BuildTask task;
     task.id = name_;
     task.kind = CustomTargetTask{};
@@ -2736,12 +2556,9 @@ std::expected<void, std::string> CustomTarget::generate_tasks(GraphTransaction& 
     const auto& custom_rules = interp.get_custom_command_rules();
     std::set<std::string> generated_cc_tasks;
 
-
     for (const auto& custom_cmd : custom_commands_) {
         task.commands.push_back(custom_cmd.command);
-        if (!custom_cmd.working_dir.empty()) {
-            task.working_dir = custom_cmd.working_dir;
-        }
+        if (!custom_cmd.working_dir.empty()) { task.working_dir = custom_cmd.working_dir; }
     }
 
     resolve_command_target_references(task.commands, task, all_targets, interp.get_target_aliases());
@@ -2752,8 +2569,10 @@ std::expected<void, std::string> CustomTarget::generate_tasks(GraphTransaction& 
         // Skip self-dependencies (CMake silently ignores these)
         if (dep_name == name_) {
             kiln::print_message(std::cerr, "WARNING",
-                "Target '" + name_ + "' has itself in DEPENDS - ignoring self-dependency. "
-                "If you meant to depend on a file named '" + dep_name + "', use an absolute path.");
+                                "Target '" + name_
+                                    + "' has itself in DEPENDS - ignoring self-dependency. "
+                                      "If you meant to depend on a file named '"
+                                    + dep_name + "', use an absolute path.");
             continue;
         }
 
@@ -2784,12 +2603,12 @@ std::expected<void, std::string> CustomTarget::generate_tasks(GraphTransaction& 
                 // Fallback: check binary dir (custom command outputs are registered there)
                 auto bin_normalized = Path::make_absolute_and_normal(binary_dir_, dep_name);
                 cc_it = custom_rules.find(bin_normalized);
-                if (cc_it != custom_rules.end()) {
-                    normalized = bin_normalized;
-                }
+                if (cc_it != custom_rules.end()) { normalized = bin_normalized; }
             }
             if (cc_it != custom_rules.end()) {
-                if (auto r = generate_custom_command_task(txn, *cc_it->second, all_targets, custom_rules, generated_cc_tasks, interp.get_target_aliases()); !r)
+                if (auto r = generate_custom_command_task(txn, *cc_it->second, all_targets, custom_rules, generated_cc_tasks,
+                                                          interp.get_target_aliases());
+                    !r)
                     return std::unexpected(std::move(r.error()));
                 task.explicit_deps.push_back(cc_it->second->outputs[0]);
             }
@@ -2811,13 +2630,11 @@ std::expected<void, std::string> CustomTarget::generate_tasks(GraphTransaction& 
     }
 
     // Register byproducts as outputs so the build graph knows this target produces them
-    for (const auto& bp : byproducts_) {
-        task.outputs.push_back(bp);
-    }
+    for (const auto& bp : byproducts_) { task.outputs.push_back(bp); }
 
     // Support SOURCES in custom targets just in case
     for (const auto& src : get_property_list("SOURCES", TargetPropertyScope::BUILD)) {
-         task.inputs.push_back(Path(src).is_absolute() ? src : Path::join(source_dir_, src));
+        task.inputs.push_back(Path(src).is_absolute() ? src : Path::join(source_dir_, src));
     }
 
     if (auto r = txn.add(std::move(task)); !r) return std::unexpected(std::move(r.error()));
@@ -2868,12 +2685,10 @@ bool Target::has_module_sources() const {
 //
 // Returns the manifest path on success, empty string when std isn't
 // available (no CXX compiler, GCC<15, libstdc++.modules.json missing).
-static std::expected<std::string, std::string> ensure_std_module_tasks(GraphTransaction& txn,
-                                           const Compiler* cxx,
-                                           const std::string& top_binary_dir,
-                                           int cxx_default_std,
-                                           bool extensions_enabled,
-                                           const std::vector<std::string>& compiler_launcher) {
+static std::expected<std::string, std::string> ensure_std_module_tasks(GraphTransaction& txn, const Compiler* cxx,
+                                                                       const std::string& top_binary_dir, int cxx_default_std,
+                                                                       bool extensions_enabled,
+                                                                       const std::vector<std::string>& compiler_launcher) {
     if (!cxx || !cxx->supports_import_std()) return std::string{};
     std::string json_path = cxx->libstdcxx_modules_json_path();
     if (json_path.empty()) return std::string{};
@@ -2883,9 +2698,9 @@ static std::expected<std::string, std::string> ensure_std_module_tasks(GraphTran
 
     std::filesystem::path std_dir = std::filesystem::path(top_binary_dir) / "_kiln_std";
     std::string manifest_path = (std_dir / "std.module-exports.json").string();
-    std::string mapper_path   = (std_dir / "std.mapper").string();
-    std::string obj_path      = (std_dir / "std.o").string();
-    std::string bmi_path      = (std_dir / "bmis" / "std.gcm").string();
+    std::string mapper_path = (std_dir / "std.mapper").string();
+    std::string obj_path = (std_dir / "std.o").string();
+    std::string bmi_path = (std_dir / "bmis" / "std.gcm").string();
 
     std::error_code ec;
     std::filesystem::create_directories(std_dir, ec);
@@ -2916,11 +2731,9 @@ static std::expected<std::string, std::string> ensure_std_module_tasks(GraphTran
         ctx.standard = standard;
         ctx.extensions_enabled = extensions_enabled;
         ctx.is_module_source = true;
-        ctx.module_mapper_file = mapper_path;  // Unused on clang; harmless.
+        ctx.module_mapper_file = mapper_path; // Unused on clang; harmless.
         ctx.bmi_output = bmi_path;
-        if (clang && clang->import_std_uses_libcxx()) {
-            ctx.options.push_back("-stdlib=libc++");
-        }
+        if (clang && clang->import_std_uses_libcxx()) { ctx.options.push_back("-stdlib=libc++"); }
         if (clang_rsp) {
             // libstdc++'s std module references reserved identifiers as part
             // of its implementation; clang warns by default. Silencing
@@ -2938,12 +2751,9 @@ static std::expected<std::string, std::string> ensure_std_module_tasks(GraphTran
         // stable; otherwise every config rerun bumps it and forces the std
         // compile to invalidate its signature.
         {
-            std::string desired = clang_rsp
-                ? ("-fmodule-output=" + bmi_path + "\n")
-                : ("std " + bmi_path + "\n");
+            std::string desired = clang_rsp ? ("-fmodule-output=" + bmi_path + "\n") : ("std " + bmi_path + "\n");
             std::ifstream existing(late_bound_path);
-            std::string current((std::istreambuf_iterator<char>(existing)),
-                                 std::istreambuf_iterator<char>());
+            std::string current((std::istreambuf_iterator<char>(existing)), std::istreambuf_iterator<char>());
             if (current != desired) {
                 std::ofstream m(late_bound_path);
                 m << desired;
@@ -2969,15 +2779,15 @@ static std::expected<std::string, std::string> ensure_std_module_tasks(GraphTran
         me.source_path = src_abs;
         me.visibility = "PUBLIC";
         manifest.entries.push_back(std::move(me));
-        (void)write_module_manifest(manifest_path, manifest);
+        (void) write_module_manifest(manifest_path, manifest);
     }
 
     return manifest_path;
 }
 
 std::expected<bool, std::string> Target::generate_module_scanner_tasks(GraphTransaction& txn, const Toolchain& toolchain,
-                                            const TargetMap& all_targets, const Interpreter& interp,
-                                            int cxx_default_std) {
+                                                                       const TargetMap& all_targets, const Interpreter& interp,
+                                                                       int cxx_default_std) {
     std::vector<std::string> scanner_ids;
 
     auto sources = get_property_list("SOURCES", TargetPropertyScope::BUILD);
@@ -3004,9 +2814,7 @@ std::expected<bool, std::string> Target::generate_module_scanner_tasks(GraphTran
         auto lang_info = LanguageClassifier::from_path(src);
 
         // Override module interface detection if file is in CXX_MODULES file set
-        if (is_in_cxx_modules_file_set(src)) {
-            lang_info.is_module_interface = true;
-        }
+        if (is_in_cxx_modules_file_set(src)) { lang_info.is_module_interface = true; }
 
         // Scan all CXX sources: interface units to discover what they `provide`,
         // regular .cpp files to discover what they `import`. Without scanning
@@ -3035,25 +2843,16 @@ std::expected<bool, std::string> Target::generate_module_scanner_tasks(GraphTran
         {
             int required_std = 0;
             const auto& cf = get_resolved_property("COMPILE_FEATURES");
-            if (!cf.empty()) {
-                required_std = CompileFeatures::instance().get_required_standard(cf, lang_info.lang);
-            }
-            ctx.standard = compute_effective_standard(
-                get_language_standard(lang_info.lang), required_std, cxx_default_std);
+            if (!cf.empty()) { required_std = CompileFeatures::instance().get_required_standard(cf, lang_info.lang); }
+            ctx.standard = compute_effective_standard(get_language_standard(lang_info.lang), required_std, cxx_default_std);
         }
         ctx.extensions_enabled = get_language_extensions(lang_info.lang);
         ctx.color_diagnostics = isatty(STDOUT_FILENO);
 
         // Note: Do NOT automatically add source_dir - only add what's explicitly in INCLUDE_DIRECTORIES
-        for (const auto& dir : get_resolved_property("INCLUDE_DIRECTORIES")) {
-            ctx.includes.push_back(dir);
-        }
-        for (const auto& dir : get_resolved_property("SYSTEM_INCLUDE_DIRECTORIES")) {
-            ctx.system_includes.push_back(dir);
-        }
-        for (const auto& def : get_resolved_property("COMPILE_DEFINITIONS")) {
-            ctx.definitions.push_back(def);
-        }
+        for (const auto& dir : get_resolved_property("INCLUDE_DIRECTORIES")) { ctx.includes.push_back(dir); }
+        for (const auto& dir : get_resolved_property("SYSTEM_INCLUDE_DIRECTORIES")) { ctx.system_includes.push_back(dir); }
+        for (const auto& def : get_resolved_property("COMPILE_DEFINITIONS")) { ctx.definitions.push_back(def); }
 
         BuildTask scanner;
         scanner.id = ddi_path;
@@ -3083,12 +2882,8 @@ std::expected<bool, std::string> Target::generate_module_scanner_tasks(GraphTran
         std::string std_manifest;
         if (target_imports_std()) {
             const std::string& top_binary = interp.get_variable("CMAKE_BINARY_DIR");
-            auto sm = ensure_std_module_tasks(
-                txn, cxx,
-                top_binary.empty() ? binary_dir_ : top_binary,
-                cxx_default_std,
-                cxx_ext,
-                resolve_launcher(*this, interp, Language::CXX, "COMPILER"));
+            auto sm = ensure_std_module_tasks(txn, cxx, top_binary.empty() ? binary_dir_ : top_binary, cxx_default_std, cxx_ext,
+                                              resolve_launcher(*this, interp, Language::CXX, "COMPILER"));
             if (!sm) return std::unexpected(std::move(sm.error()));
             std_manifest = std::move(*sm);
         }
@@ -3099,14 +2894,10 @@ std::expected<bool, std::string> Target::generate_module_scanner_tasks(GraphTran
         // importers in this target, so per-source variance can't be honored.
         int required_std = 0;
         const auto& cf = get_resolved_property("COMPILE_FEATURES");
-        if (!cf.empty()) {
-            required_std = CompileFeatures::instance().get_required_standard(cf, Language::CXX);
-        }
-        std::string cxx_std_str = compute_effective_standard(
-            get_language_standard(Language::CXX), required_std, cxx_default_std);
+        if (!cf.empty()) { required_std = CompileFeatures::instance().get_required_standard(cf, Language::CXX); }
+        std::string cxx_std_str = compute_effective_standard(get_language_standard(Language::CXX), required_std, cxx_default_std);
 
-        if (auto r = generate_module_collator_task(txn, scanner_ids, all_targets, std_manifest,
-                                      cxx, cxx_std_str, cxx_ext); !r)
+        if (auto r = generate_module_collator_task(txn, scanner_ids, all_targets, std_manifest, cxx, cxx_std_str, cxx_ext); !r)
             return std::unexpected(std::move(r.error()));
         return true;
     }
@@ -3114,13 +2905,10 @@ std::expected<bool, std::string> Target::generate_module_scanner_tasks(GraphTran
     return false;
 }
 
-std::expected<void, std::string> Target::generate_module_collator_task(GraphTransaction& txn,
-                                           const std::vector<std::string>& scanner_task_ids,
-                                           const TargetMap& all_targets,
-                                           const std::string& std_module_manifest_path,
-                                           const Compiler* cxx_compiler,
-                                           const std::string& cxx_standard,
-                                           bool cxx_extensions_enabled) {
+std::expected<void, std::string>
+Target::generate_module_collator_task(GraphTransaction& txn, const std::vector<std::string>& scanner_task_ids, const TargetMap& all_targets,
+                                      const std::string& std_module_manifest_path, const Compiler* cxx_compiler,
+                                      const std::string& cxx_standard, bool cxx_extensions_enabled) {
     std::string mapper_path = get_module_mapper_path();
     std::string manifest_path = get_module_manifest_path();
 
@@ -3152,9 +2940,7 @@ std::expected<void, std::string> Target::generate_module_collator_task(GraphTran
     // Toolchain-level std module: foreign manifest for `import std;`. The
     // collator picks it up via the same suffix-detection used for cross-
     // target manifests.
-    if (!std_module_manifest_path.empty()) {
-        collator.inputs.push_back(std_module_manifest_path);
-    }
+    if (!std_module_manifest_path.empty()) { collator.inputs.push_back(std_module_manifest_path); }
 
     // Both the per-target mapper (consumed by this target's compiles) and the
     // export manifest (consumed by downstream targets' collators) are graph-
@@ -3169,8 +2955,7 @@ std::expected<void, std::string> Target::generate_module_collator_task(GraphTran
     return {};
 }
 
-std::vector<Target*>
-Target::transitive_module_providing_deps(const TargetMap& all_targets) const {
+std::vector<Target*> Target::transitive_module_providing_deps(const TargetMap& all_targets) const {
     // Walk resolved LINK_LIBRARIES (already flattened by resolve()) and collect
     // every dep that has its own module-interface units. PRIVATE link deps are
     // already excluded from this property's transitive closure as resolved by
@@ -3209,9 +2994,7 @@ bool Target::target_imports_std() const {
                 while (q < buf.size() && (buf[q] == ' ' || buf[q] == '\t')) ++q;
                 if (q + 3 <= buf.size() && buf.compare(q, 3, "std") == 0) {
                     char after = q + 3 < buf.size() ? buf[q + 3] : '\0';
-                    if (after == ';' || after == '.' || after == ' ' || after == '\t' || after == '\n') {
-                        return true;
-                    }
+                    if (after == ';' || after == '.' || after == ' ' || after == '\t' || after == '\n') { return true; }
                 }
             }
             while (pos < buf.size() && buf[pos] != '\n') ++pos;
@@ -3245,7 +3028,7 @@ bool Target::target_imports_anything() const {
             // Advance to next line
             while (pos < buf.size() && buf[pos] != '\n') ++pos;
             if (pos < buf.size()) ++pos;
-            (void)line_start;
+            (void) line_start;
         }
         return false;
     };

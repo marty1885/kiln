@@ -4,8 +4,8 @@
 #include "kiln/toolchain.hpp"
 #include "kiln/gnu_compiler.hpp"
 #include "kiln/language.hpp"
-#include "kiln/interperter.hpp" // For Interpreter
-#include "kiln/cmake-language.hpp" // For Parser
+#include "kiln/interperter.hpp"       // For Interpreter
+#include "kiln/cmake-language.hpp"    // For Parser
 #include "kiln/builtins/registry.hpp" // For register_target_builtins
 #include <filesystem>
 #include <string>
@@ -51,9 +51,7 @@ TEST_CASE("PCH Task Generation", "[target][pch]") {
     REQUIRE(ast_or_error.has_value());
 
     auto result = interp.interpret(ast_or_error.value());
-    if (!result) {
-        std::cerr << "Interpreter error: " << result.error().message << std::endl;
-    }
+    if (!result) { std::cerr << "Interpreter error: " << result.error().message << std::endl; }
     REQUIRE(result.has_value());
 
     auto& targets = interp.get_targets();
@@ -92,12 +90,14 @@ TEST_CASE("PCH Task Generation", "[target][pch]") {
 
     // After transaction commit, explicit_deps are resolved into pointer-based dependencies
     REQUIRE(std::find(obj_task.dependencies.begin(), obj_task.dependencies.end(), &pch_task) != obj_task.dependencies.end());
-    REQUIRE(std::find_if(obj_task.commands.begin(), obj_task.commands.end(), [](const auto& command) {
-        return std::find(command.begin(), command.end(), "-include") != command.end();
-    }) != obj_task.commands.end());
-    REQUIRE(std::find_if(obj_task.commands.begin(), obj_task.commands.end(), [pch_wrapper_expected](const auto& command) {
-        return std::find(command.begin(), command.end(), pch_wrapper_expected) != command.end();
-    }) != obj_task.commands.end());
+    REQUIRE(std::find_if(obj_task.commands.begin(), obj_task.commands.end(),
+                         [](const auto& command) { return std::find(command.begin(), command.end(), "-include") != command.end(); })
+            != obj_task.commands.end());
+    REQUIRE(std::find_if(obj_task.commands.begin(), obj_task.commands.end(),
+                         [pch_wrapper_expected](const auto& command) {
+                             return std::find(command.begin(), command.end(), pch_wrapper_expected) != command.end();
+                         })
+            != obj_task.commands.end());
 
     // Cleanup
     std::filesystem::remove_all(temp_dir);

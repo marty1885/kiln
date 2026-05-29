@@ -8,14 +8,14 @@ namespace kiln {
 
 GenexNodeType GenexParser::classify_genex_type(const std::string& keyword) const {
     // Check if keyword is itself a genex (conditional pattern)
-    if (keyword.starts_with("$<")) {
-        return GenexNodeType::CONDITIONAL;
-    }
+    if (keyword.starts_with("$<")) { return GenexNodeType::CONDITIONAL; }
 
     if (keyword == "BUILD_INTERFACE") return GenexNodeType::BUILD_INTERFACE;
-    if (keyword == "BUILD_LOCAL_INTERFACE") return GenexNodeType::BUILD_INTERFACE;  // CMake 3.26+, same as BUILD_INTERFACE (no export in kiln)
+    if (keyword == "BUILD_LOCAL_INTERFACE")
+        return GenexNodeType::BUILD_INTERFACE; // CMake 3.26+, same as BUILD_INTERFACE (no export in kiln)
     if (keyword == "INSTALL_INTERFACE") return GenexNodeType::INSTALL_INTERFACE;
-    if (keyword == "INSTALL_LOCAL_INTERFACE") return GenexNodeType::INSTALL_INTERFACE;  // CMake 3.26+, same as INSTALL_INTERFACE (no export in kiln)
+    if (keyword == "INSTALL_LOCAL_INTERFACE")
+        return GenexNodeType::INSTALL_INTERFACE; // CMake 3.26+, same as INSTALL_INTERFACE (no export in kiln)
     if (keyword == "LINK_ONLY") return GenexNodeType::LINK_ONLY;
     if (keyword == "CONFIG") return GenexNodeType::CONFIG;
     if (keyword == "BOOL") return GenexNodeType::BOOL;
@@ -76,7 +76,7 @@ std::expected<std::string, std::string> GenexParser::parse_genex_content() {
     // Bare '<' is NOT special — only '$<' opens a nesting level, matching CMake's
     // lexer which tokenizes '$<' as BeginExpression but treats bare '<' as text.
     std::string content;
-    int depth = 1;  // We're already inside one '$<'
+    int depth = 1; // We're already inside one '$<'
     size_t start_pos = pos_;
 
     while (!at_end() && depth > 0) {
@@ -91,9 +91,7 @@ std::expected<std::string, std::string> GenexParser::parse_genex_content() {
             advance();
         } else if (c == '>') {
             --depth;
-            if (depth > 0) {
-                content += c;
-            }
+            if (depth > 0) { content += c; }
             advance();
         } else {
             content += c;
@@ -101,9 +99,7 @@ std::expected<std::string, std::string> GenexParser::parse_genex_content() {
         }
     }
 
-    if (depth != 0) {
-        return std::unexpected("Unmatched '$<' in generator expression at position " + std::to_string(start_pos));
-    }
+    if (depth != 0) { return std::unexpected("Unmatched '$<' in generator expression at position " + std::to_string(start_pos)); }
 
     return content;
 }
@@ -122,7 +118,7 @@ std::vector<std::string> GenexParser::split_genex_args(const std::string& conten
             ++depth;
             current += '$';
             current += '<';
-            ++i;  // skip the '<'
+            ++i; // skip the '<'
         } else if (c == '>') {
             --depth;
             current += c;
@@ -144,14 +140,10 @@ std::expected<std::shared_ptr<GenexNode>, std::string> GenexParser::parse_genex(
     size_t start = pos_;
 
     // Expect "$<"
-    if (peek() != '$') {
-        return std::unexpected("Expected '$' at position " + std::to_string(pos_));
-    }
+    if (peek() != '$') { return std::unexpected("Expected '$' at position " + std::to_string(pos_)); }
     advance();
 
-    if (peek() != '<') {
-        return std::unexpected("Expected '<' after '$' at position " + std::to_string(pos_));
-    }
+    if (peek() != '<') { return std::unexpected("Expected '<' after '$' at position " + std::to_string(pos_)); }
     advance();
 
     // Parse until we find ':' or '>' (but balance $<...> pairs for nested genex).
@@ -184,9 +176,7 @@ std::expected<std::shared_ptr<GenexNode>, std::string> GenexParser::parse_genex(
         }
     }
 
-    if (at_end()) {
-        return std::unexpected("Unexpected end of input in generator expression");
-    }
+    if (at_end()) { return std::unexpected("Unexpected end of input in generator expression"); }
 
     GenexNodeType type = classify_genex_type(keyword);
     auto node = std::make_shared<GenexNode>(type);
@@ -198,9 +188,7 @@ std::expected<std::shared_ptr<GenexNode>, std::string> GenexParser::parse_genex(
         // Parse it as a nested genex
         GenexParser cond_parser;
         auto cond_result = cond_parser.parse(keyword);
-        if (!cond_result) {
-            return std::unexpected(cond_result.error());
-        }
+        if (!cond_result) { return std::unexpected(cond_result.error()); }
         // Store condition in children (first set of nodes)
         node->children = cond_result->nodes;
 
@@ -208,20 +196,14 @@ std::expected<std::shared_ptr<GenexNode>, std::string> GenexParser::parse_genex(
         if (peek() == ':') {
             advance();
             auto content_result = parse_genex_content();
-            if (!content_result) {
-                return std::unexpected(content_result.error());
-            }
+            if (!content_result) { return std::unexpected(content_result.error()); }
 
             // Parse the content as potentially containing more genex
             GenexParser value_parser;
             auto value_result = value_parser.parse(*content_result);
-            if (!value_result) {
-                return std::unexpected(value_result.error());
-            }
+            if (!value_result) { return std::unexpected(value_result.error()); }
             // Append value nodes to children
-            node->children.insert(node->children.end(),
-                                value_result->nodes.begin(),
-                                value_result->nodes.end());
+            node->children.insert(node->children.end(), value_result->nodes.begin(), value_result->nodes.end());
             node->raw_content = *content_result;
         } else if (peek() == '>') {
             advance();
@@ -234,11 +216,8 @@ std::expected<std::shared_ptr<GenexNode>, std::string> GenexParser::parse_genex(
     // Handle constant literal genexes: $<SEMICOLON>, $<COMMA>, $<ANGLE-R>, $<QUOTE>
     if (type == GenexNodeType::UNSUPPORTED && peek() == '>') {
         static const std::map<std::string, std::string> constant_genexes = {
-            {"SEMICOLON", ";"},
-            {"COMMA", ","},
-            {"ANGLE-R", ">"},
-            {"QUOTE", "\""},
-            {"INSTALL_PREFIX", ""},  // Placeholder, resolved in evaluator
+            {"SEMICOLON", ";"}, {"COMMA", ","},         {"ANGLE-R", ">"},
+            {"QUOTE", "\""},    {"INSTALL_PREFIX", ""}, // Placeholder, resolved in evaluator
         };
         auto cit = constant_genexes.find(keyword);
         if (cit != constant_genexes.end()) {
@@ -258,9 +237,7 @@ std::expected<std::shared_ptr<GenexNode>, std::string> GenexParser::parse_genex(
     // If it's UNSUPPORTED but the keyword is a simple literal boolean (0/1),
     // treat as CONDITIONAL. This handles $<1:text> and $<0:text>.
     // Other unknown keywords with ':' remain UNSUPPORTED for proper error reporting.
-    auto is_literal_bool = [](const std::string& kw) {
-        return kw == "0" || kw == "1";
-    };
+    auto is_literal_bool = [](const std::string& kw) { return kw == "0" || kw == "1"; };
     if (type == GenexNodeType::UNSUPPORTED && peek() == ':' && is_literal_bool(keyword)) {
         node->type = GenexNodeType::CONDITIONAL;
         // Store the keyword as a literal condition child
@@ -269,19 +246,13 @@ std::expected<std::shared_ptr<GenexNode>, std::string> GenexParser::parse_genex(
 
         advance(); // consume ':'
         auto content_result = parse_genex_content();
-        if (!content_result) {
-            return std::unexpected(content_result.error());
-        }
+        if (!content_result) { return std::unexpected(content_result.error()); }
 
         // Parse the value part
         GenexParser value_parser;
         auto value_result = value_parser.parse(*content_result);
-        if (!value_result) {
-            return std::unexpected(value_result.error());
-        }
-        node->children.insert(node->children.end(),
-                            value_result->nodes.begin(),
-                            value_result->nodes.end());
+        if (!value_result) { return std::unexpected(value_result.error()); }
+        node->children.insert(node->children.end(), value_result->nodes.begin(), value_result->nodes.end());
         node->raw_content = *content_result;
         node->end_pos = pos_;
         return node;
@@ -294,14 +265,12 @@ std::expected<std::shared_ptr<GenexNode>, std::string> GenexParser::parse_genex(
         if (peek() == ':') {
             advance();
             auto content_result = parse_genex_content();
-            if (!content_result) {
-                return std::unexpected(content_result.error());
-            }
+            if (!content_result) { return std::unexpected(content_result.error()); }
         } else if (peek() == '>') {
             advance();
         }
         node->end_pos = pos_;
-        node->raw_content = "$<" + keyword + ">";  // Simplified representation
+        node->raw_content = "$<" + keyword + ">"; // Simplified representation
         return node;
     }
 
@@ -309,43 +278,31 @@ std::expected<std::shared_ptr<GenexNode>, std::string> GenexParser::parse_genex(
     if (peek() == ':') {
         advance();
         auto content_result = parse_genex_content();
-        if (!content_result) {
-            return std::unexpected(content_result.error());
-        }
+        if (!content_result) { return std::unexpected(content_result.error()); }
 
         std::string content = *content_result;
         node->raw_content = content;
 
         // For certain types, parse arguments recursively
-        if (type == GenexNodeType::BUILD_INTERFACE ||
-            type == GenexNodeType::INSTALL_INTERFACE ||
-            type == GenexNodeType::LINK_ONLY ||
-            type == GenexNodeType::NOT) {
+        if (type == GenexNodeType::BUILD_INTERFACE || type == GenexNodeType::INSTALL_INTERFACE || type == GenexNodeType::LINK_ONLY
+            || type == GenexNodeType::NOT) {
             // Single argument that may contain nested genex
             GenexParser inner_parser;
             inner_parser.input_ = content;
             inner_parser.pos_ = 0;
             auto inner_result = inner_parser.parse(content);
-            if (!inner_result) {
-                return std::unexpected(inner_result.error());
-            }
+            if (!inner_result) { return std::unexpected(inner_result.error()); }
             node->children = inner_result->nodes;
         } else if (type == GenexNodeType::IF) {
             // Three comma-separated arguments
             auto args = split_genex_args(content);
-            if (args.size() != 3) {
-                return std::unexpected("$<IF:...> requires exactly 3 arguments (condition,true_value,false_value)");
-            }
+            if (args.size() != 3) { return std::unexpected("$<IF:...> requires exactly 3 arguments (condition,true_value,false_value)"); }
 
             for (const auto& arg : args) {
                 GenexParser inner_parser;
                 auto inner_result = inner_parser.parse(arg);
-                if (!inner_result) {
-                    return std::unexpected(inner_result.error());
-                }
-                node->children.insert(node->children.end(),
-                                    inner_result->nodes.begin(),
-                                    inner_result->nodes.end());
+                if (!inner_result) { return std::unexpected(inner_result.error()); }
+                node->children.insert(node->children.end(), inner_result->nodes.begin(), inner_result->nodes.end());
             }
         } else if (type == GenexNodeType::AND || type == GenexNodeType::OR) {
             // Multiple comma-separated arguments
@@ -353,86 +310,65 @@ std::expected<std::shared_ptr<GenexNode>, std::string> GenexParser::parse_genex(
             for (const auto& arg : args) {
                 GenexParser inner_parser;
                 auto inner_result = inner_parser.parse(arg);
-                if (!inner_result) {
-                    return std::unexpected(inner_result.error());
-                }
-                node->children.insert(node->children.end(),
-                                    inner_result->nodes.begin(),
-                                    inner_result->nodes.end());
+                if (!inner_result) { return std::unexpected(inner_result.error()); }
+                node->children.insert(node->children.end(), inner_result->nodes.begin(), inner_result->nodes.end());
             }
-        } else if (type == GenexNodeType::STREQUAL ||
-                   type == GenexNodeType::EQUAL ||
-                   type == GenexNodeType::VERSION_LESS ||
-                   type == GenexNodeType::VERSION_GREATER ||
-                   type == GenexNodeType::VERSION_EQUAL ||
-                   type == GenexNodeType::VERSION_LESS_EQUAL ||
-                   type == GenexNodeType::VERSION_GREATER_EQUAL) {
+        } else if (type == GenexNodeType::STREQUAL || type == GenexNodeType::EQUAL || type == GenexNodeType::VERSION_LESS
+                   || type == GenexNodeType::VERSION_GREATER || type == GenexNodeType::VERSION_EQUAL
+                   || type == GenexNodeType::VERSION_LESS_EQUAL || type == GenexNodeType::VERSION_GREATER_EQUAL) {
             // Two comma-separated arguments
             auto args = split_genex_args(content);
             if (args.size() != 2) {
                 std::string genex_name;
-                if (type == GenexNodeType::STREQUAL) genex_name = "STREQUAL";
-                else if (type == GenexNodeType::EQUAL) genex_name = "EQUAL";
-                else if (type == GenexNodeType::VERSION_LESS) genex_name = "VERSION_LESS";
-                else if (type == GenexNodeType::VERSION_GREATER) genex_name = "VERSION_GREATER";
-                else if (type == GenexNodeType::VERSION_EQUAL) genex_name = "VERSION_EQUAL";
-                else if (type == GenexNodeType::VERSION_LESS_EQUAL) genex_name = "VERSION_LESS_EQUAL";
-                else if (type == GenexNodeType::VERSION_GREATER_EQUAL) genex_name = "VERSION_GREATER_EQUAL";
+                if (type == GenexNodeType::STREQUAL)
+                    genex_name = "STREQUAL";
+                else if (type == GenexNodeType::EQUAL)
+                    genex_name = "EQUAL";
+                else if (type == GenexNodeType::VERSION_LESS)
+                    genex_name = "VERSION_LESS";
+                else if (type == GenexNodeType::VERSION_GREATER)
+                    genex_name = "VERSION_GREATER";
+                else if (type == GenexNodeType::VERSION_EQUAL)
+                    genex_name = "VERSION_EQUAL";
+                else if (type == GenexNodeType::VERSION_LESS_EQUAL)
+                    genex_name = "VERSION_LESS_EQUAL";
+                else if (type == GenexNodeType::VERSION_GREATER_EQUAL)
+                    genex_name = "VERSION_GREATER_EQUAL";
                 return std::unexpected("$<" + genex_name + ":...> requires exactly 2 arguments");
             }
 
             for (const auto& arg : args) {
                 GenexParser inner_parser;
                 auto inner_result = inner_parser.parse(arg);
-                if (!inner_result) {
-                    return std::unexpected(inner_result.error());
-                }
-                node->children.insert(node->children.end(),
-                                    inner_result->nodes.begin(),
-                                    inner_result->nodes.end());
+                if (!inner_result) { return std::unexpected(inner_result.error()); }
+                node->children.insert(node->children.end(), inner_result->nodes.begin(), inner_result->nodes.end());
             }
         } else if (type == GenexNodeType::TARGET_PROPERTY) {
             // One or two comma-separated arguments: target,property or just property
             auto args = split_genex_args(content);
-            if (args.size() != 1 && args.size() != 2) {
-                return std::unexpected("$<TARGET_PROPERTY:...> requires 1 or 2 arguments");
-            }
+            if (args.size() != 1 && args.size() != 2) { return std::unexpected("$<TARGET_PROPERTY:...> requires 1 or 2 arguments"); }
 
             for (const auto& arg : args) {
                 GenexParser inner_parser;
                 auto inner_result = inner_parser.parse(arg);
-                if (!inner_result) {
-                    return std::unexpected(inner_result.error());
-                }
-                node->children.insert(node->children.end(),
-                                    inner_result->nodes.begin(),
-                                    inner_result->nodes.end());
+                if (!inner_result) { return std::unexpected(inner_result.error()); }
+                node->children.insert(node->children.end(), inner_result->nodes.begin(), inner_result->nodes.end());
             }
-        } else if (type == GenexNodeType::GENEX_EVAL ||
-                   type == GenexNodeType::REMOVE_DUPLICATES ||
-                   type == GenexNodeType::LOWER_CASE ||
-                   type == GenexNodeType::UPPER_CASE) {
+        } else if (type == GenexNodeType::GENEX_EVAL || type == GenexNodeType::REMOVE_DUPLICATES || type == GenexNodeType::LOWER_CASE
+                   || type == GenexNodeType::UPPER_CASE) {
             // Single argument that may contain nested genex
             GenexParser inner_parser;
             auto inner_result = inner_parser.parse(content);
-            if (!inner_result) {
-                return std::unexpected(inner_result.error());
-            }
+            if (!inner_result) { return std::unexpected(inner_result.error()); }
             node->children = inner_result->nodes;
-        } else if (type == GenexNodeType::TARGET_GENEX_EVAL ||
-                   type == GenexNodeType::JOIN ||
-                   type == GenexNodeType::IN_LIST) {
+        } else if (type == GenexNodeType::TARGET_GENEX_EVAL || type == GenexNodeType::JOIN || type == GenexNodeType::IN_LIST) {
             // Two comma-separated arguments
             auto args = split_genex_args(content);
             for (const auto& arg : args) {
                 GenexParser inner_parser;
                 auto inner_result = inner_parser.parse(arg);
-                if (!inner_result) {
-                    return std::unexpected(inner_result.error());
-                }
-                node->children.insert(node->children.end(),
-                                    inner_result->nodes.begin(),
-                                    inner_result->nodes.end());
+                if (!inner_result) { return std::unexpected(inner_result.error()); }
+                node->children.insert(node->children.end(), inner_result->nodes.begin(), inner_result->nodes.end());
             }
         }
         // For simple types (CONFIG, BOOL, etc.), raw_content is sufficient
@@ -471,7 +407,7 @@ std::expected<GenexParseResult, std::string> GenexParser::parse(const std::strin
                 if (allow_recovery_) {
                     // Recovery mode: unmatched $< degrades to literal "$<" text
                     // (matches CMake behaviour for structurally-unbalanced expressions)
-                    pos_ = saved_pos + 1;  // skip past '$', re-parse '<' as text
+                    pos_ = saved_pos + 1; // skip past '$', re-parse '<' as text
                     literal += '$';
                     continue;
                 }
@@ -505,55 +441,41 @@ std::expected<void, std::string> GenexParser::validate_genex_support(const std::
     GenexParser parser;
     auto result = parser.parse(input);
     if (!result) {
-        return std::unexpected(result.error());  // Syntax error
+        return std::unexpected(result.error()); // Syntax error
     }
 
     // Check for unsupported types recursively
     std::function<std::expected<void, std::string>(const GenexNode&)> check_node =
         [&](const GenexNode& node) -> std::expected<void, std::string> {
-        if (node.type == GenexNodeType::UNSUPPORTED) {
-            return std::unexpected("Unsupported generator expression: " + node.raw_content);
-        }
+        if (node.type == GenexNodeType::UNSUPPORTED) { return std::unexpected("Unsupported generator expression: " + node.raw_content); }
         for (const auto& child : node.children) {
             auto child_result = check_node(*child);
-            if (!child_result) {
-                return child_result;
-            }
+            if (!child_result) { return child_result; }
         }
         return {};
     };
 
     for (const auto& node : result->nodes) {
         auto node_result = check_node(*node);
-        if (!node_result) {
-            return node_result;
-        }
+        if (!node_result) { return node_result; }
     }
 
-    return {};  // All genex are supported
+    return {}; // All genex are supported
 }
 
 std::expected<std::set<GenexNodeType>, std::string> GenexParser::extract_genex_types(const std::string& input) {
     GenexParser parser;
     auto result = parser.parse(input);
-    if (!result) {
-        return std::unexpected(result.error());
-    }
+    if (!result) { return std::unexpected(result.error()); }
 
     std::set<GenexNodeType> types;
 
     std::function<void(const GenexNode&)> collect_types = [&](const GenexNode& node) {
-        if (node.type != GenexNodeType::LITERAL) {
-            types.insert(node.type);
-        }
-        for (const auto& child : node.children) {
-            collect_types(*child);
-        }
+        if (node.type != GenexNodeType::LITERAL) { types.insert(node.type); }
+        for (const auto& child : node.children) { collect_types(*child); }
     };
 
-    for (const auto& node : result->nodes) {
-        collect_types(*node);
-    }
+    for (const auto& node : result->nodes) { collect_types(*node); }
 
     return types;
 }

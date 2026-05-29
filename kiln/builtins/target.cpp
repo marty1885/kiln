@@ -18,13 +18,7 @@ namespace kiln {
 // Target names reserved by the build system. Users cannot create targets with these names
 // because they collide with built-in build targets (e.g. "make all", "make test").
 static constexpr std::string_view kBannedTargetNames[] = {
-    "all",
-    "test",
-    "clean",
-    "install",
-    "package",
-    "rebuild_cache",
-    "edit_cache",
+    "all", "test", "clean", "install", "package", "rebuild_cache", "edit_cache",
 };
 
 static bool is_banned_target_name(std::string_view name) {
@@ -41,9 +35,7 @@ static bool is_banned_target_name(std::string_view name) {
 // "test" gets a further exemption per CMP0037: it is only reserved after
 // enable_testing() / include(CTest). Even when allowed under NEW, we warn that
 // shadowing the conventional `make test` target is a footgun.
-static bool reject_reserved_target_name(Interpreter& interp,
-                                        std::string_view command,
-                                        const std::string& name) {
+static bool reject_reserved_target_name(Interpreter& interp, std::string_view command, const std::string& name) {
     if (!is_banned_target_name(name)) return false;
 
     // CMP0037's `test` carve-out keys on whether the *project* called
@@ -53,20 +45,18 @@ static bool reject_reserved_target_name(Interpreter& interp,
     bool policy_new = interp.get_policy(CMakePolicy::CMP0037) == PolicyState::NEW;
 
     if (test_allowed_by_cmp0037) {
-        interp.print_warning_with_context(
-            std::string(command) + "() target name 'test' shadows the conventional "
-            "test target. This is allowed because enable_testing() has not been "
-            "called, but is discouraged - calling enable_testing() later will "
-            "collide with this target.");
+        interp.print_warning_with_context(std::string(command)
+                                          + "() target name 'test' shadows the conventional "
+                                            "test target. This is allowed because enable_testing() has not been "
+                                            "called, but is discouraged - calling enable_testing() later will "
+                                            "collide with this target.");
         return false;
     }
 
-    std::string msg = std::string(command) + "() target name '" + name
-                      + "' is reserved by the build system";
+    std::string msg = std::string(command) + "() target name '" + name + "' is reserved by the build system";
     if (!policy_new) {
         KILN_POLICY_OLD(CMP0037);
-        interp.print_warning_with_context(
-            msg + " (CMP0037 is set to OLD; treating as a warning)");
+        interp.print_warning_with_context(msg + " (CMP0037 is set to OLD; treating as a warning)");
         return false;
     }
     interp.set_fatal_error(msg);
@@ -81,11 +71,11 @@ static void warn_if_no_project(Interpreter& interp, std::string_view command) {
     if (interp.project_called()) return;
     if (interp.no_project_warned()) return;
     interp.mark_no_project_warned();
-    interp.print_warning_with_context(
-        std::string(command) + "() called without a prior project() call. "
-        "The top-level CMakeLists.txt should contain a call to project() "
-        "before defining any targets, otherwise no compiler is selected and "
-        "the build will fail with 'no compiler available'.");
+    interp.print_warning_with_context(std::string(command)
+                                      + "() called without a prior project() call. "
+                                        "The top-level CMakeLists.txt should contain a call to project() "
+                                        "before defining any targets, otherwise no compiler is selected and "
+                                        "the build will fail with 'no compiler available'.");
 }
 
 void register_target_builtins(Interpreter& interp) {
@@ -95,9 +85,7 @@ void register_target_builtins(Interpreter& interp) {
             // Set standard from CMAKE_<LANG>_STANDARD
             std::string std_var = "CMAKE_" + lang_prefix + "_STANDARD";
             std::string lang_std = interp.get_variable(std_var);
-            if (!lang_std.empty()) {
-                target->set_language_standard(lang, lang_std);
-            }
+            if (!lang_std.empty()) { target->set_language_standard(lang, lang_std); }
 
             // Set extensions from CMAKE_<LANG>_EXTENSIONS (default: ON)
             std::string ext_var = "CMAKE_" + lang_prefix + "_EXTENSIONS";
@@ -112,9 +100,7 @@ void register_target_builtins(Interpreter& interp) {
             // Set visibility preset from CMAKE_<LANG>_VISIBILITY_PRESET
             std::string vis_var = "CMAKE_" + lang_prefix + "_VISIBILITY_PRESET";
             std::string vis_preset = interp.get_variable(vis_var);
-            if (!vis_preset.empty()) {
-                target->set_property(lang_prefix + "_VISIBILITY_PRESET", vis_preset);
-            }
+            if (!vis_preset.empty()) { target->set_property(lang_prefix + "_VISIBILITY_PRESET", vis_preset); }
 
             // Apply CMAKE_<LANG>_FLAGS and CMAKE_<LANG>_FLAGS_<CONFIG>
             auto get_flags = [&](const std::string& var_name) -> std::vector<std::string> {
@@ -140,23 +126,19 @@ void register_target_builtins(Interpreter& interp) {
             // that a later set(CMAKE_<LANG>_COMPILER ...) in a different
             // scope doesn't change which compiler this target uses.
             // Empty values flow through and are interpreted as "use default".
-            target->capture_compiler_var("CMAKE_" + lang_prefix + "_COMPILER",
-                interp.get_variable("CMAKE_" + lang_prefix + "_COMPILER"));
+            target->capture_compiler_var("CMAKE_" + lang_prefix + "_COMPILER", interp.get_variable("CMAKE_" + lang_prefix + "_COMPILER"));
             target->capture_compiler_var("CMAKE_" + lang_prefix + "_COMPILER_TARGET",
-                interp.get_variable("CMAKE_" + lang_prefix + "_COMPILER_TARGET"));
+                                         interp.get_variable("CMAKE_" + lang_prefix + "_COMPILER_TARGET"));
             target->capture_compiler_var("CMAKE_" + lang_prefix + "_COMPILER_ID",
-                interp.get_variable("CMAKE_" + lang_prefix + "_COMPILER_ID"));
+                                         interp.get_variable("CMAKE_" + lang_prefix + "_COMPILER_ID"));
         };
 
         configure_lang(Language::CXX, "CXX");
         configure_lang(Language::C, "C");
-        if (!interp.get_variable("CMAKE_ASM_COMPILER_LOADED").empty()) {
-            configure_lang(Language::ASM, "ASM");
-        }
+        if (!interp.get_variable("CMAKE_ASM_COMPILER_LOADED").empty()) { configure_lang(Language::ASM, "ASM"); }
 
         // CMAKE_SYSROOT is global, not per-language.
-        target->capture_compiler_var("CMAKE_SYSROOT",
-            interp.get_variable("CMAKE_SYSROOT"));
+        target->capture_compiler_var("CMAKE_SYSROOT", interp.get_variable("CMAKE_SYSROOT"));
 
         // Snapshot the active build configuration so get_output_path() can
         // apply <CONFIG>_POSTFIX without threading the interpreter through.
@@ -164,22 +146,18 @@ void register_target_builtins(Interpreter& interp) {
 
         // Set VISIBILITY_INLINES_HIDDEN from CMAKE_VISIBILITY_INLINES_HIDDEN
         std::string vih = interp.get_variable("CMAKE_VISIBILITY_INLINES_HIDDEN");
-        if (!vih.empty() && !interp.is_falsy(vih)) {
-            target->set_property("VISIBILITY_INLINES_HIDDEN", "ON");
-        }
+        if (!vih.empty() && !interp.is_falsy(vih)) { target->set_property("VISIBILITY_INLINES_HIDDEN", "ON"); }
 
         // Set POSITION_INDEPENDENT_CODE from CMAKE_POSITION_INDEPENDENT_CODE
         std::string pic = interp.get_variable("CMAKE_POSITION_INDEPENDENT_CODE");
-        if (!pic.empty() && !interp.is_falsy(pic)) {
-            target->set_property("POSITION_INDEPENDENT_CODE", "ON");
-        }
+        if (!pic.empty() && !interp.is_falsy(pic)) { target->set_property("POSITION_INDEPENDENT_CODE", "ON"); }
 
         // Set output directory properties from CMAKE_ globals
         for (const auto& [cmake_var, prop] : {
-            std::pair{"CMAKE_RUNTIME_OUTPUT_DIRECTORY", "RUNTIME_OUTPUT_DIRECTORY"},
-            std::pair{"CMAKE_ARCHIVE_OUTPUT_DIRECTORY", "ARCHIVE_OUTPUT_DIRECTORY"},
-            std::pair{"CMAKE_LIBRARY_OUTPUT_DIRECTORY", "LIBRARY_OUTPUT_DIRECTORY"},
-        }) {
+                 std::pair{"CMAKE_RUNTIME_OUTPUT_DIRECTORY", "RUNTIME_OUTPUT_DIRECTORY"},
+                 std::pair{"CMAKE_ARCHIVE_OUTPUT_DIRECTORY", "ARCHIVE_OUTPUT_DIRECTORY"},
+                 std::pair{"CMAKE_LIBRARY_OUTPUT_DIRECTORY", "LIBRARY_OUTPUT_DIRECTORY"},
+             }) {
             std::string val = interp.get_variable(cmake_var);
             if (!val.empty()) target->set_property(prop, val);
         }
@@ -187,9 +165,7 @@ void register_target_builtins(Interpreter& interp) {
         // Set AUTOMOC/AUTOUIC/AUTORCC from CMAKE_ globals
         for (const auto& prop : {"AUTOMOC", "AUTOUIC", "AUTORCC"}) {
             std::string val = interp.get_variable(std::string("CMAKE_") + prop);
-            if (!val.empty() && !interp.is_falsy(val)) {
-                target->set_property(prop, "ON");
-            }
+            if (!val.empty() && !interp.is_falsy(val)) { target->set_property(prop, "ON"); }
         }
 
         // Note: Accumulated directory properties are applied retroactively via
@@ -202,7 +178,8 @@ void register_target_builtins(Interpreter& interp) {
     // Skips existence check for files that are outputs of add_custom_command or have GENERATED property
     // Source validation is deferred to build graph construction (generate_object_tasks),
     // matching CMake behavior. Custom commands may be registered after add_library/add_executable.
-    auto add_sources_to_target = [](Interpreter& interp, const std::shared_ptr<Target>& target, const std::string&, const std::vector<std::string>& sources) -> bool {
+    auto add_sources_to_target = [](Interpreter& interp, const std::shared_ptr<Target>& target, const std::string&,
+                                    const std::vector<std::string>& sources) -> bool {
         // Reject C++ module sources at interpretation time when the toolchain
         // can't emit P1689r5. Failing here yields a stack trace pointing at
         // the offending add_executable/add_library/target_sources call.
@@ -222,11 +199,13 @@ void register_target_builtins(Interpreter& interp) {
             // the failure with a stack trace pointing at this call.
             const Compiler* cxx = interp.get_toolchain().get_compiler(Language::CXX);
             if (cxx && !cxx->supports_p1689()) {
-                interp.set_fatal_error(
-                    "target '" + target->get_name() + "' has a C++ module-interface source, but the configured "
-                    "C++ compiler ('" + cxx->binary() + "') does not support P1689r5 dependency scanning. "
-                    "kiln requires GCC >=14 (-fdeps-format=p1689r5) or Clang with clang-scan-deps "
-                    "for C++ modules.");
+                interp.set_fatal_error("target '" + target->get_name()
+                                       + "' has a C++ module-interface source, but the configured "
+                                         "C++ compiler ('"
+                                       + cxx->binary()
+                                       + "') does not support P1689r5 dependency scanning. "
+                                         "kiln requires GCC >=14 (-fdeps-format=p1689r5) or Clang with clang-scan-deps "
+                                         "for C++ modules.");
                 return false;
             }
         }
@@ -297,24 +276,19 @@ void register_target_builtins(Interpreter& interp) {
             if (!add_sources_to_target(interp, target, src_dir, sources)) return;
         }
         // Set WIN32_EXECUTABLE, MACOSX_BUNDLE, and EXCLUDE_FROM_ALL properties
-        if (win32) {
-            target->set_property("WIN32_EXECUTABLE", "TRUE");
-        }
-        if (macosx_bundle) {
-            target->set_property("MACOSX_BUNDLE", "TRUE");
-        }
-        if (exclude_from_all) {
-            target->set_property("EXCLUDE_FROM_ALL", "TRUE");
-        }
+        if (win32) { target->set_property("WIN32_EXECUTABLE", "TRUE"); }
+        if (macosx_bundle) { target->set_property("MACOSX_BUNDLE", "TRUE"); }
+        if (exclude_from_all) { target->set_property("EXCLUDE_FROM_ALL", "TRUE"); }
         interp.get_targets()[name] = target;
-        interp.get_current_directory_context().owned_targets.push_back(target);  // Track ownership for this directory
+        interp.get_current_directory_context().owned_targets.push_back(target); // Track ownership for this directory
     });
 
     interp.add_builtin("add_library", [&](Interpreter& interp, const std::vector<std::string>& args) {
         warn_if_no_project(interp, "add_library");
         CommandParser parser("add_library");
         std::string name;
-        bool shared = false, static_lib = false, module_lib = false, object_lib = false, interface_lib = false, imported = false, imported_global = false, is_alias = false;
+        bool shared = false, static_lib = false, module_lib = false, object_lib = false, interface_lib = false, imported = false,
+             imported_global = false, is_alias = false;
         std::vector<std::string> sources;
 
         parser.positional(name, "target name");
@@ -350,8 +324,8 @@ void register_target_builtins(Interpreter& interp) {
             // Validate that the target is a library
             auto target = targets[resolved];
             auto type = target->get_type();
-            if (type != TargetType::SHARED_LIBRARY && type != TargetType::STATIC_LIBRARY &&
-                type != TargetType::OBJECT_LIBRARY && type != TargetType::INTERFACE_LIBRARY) {
+            if (type != TargetType::SHARED_LIBRARY && type != TargetType::STATIC_LIBRARY && type != TargetType::OBJECT_LIBRARY
+                && type != TargetType::INTERFACE_LIBRARY) {
                 interp.set_fatal_error("add_library() ALIAS target '" + alias_target + "' is not a library");
                 return;
             }
@@ -368,10 +342,14 @@ void register_target_builtins(Interpreter& interp) {
         }
 
         TargetType type;
-        if (shared || module_lib) type = TargetType::SHARED_LIBRARY;
-        else if (static_lib) type = TargetType::STATIC_LIBRARY;
-        else if (object_lib) type = TargetType::OBJECT_LIBRARY;
-        else if (interface_lib) type = TargetType::INTERFACE_LIBRARY;
+        if (shared || module_lib)
+            type = TargetType::SHARED_LIBRARY;
+        else if (static_lib)
+            type = TargetType::STATIC_LIBRARY;
+        else if (object_lib)
+            type = TargetType::OBJECT_LIBRARY;
+        else if (interface_lib)
+            type = TargetType::INTERFACE_LIBRARY;
         else {
             // No explicit type — check BUILD_SHARED_LIBS (CMake behavior)
             auto bsl = interp.get_variable("BUILD_SHARED_LIBS");
@@ -390,7 +368,7 @@ void register_target_builtins(Interpreter& interp) {
             if (!add_sources_to_target(interp, target, src_dir, sources)) return;
         }
         interp.get_targets()[name] = target;
-        interp.get_current_directory_context().owned_targets.push_back(target);  // Track ownership for this directory
+        interp.get_current_directory_context().owned_targets.push_back(target); // Track ownership for this directory
     });
 
     // add_custom_command - two forms:
@@ -456,7 +434,7 @@ void register_target_builtins(Interpreter& interp) {
             parser.list("OUTPUT", outputs);
             parser.multi_list("COMMAND", commands);
             parser.list("DEPENDS", depends);
-            parser.list("BYPRODUCTS", byproducts);  // Parsed but treated same as OUTPUT
+            parser.list("BYPRODUCTS", byproducts); // Parsed but treated same as OUTPUT
             parser.value("WORKING_DIRECTORY", working_dir);
             parser.list("COMMENT", comment_parts);
             parser.value("MAIN_DEPENDENCY", main_dependency);
@@ -464,7 +442,7 @@ void register_target_builtins(Interpreter& interp) {
             parser.value("JOB_POOL", job_pool);
             parser.list("IMPLICIT_DEPENDS", implicit_depends);
             parser.flag("APPEND", append_flag);
-            parser.flag("VERBATIM", verbatim);  // Ignored (we always quote properly)
+            parser.flag("VERBATIM", verbatim); // Ignored (we always quote properly)
             parser.flag("COMMAND_EXPAND_LISTS", command_expand_lists);
             parser.flag("USES_TERMINAL", uses_terminal);
             parser.flag("CODEGEN", codegen);
@@ -489,14 +467,10 @@ void register_target_builtins(Interpreter& interp) {
             }
             // CMake drops empty arguments from COMMAND (e.g. Qt's tool-wrapper
             // path is empty on non-Windows hosts and prefixes the real exe).
-            for (auto& cmd_args : commands) {
-                std::erase(cmd_args, std::string());
-            }
+            for (auto& cmd_args : commands) { std::erase(cmd_args, std::string()); }
 
             // MAIN_DEPENDENCY is treated as an additional dependency
-            if (!main_dependency.empty()) {
-                depends.push_back(main_dependency);
-            }
+            if (!main_dependency.empty()) { depends.push_back(main_dependency); }
 
             if (outputs.empty()) {
                 interp.set_fatal_error("add_custom_command(OUTPUT) requires at least one output file");
@@ -510,14 +484,10 @@ void register_target_builtins(Interpreter& interp) {
 
             // Normalize output paths (relative to binary dir)
             std::vector<std::string> normalized_outputs;
-            for (const auto& out : outputs) {
-                normalized_outputs.push_back(Path::make_absolute_and_normal(bin_dir, out));
-            }
+            for (const auto& out : outputs) { normalized_outputs.push_back(Path::make_absolute_and_normal(bin_dir, out)); }
 
             // Also treat BYPRODUCTS as outputs
-            for (const auto& out : byproducts) {
-                normalized_outputs.push_back(Path::make_absolute_and_normal(bin_dir, out));
-            }
+            for (const auto& out : byproducts) { normalized_outputs.push_back(Path::make_absolute_and_normal(bin_dir, out)); }
 
             // Default working directory to binary dir
             if (working_dir.empty()) {
@@ -546,13 +516,9 @@ void register_target_builtins(Interpreter& interp) {
                 }
 
                 // Append commands
-                for (const auto& cmd : commands) {
-                    existing_rule->commands.push_back(cmd);
-                }
+                for (const auto& cmd : commands) { existing_rule->commands.push_back(cmd); }
                 // Append depends
-                for (const auto& dep : depends) {
-                    existing_rule->depends.push_back(dep);
-                }
+                for (const auto& dep : depends) { existing_rule->depends.push_back(dep); }
             } else {
                 // Create new rule
                 auto rule = std::make_shared<CustomCommandRule>();
@@ -657,9 +623,7 @@ void register_target_builtins(Interpreter& interp) {
                     cmd_args = std::move(expanded_args);
                 }
             }
-            for (auto& cmd_args : commands) {
-                std::erase(cmd_args, std::string());
-            }
+            for (auto& cmd_args : commands) { std::erase(cmd_args, std::string()); }
 
             // Default working directory
             if (working_dir.empty()) {
@@ -686,7 +650,7 @@ void register_target_builtins(Interpreter& interp) {
                     target->add_pre_build_command(std::move(cmd));
                 } else if (timing == "PRE_LINK") {
                     target->add_pre_link_command(std::move(cmd));
-                } else {  // POST_BUILD
+                } else { // POST_BUILD
                     target->add_post_build_command(std::move(cmd));
                 }
             }
@@ -704,11 +668,9 @@ void register_target_builtins(Interpreter& interp) {
         //   add_custom_target(coverage_report
         //     lcov --capture ...
         //     COMMAND genhtml ...)
-        static const std::set<std::string> keywords = {
-            "COMMAND", "DEPENDS", "WORKING_DIRECTORY", "COMMENT", "SOURCES",
-            "VERBATIM", "COMMAND_EXPAND_LISTS", "ALL", "BYPRODUCTS", "JOB_POOL",
-            "USES_TERMINAL"
-        };
+        static const std::set<std::string> keywords = {"COMMAND",    "DEPENDS",  "WORKING_DIRECTORY",    "COMMENT",
+                                                       "SOURCES",    "VERBATIM", "COMMAND_EXPAND_LISTS", "ALL",
+                                                       "BYPRODUCTS", "JOB_POOL", "USES_TERMINAL"};
 
         std::vector<std::string> normalized_args;
         if (!args.empty()) {
@@ -716,33 +678,30 @@ void register_target_builtins(Interpreter& interp) {
             // First arg is target name
             normalized_args.push_back(args[i++]);
             // Skip ALL if present
-            if (i < args.size() && args[i] == "ALL") {
-                normalized_args.push_back(args[i++]);
-            }
+            if (i < args.size() && args[i] == "ALL") { normalized_args.push_back(args[i++]); }
             // Collect non-keyword arguments as implicit command
             std::vector<std::string> implicit_cmd;
-            while (i < args.size() && keywords.find(args[i]) == keywords.end()) {
-                implicit_cmd.push_back(args[i++]);
-            }
+            while (i < args.size() && keywords.find(args[i]) == keywords.end()) { implicit_cmd.push_back(args[i++]); }
             if (!implicit_cmd.empty()) {
                 // Warn if mixing implicit args with explicit COMMAND (undocumented CMake behaviour)
                 bool has_explicit_command = false;
                 for (size_t j = i; j < args.size(); ++j) {
-                    if (args[j] == "COMMAND") { has_explicit_command = true; break; }
+                    if (args[j] == "COMMAND") {
+                        has_explicit_command = true;
+                        break;
+                    }
                 }
                 if (has_explicit_command) {
-                    interp.print_message("WARNING",
-                        "add_custom_target(" + args[0] + "): mixing implicit command arguments "
-                        "with explicit COMMAND keywords is undocumented CMake behaviour. "
-                        "Prefer using COMMAND for all commands.");
+                    interp.print_message("WARNING", "add_custom_target(" + args[0]
+                                                        + "): mixing implicit command arguments "
+                                                          "with explicit COMMAND keywords is undocumented CMake behaviour. "
+                                                          "Prefer using COMMAND for all commands.");
                 }
                 normalized_args.push_back("COMMAND");
                 normalized_args.insert(normalized_args.end(), implicit_cmd.begin(), implicit_cmd.end());
             }
             // Copy remaining arguments
-            while (i < args.size()) {
-                normalized_args.push_back(args[i++]);
-            }
+            while (i < args.size()) { normalized_args.push_back(args[i++]); }
         }
 
         CommandParser parser("add_custom_target");
@@ -787,9 +746,7 @@ void register_target_builtins(Interpreter& interp) {
             if (i > 0) comment += " ";
             comment += comment_parts[i];
         }
-        if (!comment.empty()) {
-            target->set_property("COMMENT", comment);
-        }
+        if (!comment.empty()) { target->set_property("COMMENT", comment); }
 
         // Expand lists in command arguments if COMMAND_EXPAND_LISTS is set
         if (command_expand_lists) {
@@ -804,9 +761,7 @@ void register_target_builtins(Interpreter& interp) {
                 cmd_args = std::move(expanded_args);
             }
         }
-        for (auto& cmd_args : commands) {
-            std::erase(cmd_args, std::string());
-        }
+        for (auto& cmd_args : commands) { std::erase(cmd_args, std::string()); }
 
         for (const auto& cmd_args : commands) {
             CustomCommand cmd;
@@ -818,9 +773,7 @@ void register_target_builtins(Interpreter& interp) {
 
         for (const auto& dep : depends) {
             // DEPENDS items may contain semicolon-separated lists (e.g. from "${LIST_VAR}")
-            for (auto item : CMakeArrayIterator(dep)) {
-                target->add_custom_dependency(std::string(item));
-            }
+            for (auto item : CMakeArrayIterator(dep)) { target->add_custom_dependency(std::string(item)); }
         }
 
         auto& source_props = interp.get_source_properties();
@@ -833,19 +786,15 @@ void register_target_builtins(Interpreter& interp) {
             source_props[abs]["GENERATED"] = "TRUE";
         }
 
-        if (!sources.empty()) {
-            target->append_property("SOURCES", sources, PropertyVisibility::PRIVATE);
-        }
+        if (!sources.empty()) { target->append_property("SOURCES", sources, PropertyVisibility::PRIVATE); }
 
         interp.get_targets()[name] = target;
-        interp.get_current_directory_context().owned_targets.push_back(target);  // Track ownership for this directory
+        interp.get_current_directory_context().owned_targets.push_back(target); // Track ownership for this directory
     });
 
     auto get_target_from_name = [](Interpreter& interp, const std::string& name, const std::string& cmd_name) -> Target* {
         auto* target = interp.find_target(name);
-        if (!target) {
-            interp.set_fatal_error(cmd_name + "() called on unknown target '" + name + "'");
-        }
+        if (!target) { interp.set_fatal_error(cmd_name + "() called on unknown target '" + name + "'"); }
         return target;
     };
 
@@ -906,7 +855,7 @@ void register_target_builtins(Interpreter& interp) {
         std::string name;
         bool is_system = false;
         bool before = false;
-        bool after = false;  // Consume but ignore (AFTER is default)
+        bool after = false; // Consume but ignore (AFTER is default)
         std::vector<std::string> pub, priv, inter;
 
         parser.positional(name, "target name");
@@ -1039,8 +988,8 @@ void register_target_builtins(Interpreter& interp) {
             for (const auto& feature : features) {
                 if (GenexParser::contains_genex(feature)) continue;
                 if (!features_db.is_known_feature(feature)) {
-                    interp.set_fatal_error("target_compile_features: Unknown compile feature '" + feature +
-                                          "' in " + visibility + " scope for target '" + name + "'");
+                    interp.set_fatal_error("target_compile_features: Unknown compile feature '" + feature + "' in " + visibility
+                                           + " scope for target '" + name + "'");
                     return false;
                 }
             }
@@ -1121,9 +1070,7 @@ void register_target_builtins(Interpreter& interp) {
         bool is_custom = (target->get_type() == TargetType::CUSTOM);
 
         // Source validation is deferred to build graph construction, matching CMake behavior.
-        auto validate_sources = [&](const std::vector<std::string>&) -> bool {
-            return true;
-        };
+        auto validate_sources = [&](const std::vector<std::string>&) -> bool { return true; };
 
         // Parse arguments manually to handle complex FILE_SET syntax
         PropertyVisibility current_visibility = PropertyVisibility::PRIVATE;
@@ -1135,9 +1082,7 @@ void register_target_builtins(Interpreter& interp) {
                     interp.set_fatal_error("target_sources() on custom target '" + target_name + "' only supports PRIVATE scope");
                     return false;
                 }
-                if (!validate_sources(current_sources)) {
-                    return false;
-                }
+                if (!validate_sources(current_sources)) { return false; }
                 target->append_property("SOURCES", current_sources, current_visibility);
                 current_sources.clear();
             }
@@ -1196,7 +1141,8 @@ void register_target_builtins(Interpreter& interp) {
 
                         // Validate CXX_MODULES can't be INTERFACE unless imported
                         if (fs.type == "CXX_MODULES" && fs.visibility == PropertyVisibility::INTERFACE && !target->is_imported()) {
-                            interp.set_fatal_error("target_sources() FILE_SET TYPE CXX_MODULES cannot use INTERFACE scope on non-imported targets");
+                            interp.set_fatal_error(
+                                "target_sources() FILE_SET TYPE CXX_MODULES cannot use INTERFACE scope on non-imported targets");
                             return;
                         }
 
@@ -1207,26 +1153,27 @@ void register_target_builtins(Interpreter& interp) {
                         if (fs.type == "CXX_MODULES" && !target->is_imported()) {
                             const Compiler* cxx = interp.get_toolchain().get_compiler(Language::CXX);
                             if (cxx && !cxx->supports_p1689()) {
-                                interp.set_fatal_error("target_sources() FILE_SET TYPE CXX_MODULES on '" + target->get_name() +
-                                                       "' requires a compiler with P1689r5 support; configured C++ compiler '" +
-                                                       cxx->binary() + "' does not. kiln requires GCC >=14 or Clang with "
-                                                       "clang-scan-deps installed.");
+                                interp.set_fatal_error("target_sources() FILE_SET TYPE CXX_MODULES on '" + target->get_name()
+                                                       + "' requires a compiler with P1689r5 support; configured C++ compiler '"
+                                                       + cxx->binary()
+                                                       + "' does not. kiln requires GCC >=14 or Clang with "
+                                                         "clang-scan-deps installed.");
                                 return;
                             }
                         }
                     } else if (keyword == "BASE_DIRS") {
                         i++;
-                        while (i < args.size() && args[i] != "FILES" && args[i] != "FILE_SET" &&
-                               args[i] != "PRIVATE" && args[i] != "PUBLIC" && args[i] != "INTERFACE") {
+                        while (i < args.size() && args[i] != "FILES" && args[i] != "FILE_SET" && args[i] != "PRIVATE" && args[i] != "PUBLIC"
+                               && args[i] != "INTERFACE") {
                             fs.base_dirs.push_back(args[i++]);
                         }
                     } else if (keyword == "FILES") {
                         i++;
-                        while (i < args.size() && args[i] != "TYPE" && args[i] != "BASE_DIRS" && args[i] != "FILE_SET" &&
-                               args[i] != "PRIVATE" && args[i] != "PUBLIC" && args[i] != "INTERFACE") {
+                        while (i < args.size() && args[i] != "TYPE" && args[i] != "BASE_DIRS" && args[i] != "FILE_SET"
+                               && args[i] != "PRIVATE" && args[i] != "PUBLIC" && args[i] != "INTERFACE") {
                             fs.files.push_back(args[i++]);
                         }
-                        break;  // FILES is typically last in a FILE_SET block
+                        break; // FILES is typically last in a FILE_SET block
                     } else {
                         // Hit a new visibility keyword or FILE_SET, break out
                         break;
@@ -1234,14 +1181,10 @@ void register_target_builtins(Interpreter& interp) {
                 }
 
                 // Default BASE_DIRS to CMAKE_CURRENT_SOURCE_DIR if not specified
-                if (fs.base_dirs.empty()) {
-                    fs.base_dirs.push_back(src_dir);
-                }
+                if (fs.base_dirs.empty()) { fs.base_dirs.push_back(src_dir); }
 
                 // Validate files exist
-                if (!validate_sources(fs.files)) {
-                    return;
-                }
+                if (!validate_sources(fs.files)) { return; }
 
                 // Add files to SOURCES property with appropriate visibility
                 target->append_property("SOURCES", fs.files, fs.visibility);
@@ -1266,8 +1209,8 @@ void register_target_builtins(Interpreter& interp) {
         parser.positional(name, "target name");
         parser.list("PUBLIC", pub);
         parser.list("PRIVATE", priv);
-        parser.list("LINK_PUBLIC", pub);    // Legacy alias for PUBLIC
-        parser.list("LINK_PRIVATE", priv);  // Legacy alias for PRIVATE
+        parser.list("LINK_PUBLIC", pub);   // Legacy alias for PUBLIC
+        parser.list("LINK_PRIVATE", priv); // Legacy alias for PRIVATE
         parser.list("INTERFACE", inter);
         parser.positionals(def, "libraries");
         PARSE_OR_RETURN(parser, interp, args);
@@ -1298,9 +1241,7 @@ void register_target_builtins(Interpreter& interp) {
 
         // Helper to resolve aliases in library list
         auto resolve_lib_aliases = [&](std::vector<std::string>& libs) {
-            for (auto& lib : libs) {
-                lib = interp.resolve_target_alias(lib);
-            }
+            for (auto& lib : libs) { lib = interp.resolve_target_alias(lib); }
         };
 
         resolve_lib_aliases(pub);
@@ -1341,8 +1282,9 @@ void register_target_builtins(Interpreter& interp) {
         if (target_names.empty()) {
             // CMake silently accepts this when a variable expands to empty
             interp.print_message("WARNING",
-                "set_target_properties() called with no targets "
-                "(undocumented CMake behavior, accepted for compatibility)", true);
+                                 "set_target_properties() called with no targets "
+                                 "(undocumented CMake behavior, accepted for compatibility)",
+                                 true);
             return;
         }
 
@@ -1369,19 +1311,17 @@ void register_target_builtins(Interpreter& interp) {
                 // Validate the full joined value since multi-line genex become fragments.
                 auto validation = GenexParser::validate_genex_support(value);
                 if (!validation) {
-                    interp.set_fatal_error("set_target_properties: " + validation.error() +
-                                         " in INTERFACE_" + base_prop_name + " property");
+                    interp.set_fatal_error("set_target_properties: " + validation.error() + " in INTERFACE_" + base_prop_name
+                                           + " property");
                     return;
                 }
 
-                if (!value.empty()) {
-                    target->append_property_from_string(base_prop_name, value, PropertyVisibility::INTERFACE);
-                }
+                if (!value.empty()) { target->append_property_from_string(base_prop_name, value, PropertyVisibility::INTERFACE); }
             };
 
-            for(size_t i = 0; i < props.size(); i += 2) {
+            for (size_t i = 0; i < props.size(); i += 2) {
                 std::string prop_name = props[i];
-                std::string prop_value = props[i+1];
+                std::string prop_value = props[i + 1];
 
                 // Special-case: scalar properties with dedicated setters
                 if (prop_name == "IMPORTED_LOCATION" || prop_name.starts_with("IMPORTED_LOCATION_")) {
@@ -1402,8 +1342,7 @@ void register_target_builtins(Interpreter& interp) {
                 } else if (prop_name == "C_EXTENSIONS") {
                     target->set_language_extensions(Language::C, !Interpreter::is_falsy(prop_value));
                     target->set_property(prop_name, prop_value);
-                } else if (auto* meta = find_list_property(prop_name);
-                           meta && meta->name != "LINK_LIBRARIES" && meta->name != "SOURCES") {
+                } else if (auto* meta = find_list_property(prop_name); meta && meta->name != "LINK_LIBRARIES" && meta->name != "SOURCES") {
                     // Known list property → append with PRIVATE visibility
                     // (LINK_LIBRARIES and SOURCES are excluded - they use dedicated commands)
                     target->append_property_from_string(prop_name, prop_value, PropertyVisibility::PRIVATE);
@@ -1434,14 +1373,21 @@ void register_target_builtins(Interpreter& interp) {
 
         // Helper to convert TargetType to string
         auto target_type_to_string = [](TargetType type) -> std::string {
-            switch(type) {
-                case TargetType::EXECUTABLE: return "EXECUTABLE";
-                case TargetType::SHARED_LIBRARY: return "SHARED_LIBRARY";
-                case TargetType::STATIC_LIBRARY: return "STATIC_LIBRARY";
-                case TargetType::OBJECT_LIBRARY: return "OBJECT_LIBRARY";
-                case TargetType::INTERFACE_LIBRARY: return "INTERFACE_LIBRARY";
-                case TargetType::CUSTOM: return "UTILITY";
-                default: return "";
+            switch (type) {
+            case TargetType::EXECUTABLE:
+                return "EXECUTABLE";
+            case TargetType::SHARED_LIBRARY:
+                return "SHARED_LIBRARY";
+            case TargetType::STATIC_LIBRARY:
+                return "STATIC_LIBRARY";
+            case TargetType::OBJECT_LIBRARY:
+                return "OBJECT_LIBRARY";
+            case TargetType::INTERFACE_LIBRARY:
+                return "INTERFACE_LIBRARY";
+            case TargetType::CUSTOM:
+                return "UTILITY";
+            default:
+                return "";
             }
         };
 
@@ -1465,16 +1411,13 @@ void register_target_builtins(Interpreter& interp) {
             // In CMake, PUBLIC items appear in both the target's own property and the
             // INTERFACE property (they are visible to consumers).
             std::string base_prop = property_name.substr(10); // strlen("INTERFACE_")
-            auto vals = target->get_property_list(base_prop,
-                {PropertyVisibility::PUBLIC, PropertyVisibility::INTERFACE});
+            auto vals = target->get_property_list(base_prop, {PropertyVisibility::PUBLIC, PropertyVisibility::INTERFACE});
             if (!vals.empty()) {
                 // CMake absolutifies source paths for INTERFACE_SOURCES
                 if (base_prop == "SOURCES") {
                     std::string src_dir = target->get_source_dir();
                     for (auto& v : vals) {
-                        if (!v.empty() && v[0] != '/' && v[0] != '$') {
-                            v = src_dir + "/" + v;
-                        }
+                        if (!v.empty() && v[0] != '/' && v[0] != '$') { v = src_dir + "/" + v; }
                     }
                 }
                 result = CMakeArray(vals).to_string();
@@ -1482,24 +1425,19 @@ void register_target_builtins(Interpreter& interp) {
                 // Fall back to generic scalar properties (custom INTERFACE_ properties
                 // set via set_target_properties are stored under the full name)
                 result = target->get_property(property_name);
-                if (result.empty()) {
-                    result = property_name + "-NOTFOUND";
-                }
+                if (result.empty()) { result = property_name + "-NOTFOUND"; }
             }
         } else {
             // Non-INTERFACE_ properties: return PUBLIC + PRIVATE only.
             // INTERFACE visibility is only accessible via the INTERFACE_ prefix
             // (handled above). This matches CMake's get_target_property behavior.
-            auto vals = target->get_property_list(property_name,
-                {PropertyVisibility::PRIVATE, PropertyVisibility::PUBLIC});
+            auto vals = target->get_property_list(property_name, {PropertyVisibility::PRIVATE, PropertyVisibility::PUBLIC});
             if (!vals.empty()) {
                 result = CMakeArray(vals).to_string();
             } else {
                 // Fall back to scalar properties
                 result = target->get_property(property_name);
-                if (result.empty()) {
-                    result = property_name + "-NOTFOUND";
-                }
+                if (result.empty()) { result = property_name + "-NOTFOUND"; }
             }
         }
 
@@ -1507,9 +1445,7 @@ void register_target_builtins(Interpreter& interp) {
     });
 
     interp.add_builtin("include_directories", [](Interpreter& interp, const std::vector<std::string>& args) {
-        if (args.empty()) {
-            return;
-        }
+        if (args.empty()) { return; }
 
         bool before = false;
         std::string src_dir = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
@@ -1518,9 +1454,12 @@ void register_target_builtins(Interpreter& interp) {
         std::vector<std::string> resolved_dirs;
         for (const auto& arg : args) {
             // Handle keywords
-            if (arg == "BEFORE") { before = true; continue; }
+            if (arg == "BEFORE") {
+                before = true;
+                continue;
+            }
             if (arg == "AFTER") { continue; }  // AFTER is default
-            if (arg == "SYSTEM") { continue; }  // SYSTEM ignored for now
+            if (arg == "SYSTEM") { continue; } // SYSTEM ignored for now
 
             // Generator expressions are resolved later; store as-is
             if (arg.find("$<") != std::string::npos) {
@@ -1559,9 +1498,7 @@ void register_target_builtins(Interpreter& interp) {
         std::string src_dir = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
         auto resolve_dirs = [&](std::vector<std::string>& dirs) {
             for (auto& dir : dirs) {
-                if (Path(dir).is_relative()) {
-                    dir = Path::join(src_dir, dir);
-                }
+                if (Path(dir).is_relative()) { dir = Path::join(src_dir, dir); }
             }
         };
 
@@ -1582,9 +1519,7 @@ void register_target_builtins(Interpreter& interp) {
     });
 
     interp.add_builtin("link_directories", [](Interpreter& interp, const std::vector<std::string>& args) {
-        if (args.empty()) {
-            return;
-        }
+        if (args.empty()) { return; }
 
         std::string src_dir = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
         auto& dirs = interp.get_current_directory_context().accumulated["LINK_DIRECTORIES"];
@@ -1599,9 +1534,7 @@ void register_target_builtins(Interpreter& interp) {
     });
 
     interp.add_builtin("add_definitions", [](Interpreter& interp, const std::vector<std::string>& args) {
-        if (args.empty()) {
-            return;
-        }
+        if (args.empty()) { return; }
 
         auto& defs = interp.get_current_directory_context().accumulated["COMPILE_DEFINITIONS"];
         auto& opts = interp.get_current_directory_context().accumulated["COMPILE_OPTIONS"];
@@ -1620,9 +1553,8 @@ void register_target_builtins(Interpreter& interp) {
                 // HACK: some projects pass flags like "-include stdint.h" through
                 // add_definitions(). CMake keeps the argument with its flag; we do
                 // the same by consuming the next token as an option value.
-                if (arg == "-include" || arg == "-isystem" ||
-                    arg == "-I" || arg == "-D" || arg == "-U" ||
-                    arg == "-F" || arg == "-iframework") {
+                if (arg == "-include" || arg == "-isystem" || arg == "-I" || arg == "-D" || arg == "-U" || arg == "-F"
+                    || arg == "-iframework") {
                     next_is_option_value = true;
                 }
             } else if (!arg.empty()) {
@@ -1633,9 +1565,7 @@ void register_target_builtins(Interpreter& interp) {
     });
 
     interp.add_builtin("remove_definitions", [](Interpreter& interp, const std::vector<std::string>& args) {
-        if (args.empty()) {
-            return;
-        }
+        if (args.empty()) { return; }
 
         // Build set of items to remove (args may be semicolon-separated lists)
         std::set<std::string> to_remove;
@@ -1643,9 +1573,7 @@ void register_target_builtins(Interpreter& interp) {
             for (auto sv : CMakeArrayIterator(arg)) {
                 std::string def(sv);
                 // Strip -D prefix if present (CMake compatibility)
-                if (def.size() >= 2 && def[0] == '-' && def[1] == 'D') {
-                    def = def.substr(2);
-                }
+                if (def.size() >= 2 && def[0] == '-' && def[1] == 'D') { def = def.substr(2); }
                 to_remove.insert(def);
             }
         }
@@ -1653,23 +1581,17 @@ void register_target_builtins(Interpreter& interp) {
         // Flatten accumulated defs (may contain semicolon-separated entries), filter, store back
         auto& defs = interp.get_current_directory_context().accumulated["COMPILE_DEFINITIONS"];
         CMakeArray all_defs;
-        for (const auto& d : defs) {
-            all_defs.append(d);
-        }
+        for (const auto& d : defs) { all_defs.append(d); }
 
         std::vector<std::string> filtered;
         for (const auto& def : all_defs) {
-            if (to_remove.find(def) == to_remove.end()) {
-                filtered.push_back(def);
-            }
+            if (to_remove.find(def) == to_remove.end()) { filtered.push_back(def); }
         }
         defs = std::move(filtered);
     });
 
     interp.add_builtin("add_compile_definitions", [](Interpreter& interp, const std::vector<std::string>& args) {
-        if (args.empty()) {
-            return;
-        }
+        if (args.empty()) { return; }
 
         auto& defs = interp.get_current_directory_context().accumulated["COMPILE_DEFINITIONS"];
         // No -D prefix stripping (modern CMake style)
@@ -1677,33 +1599,25 @@ void register_target_builtins(Interpreter& interp) {
     });
 
     interp.add_builtin("add_compile_options", [](Interpreter& interp, const std::vector<std::string>& args) {
-        if (args.empty()) {
-            return;
-        }
+        if (args.empty()) { return; }
 
         auto& opts = interp.get_current_directory_context().accumulated["COMPILE_OPTIONS"];
         opts.insert(opts.end(), args.begin(), args.end());
     });
 
     interp.add_builtin("add_link_options", [](Interpreter& interp, const std::vector<std::string>& args) {
-        if (args.empty()) {
-            return;
-        }
+        if (args.empty()) { return; }
 
         auto& opts = interp.get_current_directory_context().accumulated["LINK_OPTIONS"];
         opts.insert(opts.end(), args.begin(), args.end());
     });
 
     interp.add_builtin("link_libraries", [](Interpreter& interp, const std::vector<std::string>& args) {
-        if (args.empty()) {
-            return;
-        }
+        if (args.empty()) { return; }
 
         // Resolve target aliases (same as target_link_libraries does)
         std::vector<std::string> resolved_libs;
-        for (const auto& lib : args) {
-            resolved_libs.push_back(interp.resolve_target_alias(lib));
-        }
+        for (const auto& lib : args) { resolved_libs.push_back(interp.resolve_target_alias(lib)); }
 
         auto& libs = interp.get_current_directory_context().accumulated["LINK_LIBRARIES"];
         libs.insert(libs.end(), resolved_libs.begin(), resolved_libs.end());

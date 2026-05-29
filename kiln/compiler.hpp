@@ -25,13 +25,13 @@ struct CompileContext {
     std::string source;
     std::string output;
     std::vector<std::string> includes;
-    std::vector<std::string> system_includes;  // Directories to include with -isystem (no warnings)
+    std::vector<std::string> system_includes; // Directories to include with -isystem (no warnings)
     std::vector<std::string> definitions;
     std::vector<std::string> options;
     std::string standard;
-    bool extensions_enabled = true;  // GNU extensions (gnu11 vs c11)
+    bool extensions_enabled = true; // GNU extensions (gnu11 vs c11)
     bool is_shared = false;
-    bool is_pie = false;                        // -fPIE for executables with POSITION_INDEPENDENT_CODE
+    bool is_pie = false;                    // -fPIE for executables with POSITION_INDEPENDENT_CODE
     std::string visibility_preset;          // e.g. "hidden", "default", "protected", "internal"
     bool visibility_inlines_hidden = false; // -fvisibility-inlines-hidden (GCC/Clang)
     std::string pch_include;
@@ -50,10 +50,10 @@ struct CompileContext {
 // -fmodule-header=<system|user> based on is_system_header. The BMI is written
 // to the path advertised by the mapper file (kiln pre-stages an entry there).
 struct HeaderUnitContext {
-    std::string source;                         // Absolute path to the header
-    std::string bmi_output;                     // Where the BMI should land
-    std::string module_mapper_file;             // Mapper used to advertise the BMI path
-    bool is_system_header = false;              // include-angle (true) vs include-quote
+    std::string source;             // Absolute path to the header
+    std::string bmi_output;         // Where the BMI should land
+    std::string module_mapper_file; // Mapper used to advertise the BMI path
+    bool is_system_header = false;  // include-angle (true) vs include-quote
     std::vector<std::string> includes;
     std::vector<std::string> system_includes;
     std::vector<std::string> definitions;
@@ -65,14 +65,14 @@ struct HeaderUnitContext {
 
 struct ModuleScanContext {
     std::string source;
-    std::string output;                    // DDI (P1689 JSON) output file path
-    std::string obj_path;                  // Final .o path; emitted as `primary-output` in P1689
-    std::string depfile;                   // .d depfile for header dependencies (-MF)
+    std::string output;   // DDI (P1689 JSON) output file path
+    std::string obj_path; // Final .o path; emitted as `primary-output` in P1689
+    std::string depfile;  // .d depfile for header dependencies (-MF)
     std::vector<std::string> includes;
-    std::vector<std::string> system_includes;  // Directories to include with -isystem (no warnings)
+    std::vector<std::string> system_includes; // Directories to include with -isystem (no warnings)
     std::vector<std::string> definitions;
     std::string standard;
-    bool extensions_enabled = true;  // GNU extensions (gnu11 vs c11)
+    bool extensions_enabled = true; // GNU extensions (gnu11 vs c11)
     bool color_diagnostics = false;
 };
 
@@ -105,24 +105,24 @@ struct LinkContext {
     // libfoo.so → libfoo.so.N symlinks; only DT_SONAME is set.
     std::string soname;
     bool is_shared = false;
-    bool is_pie = false;  // -pie for executables with POSITION_INDEPENDENT_CODE
+    bool is_pie = false; // -pie for executables with POSITION_INDEPENDENT_CODE
     std::string standard;
-    bool extensions_enabled = true;  // GNU extensions (gnu11 vs c11)
+    bool extensions_enabled = true; // GNU extensions (gnu11 vs c11)
     bool color_diagnostics = false;
 };
 
 // Platform information detected from the compiler and system
 struct PlatformInfo {
-    std::string compiler_id;                    // "GNU", "Clang", etc.
-    std::string compiler_version;               // "11.3.0"
-    std::string system_name;                    // "Linux", "Darwin", "Windows"
-    std::string system_processor;               // "x86_64", "aarch64", etc.
-    std::string sizeof_void_p;                  // "8" or "4"
-    std::vector<std::string> implicit_includes; // Implicit include directories
-    std::vector<std::string> implicit_link_dirs;// Implicit link directories
-    std::vector<std::string> implicit_link_libs;// Implicit link libraries
-    int default_cxx_standard = 0;               // Compiler's default C++ standard (e.g. 17)
-    int default_c_standard = 0;                 // Compiler's default C standard (e.g. 17)
+    std::string compiler_id;                     // "GNU", "Clang", etc.
+    std::string compiler_version;                // "11.3.0"
+    std::string system_name;                     // "Linux", "Darwin", "Windows"
+    std::string system_processor;                // "x86_64", "aarch64", etc.
+    std::string sizeof_void_p;                   // "8" or "4"
+    std::vector<std::string> implicit_includes;  // Implicit include directories
+    std::vector<std::string> implicit_link_dirs; // Implicit link directories
+    std::vector<std::string> implicit_link_libs; // Implicit link libraries
+    int default_cxx_standard = 0;                // Compiler's default C++ standard (e.g. 17)
+    int default_c_standard = 0;                  // Compiler's default C standard (e.g. 17)
 };
 
 class Compiler {
@@ -134,9 +134,18 @@ public:
     // entries — two captures with the same identity tuple resolve to the
     // same Compiler*. Default-empty for compilers that don't carry these
     // (only the GNU/Clang family does today).
-    virtual const std::string& binary() const { static const std::string e; return e; }
-    virtual const std::string& sysroot() const { static const std::string e; return e; }
-    virtual const std::string& compiler_target() const { static const std::string e; return e; }
+    virtual const std::string& binary() const {
+        static const std::string e;
+        return e;
+    }
+    virtual const std::string& sysroot() const {
+        static const std::string e;
+        return e;
+    }
+    virtual const std::string& compiler_target() const {
+        static const std::string e;
+        return e;
+    }
 
     // Detected version string (e.g. "13.2.0"). Populated once by the caller
     // after detect_platform() runs and the compiler is registered with the
@@ -160,22 +169,21 @@ public:
     // resolves them against the link task's working directory. Drivers that
     // emit no side-effect outputs (or aren't implemented yet, e.g. MSVC
     // /MAP, /IMPLIB, /PDB) return an empty vector.
-    virtual std::vector<std::string> get_link_side_effect_outputs(
-        const std::vector<std::string>& argv) const {
-        (void)argv;
+    virtual std::vector<std::string> get_link_side_effect_outputs(const std::vector<std::string>& argv) const {
+        (void) argv;
         return {};
     }
 
     // C++20 modules support
     virtual CompilerCommand get_module_scan_command(const ModuleScanContext& ctx) const {
-        (void)ctx;
+        (void) ctx;
         return {}; // Default: no module support
     }
 
     // C++20 header-unit compilation. Compile a header file into a BMI usable
     // by `import <header>;` / `import "header";`. Default: not supported.
     virtual CompilerCommand get_header_unit_compile_command(const HeaderUnitContext& ctx) const {
-        (void)ctx;
+        (void) ctx;
         return {};
     }
 
@@ -217,7 +225,8 @@ public:
     // "-std=c++17" etc.; MSVC will return "/std:c++17". Returns empty
     // string for standards the driver has no spelling for.
     virtual std::string std_compile_option(Language lang, int standard) const {
-        (void)lang; (void)standard;
+        (void) lang;
+        (void) standard;
         return {};
     }
 

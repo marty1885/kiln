@@ -22,8 +22,7 @@
 #include <charconv>
 #include <filesystem>
 
-kiln::Hash256 kiln::blake2b(const void *data, size_t len, const void* key, size_t keylen)
-{
+kiln::Hash256 kiln::blake2b(const void* data, size_t len, const void* key, size_t keylen) {
     Hash256 hash;
     static_assert(sizeof(hash) == 32, "Hash256 must be 32 bytes");
     static_assert(std::is_standard_layout<Hash256>::value, "Hash256 must be a standard layout type");
@@ -31,74 +30,64 @@ kiln::Hash256 kiln::blake2b(const void *data, size_t len, const void* key, size_
     return hash;
 }
 
-kiln::Hash256 kiln::sha256(const void* data, size_t len)
-{
+kiln::Hash256 kiln::sha256(const void* data, size_t len) {
     Hash256 hash;
     SHA256_CTX ctx;
     kiln_sha256_init(&ctx);
-    kiln_sha256_update(&ctx, (const uint8_t*)data, len);
-    kiln_sha256_final(&ctx, (uint8_t*)&hash);
+    kiln_sha256_update(&ctx, (const uint8_t*) data, len);
+    kiln_sha256_final(&ctx, (uint8_t*) &hash);
     return hash;
 }
 
-kiln::Hash160 kiln::sha1(const void* data, size_t len)
-{
+kiln::Hash160 kiln::sha1(const void* data, size_t len) {
     Hash160 hash;
     SHA1_CTX ctx;
     kiln_sha1_init(&ctx);
-    kiln_sha1_update(&ctx, (const unsigned char*)data, len);
-    kiln_sha1_final((unsigned char*)&hash, &ctx);
+    kiln_sha1_update(&ctx, (const unsigned char*) data, len);
+    kiln_sha1_final((unsigned char*) &hash, &ctx);
     return hash;
 }
 
-kiln::Hash128 kiln::md5(const void* data, size_t len)
-{
+kiln::Hash128 kiln::md5(const void* data, size_t len) {
     Hash128 hash;
     MD5_CTX ctx;
     kiln_md5_init(&ctx);
-    kiln_md5_update(&ctx, (const uint8_t*)data, len);
-    kiln_md5_final(&ctx, (uint8_t*)&hash);
+    kiln_md5_update(&ctx, (const uint8_t*) data, len);
+    kiln_md5_final(&ctx, (uint8_t*) &hash);
     return hash;
 }
 
-std::string kiln::Hash256::to_string() const
-{
+std::string kiln::Hash256::to_string() const {
     std::string result;
     result.reserve(2 * sizeof(bytes));
-    for (unsigned char byte : bytes)
-    {
+    for (unsigned char byte : bytes) {
         result += "0123456789abcdef"[byte >> 4];
         result += "0123456789abcdef"[byte & 0xf];
     }
     return result;
 }
 
-std::string kiln::Hash160::to_string() const
-{
+std::string kiln::Hash160::to_string() const {
     std::string result;
     result.reserve(2 * sizeof(bytes));
-    for (unsigned char byte : bytes)
-    {
+    for (unsigned char byte : bytes) {
         result += "0123456789abcdef"[byte >> 4];
         result += "0123456789abcdef"[byte & 0xf];
     }
     return result;
 }
 
-std::string kiln::Hash128::to_string() const
-{
+std::string kiln::Hash128::to_string() const {
     std::string result;
     result.reserve(2 * sizeof(bytes));
-    for (unsigned char byte : bytes)
-    {
+    for (unsigned char byte : bytes) {
         result += "0123456789abcdef"[byte >> 4];
         result += "0123456789abcdef"[byte & 0xf];
     }
     return result;
 }
 
-kiln::CommandResult kiln::run_command(const std::string& command, const std::string& working_dir)
-{
+kiln::CommandResult kiln::run_command(const std::string& command, const std::string& working_dir) {
     // Avoid popen/sh whenever possible. shell_split handles quoting/escapes
     // exactly like the shell would for the simple word-splitting case; the
     // vector overload then handles redirects (<, >, >>, 2>) natively via
@@ -107,9 +96,7 @@ kiln::CommandResult kiln::run_command(const std::string& command, const std::str
     // overload was previously the hottest user of process-global chdir,
     // which races between concurrent build workers.
     auto argv = shell_split(command);
-    if (argv.empty()) {
-        return {-1, "Empty command"};
-    }
+    if (argv.empty()) { return {-1, "Empty command"}; }
     return run_command(argv, working_dir);
 }
 
@@ -118,10 +105,9 @@ std::string kiln::escape_shell_arg(const std::string& arg) {
 
     bool needed = false;
     for (char c : arg) {
-        if (std::isspace(static_cast<unsigned char>(c)) || c == '\'' || c == '"' || c == '\\' ||
-            c == '`' || c == '$' || c == '&' || c == '|' || c == ';' || c == '<' || c == '>' ||
-            c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']' || c == '*' ||
-            c == '?' || c == '~' || c == '#' || c == '!' || c == '^') {
+        if (std::isspace(static_cast<unsigned char>(c)) || c == '\'' || c == '"' || c == '\\' || c == '`' || c == '$' || c == '&'
+            || c == '|' || c == ';' || c == '<' || c == '>' || c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']'
+            || c == '*' || c == '?' || c == '~' || c == '#' || c == '!' || c == '^') {
             needed = true;
             break;
         }
@@ -148,11 +134,11 @@ static size_t shell_redirect_prefix_len(const std::string& arg) {
     // Order matters: check longer prefixes first
     if (arg.starts_with("2>>")) return 3;
     if (arg.starts_with("1>>")) return 3;
-    if (arg.starts_with(">>"))  return 2;
-    if (arg.starts_with("2>"))  return 2;
-    if (arg.starts_with("1>"))  return 2;
-    if (arg.starts_with(">"))   return 1;
-    if (arg.starts_with("<"))   return 1;
+    if (arg.starts_with(">>")) return 2;
+    if (arg.starts_with("2>")) return 2;
+    if (arg.starts_with("1>")) return 2;
+    if (arg.starts_with(">")) return 1;
+    if (arg.starts_with("<")) return 1;
     return 0;
 }
 
@@ -164,20 +150,19 @@ static std::pair<size_t, size_t> find_embedded_redirect(const std::string& arg) 
     for (size_t i = 1; i < arg.size(); ++i) {
         if (arg[i] == '>') {
             if (i + 1 < arg.size() && arg[i + 1] == '>') {
-                return {i, 2};  // >>
+                return {i, 2}; // >>
             }
-            return {i, 1};  // >
+            return {i, 1}; // >
         }
         if (arg[i] == '<') {
-            return {i, 1};  // <
+            return {i, 1}; // <
         }
     }
     return {std::string::npos, 0};
 }
 
 static bool is_shell_operator(const std::string& arg) {
-    return arg == "|" || arg == "&&" || arg == "||" || arg == "2>&1" ||
-           arg == "(" || arg == ")";
+    return arg == "|" || arg == "&&" || arg == "||" || arg == "2>&1" || arg == "(" || arg == ")";
 }
 
 std::string kiln::join_command(const std::vector<std::string>& args) {
@@ -190,18 +175,14 @@ std::string kiln::join_command(const std::vector<std::string>& args) {
             // Split redirection operator from path: ">file" → > + escaped(file)
             result += args[i].substr(0, pfx);
             std::string path = args[i].substr(pfx);
-            if (!path.empty()) {
-                result += escape_shell_arg(path);
-            }
+            if (!path.empty()) { result += escape_shell_arg(path); }
         } else if (auto [pos, len] = find_embedded_redirect(args[i]); pos != std::string::npos) {
             // Split embedded redirect: "file.sql>" → escaped(file.sql) + " >" + escaped(path)
             result += escape_shell_arg(args[i].substr(0, pos));
             result += " ";
             result += args[i].substr(pos, len);
             std::string path = args[i].substr(pos + len);
-            if (!path.empty()) {
-                result += escape_shell_arg(path);
-            }
+            if (!path.empty()) { result += escape_shell_arg(path); }
         } else {
             result += escape_shell_arg(args[i]);
         }
@@ -231,8 +212,7 @@ std::string kiln::strip_shell_quoting(const std::string& arg) {
     if (arg.empty()) return arg;
 
     // Case 1: Entire argument is quoted (rare, but handle it)
-    if ((arg.front() == '"' && arg.back() == '"' && arg.size() >= 2) ||
-        (arg.front() == '\'' && arg.back() == '\'' && arg.size() >= 2)) {
+    if ((arg.front() == '"' && arg.back() == '"' && arg.size() >= 2) || (arg.front() == '\'' && arg.back() == '\'' && arg.size() >= 2)) {
         return arg.substr(1, arg.size() - 2);
     }
 
@@ -347,9 +327,7 @@ static kiln::CommandResult exec_resolved(const ResolvedCommand& rc, const std::s
     std::string output;
     char buffer[4096];
     ssize_t n;
-    while ((n = read(pipe_fd[0], buffer, sizeof(buffer))) > 0) {
-        output.append(buffer, n);
-    }
+    while ((n = read(pipe_fd[0], buffer, sizeof(buffer))) > 0) { output.append(buffer, n); }
     close(pipe_fd[0]);
 
     int status;
@@ -390,29 +368,34 @@ kiln::CommandResult kiln::run_command(const std::vector<std::string>& command, c
         if (pfx > 0) {
             std::string op = arg.substr(0, pfx);
             std::string path = arg.substr(pfx);
-            if (path.empty() && i + 1 < command.size()) {
-                path = command[++i];
-            }
+            if (path.empty() && i + 1 < command.size()) { path = command[++i]; }
             path = strip_shell_quoting(path);
 
-            if (op == "<") rc.stdin_file = path;
-            else if (op == ">>" || op == "1>>") { rc.stdout_file = path; rc.stdout_append = true; }
-            else if (op == ">" || op == "1>") rc.stdout_file = path;
-            else if (op == "2>" || op == "2>>") rc.stderr_file = path;
+            if (op == "<")
+                rc.stdin_file = path;
+            else if (op == ">>" || op == "1>>") {
+                rc.stdout_file = path;
+                rc.stdout_append = true;
+            } else if (op == ">" || op == "1>")
+                rc.stdout_file = path;
+            else if (op == "2>" || op == "2>>")
+                rc.stderr_file = path;
         } else if (auto [pos, len] = find_embedded_redirect(arg); pos != std::string::npos) {
             std::string pre = arg.substr(0, pos);
             std::string op = arg.substr(pos, len);
             std::string path = arg.substr(pos + len);
-            if (path.empty() && i + 1 < command.size()) {
-                path = command[++i];
-            }
+            if (path.empty() && i + 1 < command.size()) { path = command[++i]; }
             path = strip_shell_quoting(path);
 
             if (!pre.empty()) rc.argv.push_back(pre);
 
-            if (op == "<") rc.stdin_file = path;
-            else if (op == ">>") { rc.stdout_file = path; rc.stdout_append = true; }
-            else if (op == ">") rc.stdout_file = path;
+            if (op == "<")
+                rc.stdin_file = path;
+            else if (op == ">>") {
+                rc.stdout_file = path;
+                rc.stdout_append = true;
+            } else if (op == ">")
+                rc.stdout_file = path;
         } else {
             rc.argv.push_back(arg);
         }
@@ -426,14 +409,11 @@ std::string kiln::get_executable_path() {
     char result[PATH_MAX];
 #ifdef __linux__
     ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
-    if (count != -1) {
-        return std::string(result, count);
-    }
+    if (count != -1) { return std::string(result, count); }
 #elif defined __FreeBSD__
     size_t len = sizeof(result);
     int mib[] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, getpid()};
-    if (sysctl(mib, 4, result, &len, NULL, 0) == 0)
-      return result;
+    if (sysctl(mib, 4, result, &len, NULL, 0) == 0) return result;
 #endif
     // Fallback or other platforms
     return "kiln";
@@ -447,28 +427,20 @@ kiln::PipelineResult kiln::execute_pipeline(const std::vector<std::vector<std::s
     std::vector<std::vector<int>> pipes(num_commands - 1, std::vector<int>(2));
 
     for (size_t i = 0; i < num_commands - 1; ++i) {
-        if (pipe(pipes[i].data()) == -1) {
-            return {{1}, "", "", "Failed to create pipe"};
-        }
+        if (pipe(pipes[i].data()) == -1) { return {{1}, "", "", "Failed to create pipe"}; }
     }
 
     int stdout_pipe[2];
     int stderr_pipe[2];
     if (options.output_variable) {
-        if (pipe(stdout_pipe) == -1) {
-            return {{1}, "", "", "Failed to create stdout pipe"};
-        }
+        if (pipe(stdout_pipe) == -1) { return {{1}, "", "", "Failed to create stdout pipe"}; }
     }
     if (options.error_variable) {
-        if (pipe(stderr_pipe) == -1) {
-            return {{1}, "", "", "Failed to create stderr pipe"};
-        }
+        if (pipe(stderr_pipe) == -1) { return {{1}, "", "", "Failed to create stderr pipe"}; }
     }
 
     int setup_pipe[2];
-    if (pipe(setup_pipe) == -1) {
-        return {{1}, "", "", "Failed to create setup pipe"};
-    }
+    if (pipe(setup_pipe) == -1) { return {{1}, "", "", "Failed to create setup pipe"}; }
 
     for (size_t i = 0; i < num_commands; ++i) {
         pids[i] = fork();
@@ -484,26 +456,20 @@ kiln::PipelineResult kiln::execute_pipeline(const std::vector<std::vector<std::s
             auto report_setup_error = [&](const std::string& message) {
                 std::string msg = message + ": " + std::strerror(errno);
                 ssize_t ignored = write(setup_pipe[1], msg.data(), msg.size());
-                (void)ignored;
+                (void) ignored;
                 _exit(127);
             };
 
             if (!options.working_dir.empty()) {
-                if (chdir(options.working_dir.c_str()) != 0) {
-                    report_setup_error("Failed to change directory to " + options.working_dir);
-                }
+                if (chdir(options.working_dir.c_str()) != 0) { report_setup_error("Failed to change directory to " + options.working_dir); }
             }
 
             // Stdin
             if (i == 0) {
                 if (!options.input_file.empty()) {
                     int fd = open(options.input_file.c_str(), O_RDONLY);
-                    if (fd == -1) {
-                        report_setup_error("Failed to open INPUT_FILE " + options.input_file);
-                    }
-                    if (dup2(fd, STDIN_FILENO) == -1) {
-                        report_setup_error("Failed to redirect INPUT_FILE " + options.input_file);
-                    }
+                    if (fd == -1) { report_setup_error("Failed to open INPUT_FILE " + options.input_file); }
+                    if (dup2(fd, STDIN_FILENO) == -1) { report_setup_error("Failed to redirect INPUT_FILE " + options.input_file); }
                     close(fd);
                 }
             } else {
@@ -516,18 +482,12 @@ kiln::PipelineResult kiln::execute_pipeline(const std::vector<std::vector<std::s
                     dup2(stdout_pipe[1], STDOUT_FILENO);
                 } else if (!options.output_file.empty()) {
                     int fd = open(options.output_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                    if (fd == -1) {
-                        report_setup_error("Failed to open OUTPUT_FILE " + options.output_file);
-                    }
-                    if (dup2(fd, STDOUT_FILENO) == -1) {
-                        report_setup_error("Failed to redirect OUTPUT_FILE " + options.output_file);
-                    }
+                    if (fd == -1) { report_setup_error("Failed to open OUTPUT_FILE " + options.output_file); }
+                    if (dup2(fd, STDOUT_FILENO) == -1) { report_setup_error("Failed to redirect OUTPUT_FILE " + options.output_file); }
                     close(fd);
                 } else if (options.output_quiet) {
                     int fd = open("/dev/null", O_WRONLY);
-                    if (fd == -1 || dup2(fd, STDOUT_FILENO) == -1) {
-                        report_setup_error("Failed to redirect stdout to /dev/null");
-                    }
+                    if (fd == -1 || dup2(fd, STDOUT_FILENO) == -1) { report_setup_error("Failed to redirect stdout to /dev/null"); }
                     close(fd);
                 }
             } else {
@@ -539,25 +499,28 @@ kiln::PipelineResult kiln::execute_pipeline(const std::vector<std::vector<std::s
                 dup2(stderr_pipe[1], STDERR_FILENO);
             } else if (!options.error_file.empty()) {
                 int fd = open(options.error_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                if (fd == -1) {
-                    report_setup_error("Failed to open ERROR_FILE " + options.error_file);
-                }
-                if (dup2(fd, STDERR_FILENO) == -1) {
-                    report_setup_error("Failed to redirect ERROR_FILE " + options.error_file);
-                }
+                if (fd == -1) { report_setup_error("Failed to open ERROR_FILE " + options.error_file); }
+                if (dup2(fd, STDERR_FILENO) == -1) { report_setup_error("Failed to redirect ERROR_FILE " + options.error_file); }
                 close(fd);
             } else if (options.error_quiet) {
                 int fd = open("/dev/null", O_WRONLY);
-                if (fd == -1 || dup2(fd, STDERR_FILENO) == -1) {
-                    report_setup_error("Failed to redirect stderr to /dev/null");
-                }
+                if (fd == -1 || dup2(fd, STDERR_FILENO) == -1) { report_setup_error("Failed to redirect stderr to /dev/null"); }
                 close(fd);
             }
 
             // Close all pipes in child
-            for (auto& p : pipes) { close(p[0]); close(p[1]); }
-            if (options.output_variable) { close(stdout_pipe[0]); close(stdout_pipe[1]); }
-            if (options.error_variable) { close(stderr_pipe[0]); close(stderr_pipe[1]); }
+            for (auto& p : pipes) {
+                close(p[0]);
+                close(p[1]);
+            }
+            if (options.output_variable) {
+                close(stdout_pipe[0]);
+                close(stdout_pipe[1]);
+            }
+            if (options.error_variable) {
+                close(stderr_pipe[0]);
+                close(stderr_pipe[1]);
+            }
             close(setup_pipe[1]);
 
             // Exec
@@ -578,7 +541,10 @@ kiln::PipelineResult kiln::execute_pipeline(const std::vector<std::vector<std::s
     }
 
     // Parent
-    for (auto& p : pipes) { close(p[0]); close(p[1]); }
+    for (auto& p : pipes) {
+        close(p[0]);
+        close(p[1]);
+    }
     if (options.output_variable) close(stdout_pipe[1]);
     if (options.error_variable) close(stderr_pipe[1]);
     close(setup_pipe[1]);
@@ -590,9 +556,7 @@ kiln::PipelineResult kiln::execute_pipeline(const std::vector<std::vector<std::s
         std::string out;
         char buffer[4096];
         ssize_t bytes;
-        while ((bytes = read(fd, buffer, sizeof(buffer))) > 0) {
-            out.append(buffer, bytes);
-        }
+        while ((bytes = read(fd, buffer, sizeof(buffer))) > 0) { out.append(buffer, bytes); }
         return out;
     };
 
@@ -621,8 +585,10 @@ kiln::PipelineResult kiln::execute_pipeline(const std::vector<std::vector<std::s
                 int status;
                 pid_t res = waitpid(pids[i], &status, WNOHANG);
                 if (res > 0) {
-                    if (WIFEXITED(status)) result.exit_codes[i] = WEXITSTATUS(status);
-                    else result.exit_codes[i] = -1;
+                    if (WIFEXITED(status))
+                        result.exit_codes[i] = WEXITSTATUS(status);
+                    else
+                        result.exit_codes[i] = -1;
                     finished[i] = true;
                     finished_count++;
                     any_progress = true;
@@ -666,18 +632,14 @@ kiln::PipelineResult kiln::execute_pipeline(const std::vector<std::vector<std::s
 std::string kiln::to_upper(std::string_view str) {
     std::string result;
     result.reserve(str.size());
-    for (char c : str) {
-        result += (c >= 'a' && c <= 'z') ? static_cast<char>(c - 32) : c;
-    }
+    for (char c : str) { result += (c >= 'a' && c <= 'z') ? static_cast<char>(c - 32) : c; }
     return result;
 }
 
 std::string kiln::to_lower(std::string_view str) {
     std::string result;
     result.reserve(str.size());
-    for (char c : str) {
-        result += (c >= 'A' && c <= 'Z') ? static_cast<char>(c + 32) : c;
-    }
+    for (char c : str) { result += (c >= 'A' && c <= 'Z') ? static_cast<char>(c + 32) : c; }
     return result;
 }
 
@@ -741,19 +703,16 @@ std::vector<std::string> kiln::shell_split(std::string_view input) {
         }
     }
 
-    if (!current.empty()) {
-        result.push_back(std::move(current));
-    }
+    if (!current.empty()) { result.push_back(std::move(current)); }
 
     return result;
 }
 
 const std::string& kiln::cmake_extra_modules_root() {
     static const std::string root = [] -> std::string {
-        if (std::filesystem::is_directory("/usr/share/cmake/Modules"))
-            return {};
+        if (std::filesystem::is_directory("/usr/share/cmake/Modules")) return {};
 
-        std::vector<std::pair<std::pair<int,int>, std::string>> candidates;
+        std::vector<std::pair<std::pair<int, int>, std::string>> candidates;
 
         std::error_code ec;
         for (auto& entry : std::filesystem::directory_iterator("/usr/share", ec)) {
@@ -773,8 +732,7 @@ const std::string& kiln::cmake_extra_modules_root() {
         std::ranges::sort(candidates, std::greater{}, [](auto& c) { return c.first; });
 
         for (auto& [ver, path] : candidates) {
-            if (std::filesystem::is_directory(path + "/Modules"))
-                return path;
+            if (std::filesystem::is_directory(path + "/Modules")) return path;
         }
 
         return {};
@@ -791,13 +749,12 @@ const std::string& kiln::gnu_arch_triplet() {
             abort();
         }
         std::string machine = buf.machine;
-        if (machine == "x86_64")  return std::string("x86_64-linux-gnu");
+        if (machine == "x86_64") return std::string("x86_64-linux-gnu");
         if (machine == "aarch64") return std::string("aarch64-linux-gnu");
-        if (machine == "armv7l")  return std::string("arm-linux-gnueabihf");
-        if (machine == "i686" || machine == "i386")
-            return std::string("i386-linux-gnu");
+        if (machine == "armv7l") return std::string("arm-linux-gnueabihf");
+        if (machine == "i686" || machine == "i386") return std::string("i386-linux-gnu");
         if (machine == "riscv64") return std::string("riscv64-linux-gnu");
-        if (machine == "s390x")   return std::string("s390x-linux-gnu");
+        if (machine == "s390x") return std::string("s390x-linux-gnu");
         if (machine == "ppc64le") return std::string("powerpc64le-linux-gnu");
         fprintf(stderr, "fatal: unrecognized architecture '%s' - please add support for it\n", machine.c_str());
         abort();

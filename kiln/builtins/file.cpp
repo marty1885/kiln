@@ -79,7 +79,7 @@ std::vector<Regex> compile_glob_components(const std::vector<std::string>& compo
     compiled.reserve(components.size());
     for (const auto& comp : components) {
         auto rx = Regex::compile_match(glob_component_to_regex(comp));
-        if (!rx) return {};  // shouldn't happen
+        if (!rx) return {}; // shouldn't happen
         compiled.push_back(std::move(*rx));
     }
     return compiled;
@@ -89,14 +89,9 @@ std::vector<Regex> compile_glob_components(const std::vector<std::string>& compo
 // levels and files/dirs at the leaf level.  Handles patterns like
 // "*/CMakeLists.txt" and "libs/*/src/*.cpp".
 // `compiled` is the pre-compiled regex for each component (parallel to `components`).
-void glob_components(Interpreter& interp, const std::string& dir_str,
-                     const std::vector<std::string>& components,
-                     const std::vector<Regex>& compiled,
-                     size_t comp_idx,
-                     bool recurse, bool list_directories,
-                     const std::string& relative,
-                     CMakeArray& results,
-                     std::map<std::string, int64_t>& dir_mtimes) {
+void glob_components(Interpreter& interp, const std::string& dir_str, const std::vector<std::string>& components,
+                     const std::vector<Regex>& compiled, size_t comp_idx, bool recurse, bool list_directories, const std::string& relative,
+                     CMakeArray& results, std::map<std::string, int64_t>& dir_mtimes) {
     if (comp_idx >= components.size()) return;
 
     dir_mtimes[dir_str] = get_dir_mtime(dir_str);
@@ -104,8 +99,7 @@ void glob_components(Interpreter& interp, const std::string& dir_str,
     const std::string& comp = components[comp_idx];
     const Regex& rx = compiled[comp_idx];
     bool is_last = (comp_idx + 1 == components.size());
-    bool has_wildcard = comp.find('*') != std::string::npos ||
-                        comp.find('?') != std::string::npos;
+    bool has_wildcard = comp.find('*') != std::string::npos || comp.find('?') != std::string::npos;
 
     if (is_last) {
         // Leaf component — match against directory entries (files and dirs)
@@ -118,8 +112,7 @@ void glob_components(Interpreter& interp, const std::string& dir_str,
             // Filter out directories when list_directories is false
             if (!list_directories && subdirs && subdirs->contains(name)) continue;
             if (!relative.empty()) {
-                results.push_back(
-                    std::filesystem::relative(dir_str + '/' + name, relative).string());
+                results.push_back(std::filesystem::relative(dir_str + '/' + name, relative).string());
             } else {
                 results.push_back(dir_str + '/' + name);
             }
@@ -129,9 +122,8 @@ void glob_components(Interpreter& interp, const std::string& dir_str,
         if (recurse) {
             if (subdirs) {
                 for (const auto& subdir_name : *subdirs) {
-                    glob_components(interp, dir_str + '/' + subdir_name,
-                                    components, compiled, comp_idx, true,
-                                    list_directories, relative, results, dir_mtimes);
+                    glob_components(interp, dir_str + '/' + subdir_name, components, compiled, comp_idx, true, list_directories, relative,
+                                    results, dir_mtimes);
                 }
             }
         }
@@ -141,9 +133,7 @@ void glob_components(Interpreter& interp, const std::string& dir_str,
             // Fixed path component, just advance without listing
             std::string next = dir_str + '/' + comp;
             if (interp.cached_is_directory(next)) {
-                glob_components(interp, next, components, compiled,
-                                comp_idx + 1, recurse, list_directories,
-                                relative, results, dir_mtimes);
+                glob_components(interp, next, components, compiled, comp_idx + 1, recurse, list_directories, relative, results, dir_mtimes);
             }
         } else {
             auto* subdirs = interp.get_directory_subdirs(dir_str);
@@ -151,16 +141,15 @@ void glob_components(Interpreter& interp, const std::string& dir_str,
 
             for (const auto& subdir_name : *subdirs) {
                 if (!rx.match(subdir_name)) continue;
-                glob_components(interp, dir_str + '/' + subdir_name,
-                                components, compiled, comp_idx + 1,
-                                recurse, list_directories, relative,
-                                results, dir_mtimes);
+                glob_components(interp, dir_str + '/' + subdir_name, components, compiled, comp_idx + 1, recurse, list_directories,
+                                relative, results, dir_mtimes);
             }
         }
     }
 }
 
-void perform_glob(Interpreter& interp, const std::string& var, const std::vector<std::string>& patterns, bool recurse, bool list_directories, const std::string& relative) {
+void perform_glob(Interpreter& interp, const std::string& var, const std::vector<std::string>& patterns, bool recurse,
+                  bool list_directories, const std::string& relative) {
     CMakeArray results;
     std::filesystem::path base_path = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
     auto& cache = interp.get_cache_store();
@@ -171,14 +160,10 @@ void perform_glob(Interpreter& interp, const std::string& var, const std::vector
         std::string search_pattern = pattern;
 
         // If the pattern contains **, it's a recursive glob
-        if (search_pattern.find("**") != std::string::npos) {
-            pattern_recurse = true;
-        }
+        if (search_pattern.find("**") != std::string::npos) { pattern_recurse = true; }
 
         std::filesystem::path pattern_path(search_pattern);
-        if (!pattern_path.is_absolute()) {
-            pattern_path = base_path / pattern_path;
-        }
+        if (!pattern_path.is_absolute()) { pattern_path = base_path / pattern_path; }
 
         // Decompose path to find the base directory (before first wildcard)
         std::vector<std::filesystem::path> components(pattern_path.begin(), pattern_path.end());
@@ -186,8 +171,8 @@ void perform_glob(Interpreter& interp, const std::string& var, const std::vector
         std::filesystem::path base;
 #ifdef _WIN32
         if (i < components.size() && components[i].string().find(':') != std::string::npos) {
-             base = components[i++];
-             base /= "/";
+            base = components[i++];
+            base /= "/";
         }
 #else
         if (i < components.size() && components[i] == "/") {
@@ -198,9 +183,7 @@ void perform_glob(Interpreter& interp, const std::string& var, const std::vector
 
         while (i < components.size()) {
             std::string s = components[i].string();
-            if (s.find('*') != std::string::npos || s.find('?') != std::string::npos) {
-                break;
-            }
+            if (s.find('*') != std::string::npos || s.find('?') != std::string::npos) { break; }
             base /= components[i];
             i++;
         }
@@ -234,9 +217,7 @@ void perform_glob(Interpreter& interp, const std::string& var, const std::vector
                 pattern_components.push_back(std::move(s));
             }
         }
-        if (pattern_components.empty()) {
-            pattern_components.push_back("*");
-        }
+        if (pattern_components.empty()) { pattern_components.push_back("*"); }
 
         // Compile glob patterns to PCRE2 regexes (reused across all entries)
         auto compiled = compile_glob_components(pattern_components);
@@ -244,10 +225,8 @@ void perform_glob(Interpreter& interp, const std::string& var, const std::vector
         std::string search_dir_str = search_dir.string();
 
         // Cache key: dir + pattern + recurse + relative
-        std::string cache_sig = search_dir_str + "|" + remaining_pattern +
-                                "|r:" + (pattern_recurse ? "1" : "0") +
-                                "|ld:" + (list_directories ? "1" : "0") +
-                                "|rel:" + relative;
+        std::string cache_sig = search_dir_str + "|" + remaining_pattern + "|r:" + (pattern_recurse ? "1" : "0")
+                                + "|ld:" + (list_directories ? "1" : "0") + "|rel:" + relative;
 
         auto& profiler = Profiler::instance();
         int64_t t_start = g_profiling_enabled.load(std::memory_order_acquire) ? profiler.now_us() : 0;
@@ -279,7 +258,8 @@ void perform_glob(Interpreter& interp, const std::string& var, const std::vector
             all_presorted = false;
             CMakeArray pattern_results;
             std::map<std::string, int64_t> dir_mtimes;
-            glob_components(interp, search_dir_str, pattern_components, compiled, 0, pattern_recurse, list_directories, relative, pattern_results, dir_mtimes);
+            glob_components(interp, search_dir_str, pattern_components, compiled, 0, pattern_recurse, list_directories, relative,
+                            pattern_results, dir_mtimes);
 
             match_count = pattern_results.size();
 
@@ -297,23 +277,20 @@ void perform_glob(Interpreter& interp, const std::string& var, const std::vector
 
         if (t_start) {
             int64_t dur = profiler.now_us() - t_start;
-            profiler.add_complete(
-                "glob " + remaining_pattern, "configure", t_start, dur,
-                Profiler::Args{std::map<std::string, std::string>{
-                    {"pattern", pattern},
-                    {"dir", search_dir_str},
-                    {"cache", cache_hit ? "hit" : "miss"},
-                    {"matches", std::to_string(match_count)},
-                    {"recurse", pattern_recurse ? "yes" : "no"},
-                }});
+            profiler.add_complete("glob " + remaining_pattern, "configure", t_start, dur,
+                                  Profiler::Args{std::map<std::string, std::string>{
+                                      {"pattern", pattern},
+                                      {"dir", search_dir_str},
+                                      {"cache", cache_hit ? "hit" : "miss"},
+                                      {"matches", std::to_string(match_count)},
+                                      {"recurse", pattern_recurse ? "yes" : "no"},
+                                  }});
         }
     }
 
     // CMake always returns FILE(GLOB) results sorted alphabetically
     // Skip sort if single pattern and all data came from cache (pre-sorted)
-    if (!(patterns.size() == 1 && all_presorted)) {
-        results.sort();
-    }
+    if (!(patterns.size() == 1 && all_presorted)) { results.sort(); }
     interp.set_variable(var, results.to_string());
 }
 } // namespace
@@ -334,15 +311,11 @@ void register_file_builtins(Interpreter& interp) {
                 return;
             }
             std::filesystem::path path = sub_args[0];
-            if (!path.is_absolute()) {
-                path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-            }
+            if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
             // Build the content string first
             std::string new_content;
-            for (size_t i = 1; i < sub_args.size(); ++i) {
-                new_content += sub_args[i];
-            }
+            for (size_t i = 1; i < sub_args.size(); ++i) { new_content += sub_args[i]; }
 
             // For WRITE (not APPEND): skip if file already has identical content.
             // This preserves mtime for generated files that don't change between
@@ -351,10 +324,8 @@ void register_file_builtins(Interpreter& interp) {
             if (ci_equals(operation, "WRITE") && std::filesystem::exists(path)) {
                 std::ifstream existing(path, std::ios::binary);
                 if (existing) {
-                    std::string old_content((std::istreambuf_iterator<char>(existing)),
-                                             std::istreambuf_iterator<char>());
-                    if (old_content == new_content)
-                        return;
+                    std::string old_content((std::istreambuf_iterator<char>(existing)), std::istreambuf_iterator<char>());
+                    if (old_content == new_content) return;
                 }
             }
 
@@ -378,9 +349,7 @@ void register_file_builtins(Interpreter& interp) {
             PARSE_OR_RETURN(parser, interp, sub_args);
 
             std::filesystem::path path = filename;
-            if (!path.is_absolute()) {
-                path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-            }
+            if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
             std::ifstream file(path, std::ios::binary);
             if (!file) {
@@ -388,9 +357,7 @@ void register_file_builtins(Interpreter& interp) {
                 return;
             }
 
-            if (!offset_str.empty()) {
-                file.seekg(std::stoll(offset_str));
-            }
+            if (!offset_str.empty()) { file.seekg(std::stoll(offset_str)); }
 
             std::string content;
             if (!limit_str.empty()) {
@@ -457,7 +424,7 @@ void register_file_builtins(Interpreter& interp) {
             }
 
             interp.set_variable(out_var, interp.cached_weakly_canonical(p.string()));
-        } else if(ci_equals(operation, "REMOVE")) {
+        } else if (ci_equals(operation, "REMOVE")) {
             if (sub_args.empty()) {
                 interp.set_fatal_error("file(REMOVE) requires at least one file path");
                 return;
@@ -465,9 +432,7 @@ void register_file_builtins(Interpreter& interp) {
 
             for (const auto& file : sub_args) {
                 std::filesystem::path path = file;
-                if (!path.is_absolute()) {
-                    path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-                }
+                if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
                 try {
                     if (std::filesystem::exists(path) && !std::filesystem::remove(path)) {
@@ -510,35 +475,48 @@ void register_file_builtins(Interpreter& interp) {
 
             if (!length_min_str.empty()) {
                 auto v = parse_number<unsigned long long>(length_min_str);
-                if (!v) { interp.set_fatal_error("file(STRINGS) LENGTH_MINIMUM must be a number"); return; }
+                if (!v) {
+                    interp.set_fatal_error("file(STRINGS) LENGTH_MINIMUM must be a number");
+                    return;
+                }
                 length_min = *v;
             }
             if (!length_max_str.empty()) {
                 auto v = parse_number<unsigned long long>(length_max_str);
-                if (!v) { interp.set_fatal_error("file(STRINGS) LENGTH_MAXIMUM must be a number"); return; }
+                if (!v) {
+                    interp.set_fatal_error("file(STRINGS) LENGTH_MAXIMUM must be a number");
+                    return;
+                }
                 length_max = *v;
             }
             if (!limit_count_str.empty()) {
                 auto v = parse_number<unsigned long long>(limit_count_str);
-                if (!v) { interp.set_fatal_error("file(STRINGS) LIMIT_COUNT must be a number"); return; }
+                if (!v) {
+                    interp.set_fatal_error("file(STRINGS) LIMIT_COUNT must be a number");
+                    return;
+                }
                 limit_count = *v;
             }
             if (!limit_input_str.empty()) {
                 auto v = parse_number<unsigned long long>(limit_input_str);
-                if (!v) { interp.set_fatal_error("file(STRINGS) LIMIT_INPUT must be a number"); return; }
+                if (!v) {
+                    interp.set_fatal_error("file(STRINGS) LIMIT_INPUT must be a number");
+                    return;
+                }
                 limit_input = *v;
             }
             if (!limit_output_str.empty()) {
                 auto v = parse_number<unsigned long long>(limit_output_str);
-                if (!v) { interp.set_fatal_error("file(STRINGS) LIMIT_OUTPUT must be a number"); return; }
+                if (!v) {
+                    interp.set_fatal_error("file(STRINGS) LIMIT_OUTPUT must be a number");
+                    return;
+                }
                 limit_output = *v;
             }
 
             // Resolve file path
             std::filesystem::path path = filename;
-            if (!path.is_absolute()) {
-                path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-            }
+            if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
             // Open file in binary mode
             std::ifstream file(path, std::ios::binary);
@@ -570,7 +548,7 @@ void register_file_builtins(Interpreter& interp) {
             size_t bytes_read = 0;
             size_t output_bytes = 0;
             size_t string_count = 0;
-            std::vector<std::string> last_match_groups;  // For CMAKE_MATCH_* variables
+            std::vector<std::string> last_match_groups; // For CMAKE_MATCH_* variables
 
             auto is_printable = [](unsigned char c) {
                 // Printable characters: space (32) through ~ (126)
@@ -599,14 +577,10 @@ void register_file_builtins(Interpreter& interp) {
                 }
 
                 // Check limits
-                if (string_count >= limit_count) {
-                    return;
-                }
+                if (string_count >= limit_count) { return; }
 
                 size_t new_output = output_bytes + current_string.length();
-                if (new_output > limit_output) {
-                    return;
-                }
+                if (new_output > limit_output) { return; }
 
                 // Add to results
                 results.append(current_string);
@@ -629,9 +603,7 @@ void register_file_builtins(Interpreter& interp) {
                 if (uc == '\n') {
                     if (newline_consume) {
                         // Treat newline as part of string content
-                        if (is_printable(uc) || uc == '\n' || uc == '\r') {
-                            current_string += c;
-                        }
+                        if (is_printable(uc) || uc == '\n' || uc == '\r') { current_string += c; }
                     } else {
                         // Newline terminates the string
                         finalize_string();
@@ -669,9 +641,7 @@ void register_file_builtins(Interpreter& interp) {
                 }
 
                 // Check if we've hit the string count limit
-                if (string_count >= limit_count) {
-                    break;
-                }
+                if (string_count >= limit_count) { break; }
             }
 
             // Finalize any remaining string
@@ -696,15 +666,12 @@ void register_file_builtins(Interpreter& interp) {
 
             for (const auto& dir : sub_args) {
                 std::filesystem::path path = dir;
-                if (!path.is_absolute()) {
-                    path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-                }
+                if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
                 std::error_code ec;
                 std::filesystem::create_directories(path, ec);
                 if (ec) {
-                    interp.set_fatal_error("file(MAKE_DIRECTORY) failed to create directory '" +
-                                          path.string() + "': " + ec.message());
+                    interp.set_fatal_error("file(MAKE_DIRECTORY) failed to create directory '" + path.string() + "': " + ec.message());
                     return;
                 }
             }
@@ -713,9 +680,7 @@ void register_file_builtins(Interpreter& interp) {
             // Creates files if they don't exist, updates timestamp if they do
             for (const auto& file_arg : sub_args) {
                 std::filesystem::path path = file_arg;
-                if (!path.is_absolute()) {
-                    path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-                }
+                if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
                 // Create parent directories if needed
                 if (path.has_parent_path()) {
@@ -745,9 +710,7 @@ void register_file_builtins(Interpreter& interp) {
             // Updates timestamp only if file exists, silently ignores non-existent files
             for (const auto& file_arg : sub_args) {
                 std::filesystem::path path = file_arg;
-                if (!path.is_absolute()) {
-                    path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-                }
+                if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
                 if (std::filesystem::exists(path)) {
                     std::error_code ec;
@@ -760,18 +723,17 @@ void register_file_builtins(Interpreter& interp) {
             // Recursively removes files and directories
             for (const auto& file_arg : sub_args) {
                 std::filesystem::path path = file_arg;
-                if (!path.is_absolute()) {
-                    path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-                }
+                if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
                 path = std::filesystem::absolute(path);
 
-                if(path.string() == "/") {
-                    interp.print_message("FATAL_ERROR", "Trying to remove / (the root folder) is a terrible idea. kiln does not support this operation.");
+                if (path.string() == "/") {
+                    interp.print_message("FATAL_ERROR",
+                                         "Trying to remove / (the root folder) is a terrible idea. kiln does not support this operation.");
                     return;
                 }
 
                 std::error_code ec;
-                std::filesystem::remove_all(path, ec);                // CMake silently ignores errors for non-existent paths
+                std::filesystem::remove_all(path, ec); // CMake silently ignores errors for non-existent paths
             }
         } else if (ci_equals(operation, "RENAME")) {
             // file(RENAME <oldname> <newname> [RESULT <result>] [NO_REPLACE])
@@ -786,12 +748,8 @@ void register_file_builtins(Interpreter& interp) {
 
             std::filesystem::path old_path = oldname;
             std::filesystem::path new_path = newname;
-            if (!old_path.is_absolute()) {
-                old_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / old_path;
-            }
-            if (!new_path.is_absolute()) {
-                new_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / new_path;
-            }
+            if (!old_path.is_absolute()) { old_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / old_path; }
+            if (!new_path.is_absolute()) { new_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / new_path; }
 
             std::error_code ec;
             if (no_replace && std::filesystem::exists(new_path)) {
@@ -808,13 +766,12 @@ void register_file_builtins(Interpreter& interp) {
                 if (!result_var.empty()) {
                     interp.set_variable(result_var, ec.message());
                 } else {
-                    interp.set_fatal_error("file(RENAME) failed to rename\n  " + old_path.string() + "\nto\n  " + new_path.string() + "\n" + ec.message());
+                    interp.set_fatal_error("file(RENAME) failed to rename\n  " + old_path.string() + "\nto\n  " + new_path.string() + "\n"
+                                           + ec.message());
                 }
                 return;
             }
-            if (!result_var.empty()) {
-                interp.set_variable(result_var, "0");
-            }
+            if (!result_var.empty()) { interp.set_variable(result_var, "0"); }
         } else if (ci_equals(operation, "COPY_FILE")) {
             // file(COPY_FILE <oldname> <newname> [RESULT <result>] [ONLY_IF_DIFFERENT])
             CommandParser parser("file", "COPY_FILE");
@@ -828,12 +785,8 @@ void register_file_builtins(Interpreter& interp) {
 
             std::filesystem::path src_path = oldname;
             std::filesystem::path dst_path = newname;
-            if (!src_path.is_absolute()) {
-                src_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / src_path;
-            }
-            if (!dst_path.is_absolute()) {
-                dst_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / dst_path;
-            }
+            if (!src_path.is_absolute()) { src_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / src_path; }
+            if (!dst_path.is_absolute()) { dst_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / dst_path; }
 
             // Create destination directory if needed
             if (dst_path.has_parent_path()) {
@@ -854,10 +807,8 @@ void register_file_builtins(Interpreter& interp) {
                         std::string src_content((std::istreambuf_iterator<char>(src_file)), std::istreambuf_iterator<char>());
                         std::string dst_content((std::istreambuf_iterator<char>(dst_file)), std::istreambuf_iterator<char>());
                         if (src_content == dst_content) {
-                            if (!result_var.empty()) {
-                                interp.set_variable(result_var, "0");
-                            }
-                            return;  // Files are identical, skip copy
+                            if (!result_var.empty()) { interp.set_variable(result_var, "0"); }
+                            return; // Files are identical, skip copy
                         }
                     }
                 }
@@ -872,9 +823,7 @@ void register_file_builtins(Interpreter& interp) {
                 }
                 return;
             }
-            if (!result_var.empty()) {
-                interp.set_variable(result_var, "0");
-            }
+            if (!result_var.empty()) { interp.set_variable(result_var, "0"); }
         } else if (ci_equals(operation, "SIZE")) {
             // file(SIZE <filename> <variable>)
             CommandParser parser("file", "SIZE");
@@ -884,9 +833,7 @@ void register_file_builtins(Interpreter& interp) {
             PARSE_OR_RETURN(parser, interp, sub_args);
 
             std::filesystem::path path = filename;
-            if (!path.is_absolute()) {
-                path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-            }
+            if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
             std::error_code ec;
             auto size = std::filesystem::file_size(path, ec);
@@ -904,9 +851,7 @@ void register_file_builtins(Interpreter& interp) {
             PARSE_OR_RETURN(parser, interp, sub_args);
 
             std::filesystem::path path = linkname;
-            if (!path.is_absolute()) {
-                path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-            }
+            if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
             std::error_code ec;
             auto target = std::filesystem::read_symlink(path, ec);
@@ -969,9 +914,7 @@ void register_file_builtins(Interpreter& interp) {
                     return;
                 }
             }
-            if (!result_var.empty()) {
-                interp.set_variable(result_var, "0");
-            }
+            if (!result_var.empty()) { interp.set_variable(result_var, "0"); }
         } else if (ci_equals(operation, "RELATIVE_PATH")) {
             // file(RELATIVE_PATH <variable> <directory> <file>)
             CommandParser parser("file", "RELATIVE_PATH");
@@ -983,12 +926,8 @@ void register_file_builtins(Interpreter& interp) {
 
             std::filesystem::path dir_p = directory;
             std::filesystem::path file_p = file_path;
-            if (!dir_p.is_absolute()) {
-                dir_p = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / dir_p;
-            }
-            if (!file_p.is_absolute()) {
-                file_p = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / file_p;
-            }
+            if (!dir_p.is_absolute()) { dir_p = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / dir_p; }
+            if (!file_p.is_absolute()) { file_p = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / file_p; }
 
             auto rel = std::filesystem::relative(file_p, dir_p);
             if (rel == ".")
@@ -1044,9 +983,7 @@ void register_file_builtins(Interpreter& interp) {
             }
 
             std::filesystem::path path = filename;
-            if (!path.is_absolute()) {
-                path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-            }
+            if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
             std::error_code ec;
             auto ftime = std::filesystem::last_write_time(path, ec);
@@ -1092,21 +1029,16 @@ void register_file_builtins(Interpreter& interp) {
                     patterns.push_back(sub_args[++i]);
                 } else if (sub_args[i] == "REGEX" && i + 1 < sub_args.size()) {
                     regexes.push_back(sub_args[++i]);
-                } else if (sub_args[i] == "NO_SOURCE_PERMISSIONS" ||
-                           sub_args[i] == "USE_SOURCE_PERMISSIONS" ||
-                           sub_args[i] == "FOLLOW_SYMLINK_CHAIN" ||
-                           sub_args[i] == "FILE_PERMISSIONS" ||
-                           sub_args[i] == "DIRECTORY_PERMISSIONS" ||
-                           sub_args[i] == "EXCLUDE") {
+                } else if (sub_args[i] == "NO_SOURCE_PERMISSIONS" || sub_args[i] == "USE_SOURCE_PERMISSIONS"
+                           || sub_args[i] == "FOLLOW_SYMLINK_CHAIN" || sub_args[i] == "FILE_PERMISSIONS"
+                           || sub_args[i] == "DIRECTORY_PERMISSIONS" || sub_args[i] == "EXCLUDE") {
                     // Skip these options and their values for now
-                    if ((sub_args[i] == "FILE_PERMISSIONS" || sub_args[i] == "DIRECTORY_PERMISSIONS") &&
-                        i + 1 < sub_args.size()) {
+                    if ((sub_args[i] == "FILE_PERMISSIONS" || sub_args[i] == "DIRECTORY_PERMISSIONS") && i + 1 < sub_args.size()) {
                         // Skip permission values
                         ++i;
-                        while (i + 1 < sub_args.size() &&
-                               (sub_args[i + 1].find("OWNER_") == 0 ||
-                                sub_args[i + 1].find("GROUP_") == 0 ||
-                                sub_args[i + 1].find("WORLD_") == 0)) {
+                        while (i + 1 < sub_args.size()
+                               && (sub_args[i + 1].find("OWNER_") == 0 || sub_args[i + 1].find("GROUP_") == 0
+                                   || sub_args[i + 1].find("WORLD_") == 0)) {
                             ++i;
                         }
                     }
@@ -1147,9 +1079,7 @@ void register_file_builtins(Interpreter& interp) {
 
             for (const auto& file_arg : files) {
                 std::filesystem::path src = file_arg;
-                if (!src.is_absolute()) {
-                    src = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / src;
-                }
+                if (!src.is_absolute()) { src = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / src; }
 
                 if (std::filesystem::is_directory(src)) {
                     // Copy directory recursively
@@ -1158,15 +1088,13 @@ void register_file_builtins(Interpreter& interp) {
                             auto rel = std::filesystem::relative(entry.path(), src);
                             auto target = dest_path / src.filename() / rel;
                             std::filesystem::create_directories(target.parent_path(), ec);
-                            std::filesystem::copy_file(entry.path(), target,
-                                std::filesystem::copy_options::overwrite_existing, ec);
+                            std::filesystem::copy_file(entry.path(), target, std::filesystem::copy_options::overwrite_existing, ec);
                         }
                     }
                 } else if (std::filesystem::exists(src)) {
                     if (should_copy(src)) {
                         auto target = dest_path / src.filename();
-                        std::filesystem::copy_file(src, target,
-                            std::filesystem::copy_options::overwrite_existing, ec);
+                        std::filesystem::copy_file(src, target, std::filesystem::copy_options::overwrite_existing, ec);
                     }
                 }
             }
@@ -1194,8 +1122,7 @@ void register_file_builtins(Interpreter& interp) {
             };
 
             auto is_permission = [](const std::string& s) -> bool {
-                return s.find("OWNER_") == 0 || s.find("GROUP_") == 0 ||
-                       s.find("WORLD_") == 0 || s == "SETUID" || s == "SETGID";
+                return s.find("OWNER_") == 0 || s.find("GROUP_") == 0 || s.find("WORLD_") == 0 || s == "SETUID" || s == "SETGID";
             };
 
             // Parse arguments
@@ -1233,27 +1160,19 @@ void register_file_builtins(Interpreter& interp) {
             auto apply_chmod = [&](const std::filesystem::path& p) {
                 std::error_code ec;
                 if (std::filesystem::is_directory(p)) {
-                    if (has_dir_perms) {
-                        std::filesystem::permissions(p, dir_perms, std::filesystem::perm_options::replace, ec);
-                    }
+                    if (has_dir_perms) { std::filesystem::permissions(p, dir_perms, std::filesystem::perm_options::replace, ec); }
                 } else {
-                    if (has_file_perms) {
-                        std::filesystem::permissions(p, file_perms, std::filesystem::perm_options::replace, ec);
-                    }
+                    if (has_file_perms) { std::filesystem::permissions(p, file_perms, std::filesystem::perm_options::replace, ec); }
                 }
             };
 
             for (const auto& file_arg : files) {
                 std::filesystem::path path = file_arg;
-                if (!path.is_absolute()) {
-                    path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path;
-                }
+                if (!path.is_absolute()) { path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / path; }
 
                 if (ci_equals(operation, "CHMOD_RECURSE") && std::filesystem::is_directory(path)) {
-                    for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
-                        apply_chmod(entry.path());
-                    }
-                    apply_chmod(path);  // Also apply to the directory itself
+                    for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) { apply_chmod(entry.path()); }
+                    apply_chmod(path); // Also apply to the directory itself
                 } else {
                     apply_chmod(path);
                 }
@@ -1291,14 +1210,12 @@ void register_file_builtins(Interpreter& interp) {
             }
 
             std::filesystem::path out_path = output_file;
-            if (!out_path.is_absolute()) {
-                out_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_BINARY_DIR")) / out_path;
-            }
+            if (!out_path.is_absolute()) { out_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_BINARY_DIR")) / out_path; }
 
             // Perform variable substitution using manual scanning
             // (no regex needed — these are trivial fixed patterns)
-            auto is_ident_start = [](char c) { return std::isalpha((unsigned char)c) || c == '_'; };
-            auto is_ident_char = [](char c) { return std::isalnum((unsigned char)c) || c == '_'; };
+            auto is_ident_start = [](char c) { return std::isalpha((unsigned char) c) || c == '_'; };
+            auto is_ident_char = [](char c) { return std::isalnum((unsigned char) c) || c == '_'; };
             auto escape_value = [&](const std::string& val) -> std::string {
                 if (!escape_quotes) return val;
                 std::string escaped;
@@ -1416,9 +1333,7 @@ void register_file_builtins(Interpreter& interp) {
             std::string file_content;
             if (!input_file.empty()) {
                 std::filesystem::path in_path = input_file;
-                if (!in_path.is_absolute()) {
-                    in_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / in_path;
-                }
+                if (!in_path.is_absolute()) { in_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / in_path; }
                 std::ifstream in(in_path);
                 if (!in) {
                     interp.set_fatal_error("file(GENERATE) could not read INPUT: " + in_path.string());
@@ -1453,9 +1368,7 @@ void register_file_builtins(Interpreter& interp) {
 
             // For now, just acknowledge the lock request without actual locking
             // Full implementation would require platform-specific file locking
-            if (!result_var.empty()) {
-                interp.set_variable(result_var, "0");
-            }
+            if (!result_var.empty()) { interp.set_variable(result_var, "0"); }
         } else if (ci_equals(operation, "DOWNLOAD")) {
             // file(DOWNLOAD <url> [<file>] [STATUS <var>] [LOG <var>] [TIMEOUT <sec>]
             //      [INACTIVITY_TIMEOUT <sec>] [SHOW_PROGRESS] [TLS_VERIFY <ON|OFF>]
@@ -1494,10 +1407,8 @@ void register_file_builtins(Interpreter& interp) {
                 }
                 hash_algo = expected_hash_str.substr(0, eq_pos);
                 hash_value = expected_hash_str.substr(eq_pos + 1);
-                std::transform(hash_algo.begin(), hash_algo.end(), hash_algo.begin(),
-                               [](unsigned char c) { return std::toupper(c); });
-                std::transform(hash_value.begin(), hash_value.end(), hash_value.begin(),
-                               [](unsigned char c) { return std::tolower(c); });
+                std::transform(hash_algo.begin(), hash_algo.end(), hash_algo.begin(), [](unsigned char c) { return std::toupper(c); });
+                std::transform(hash_value.begin(), hash_value.end(), hash_value.begin(), [](unsigned char c) { return std::tolower(c); });
                 if (hash_algo != "SHA256" && hash_algo != "MD5") {
                     interp.set_fatal_error("file(DOWNLOAD) unsupported hash algorithm: " + hash_algo);
                     return;
@@ -1505,8 +1416,7 @@ void register_file_builtins(Interpreter& interp) {
             } else if (!expected_md5.empty()) {
                 hash_algo = "MD5";
                 hash_value = expected_md5;
-                std::transform(hash_value.begin(), hash_value.end(), hash_value.begin(),
-                               [](unsigned char c) { return std::tolower(c); });
+                std::transform(hash_value.begin(), hash_value.end(), hash_value.begin(), [](unsigned char c) { return std::tolower(c); });
             }
 
             // Resolve output file path
@@ -1522,8 +1432,7 @@ void register_file_builtins(Interpreter& interp) {
             if (!hash_algo.empty() && !out_path.empty() && std::filesystem::exists(out_path)) {
                 std::ifstream existing(out_path, std::ios::binary);
                 if (existing) {
-                    std::string content((std::istreambuf_iterator<char>(existing)),
-                                        std::istreambuf_iterator<char>());
+                    std::string content((std::istreambuf_iterator<char>(existing)), std::istreambuf_iterator<char>());
                     std::string existing_hash;
                     if (hash_algo == "SHA256") {
                         existing_hash = kiln::sha256(content).to_string();
@@ -1532,9 +1441,7 @@ void register_file_builtins(Interpreter& interp) {
                     }
                     if (existing_hash == hash_value) {
                         // File already matches, skip download
-                        if (!status_var.empty()) {
-                            interp.set_variable(status_var, "0;\"Already exists with correct hash\"");
-                        }
+                        if (!status_var.empty()) { interp.set_variable(status_var, "0;\"Already exists with correct hash\""); }
                         return;
                     }
                 }
@@ -1578,18 +1485,13 @@ void register_file_builtins(Interpreter& interp) {
             bool verify_tls = true;
             if (!tls_verify_str.empty()) {
                 std::string upper = tls_verify_str;
-                std::transform(upper.begin(), upper.end(), upper.begin(),
-                               [](unsigned char c) { return std::toupper(c); });
-                if (upper == "OFF" || upper == "FALSE" || upper == "0" || upper == "NO") {
-                    verify_tls = false;
-                }
+                std::transform(upper.begin(), upper.end(), upper.begin(), [](unsigned char c) { return std::toupper(c); });
+                if (upper == "OFF" || upper == "FALSE" || upper == "0" || upper == "NO") { verify_tls = false; }
             }
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, verify_tls ? 1L : 0L);
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, verify_tls ? 2L : 0L);
 
-            if (!tls_cainfo.empty()) {
-                curl_easy_setopt(curl, CURLOPT_CAINFO, tls_cainfo.c_str());
-            }
+            if (!tls_cainfo.empty()) { curl_easy_setopt(curl, CURLOPT_CAINFO, tls_cainfo.c_str()); }
 
             if (!timeout_str.empty()) {
                 long timeout_sec = parse_number<long>(timeout_str).value_or(0);
@@ -1602,43 +1504,30 @@ void register_file_builtins(Interpreter& interp) {
                 curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, inact_sec);
             }
 
-            if (!userpwd.empty()) {
-                curl_easy_setopt(curl, CURLOPT_USERPWD, userpwd.c_str());
-            }
+            if (!userpwd.empty()) { curl_easy_setopt(curl, CURLOPT_USERPWD, userpwd.c_str()); }
 
             struct curl_slist* headers_list = nullptr;
-            for (const auto& hdr : http_headers) {
-                headers_list = curl_slist_append(headers_list, hdr.c_str());
-            }
-            if (headers_list) {
-                curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers_list);
-            }
+            for (const auto& hdr : http_headers) { headers_list = curl_slist_append(headers_list, hdr.c_str()); }
+            if (headers_list) { curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers_list); }
 
             DownloadProgress progress(show_progress ? interp.err_ : nullptr);
             progress.apply(curl);
 
             CURLcode res = curl_easy_perform(curl);
 
-            if (res == CURLE_OK) {
-                progress.finish();
-            }
+            if (res == CURLE_OK) { progress.finish(); }
 
             long http_code = 0;
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
-            if (headers_list) {
-                curl_slist_free_all(headers_list);
-            }
+            if (headers_list) { curl_slist_free_all(headers_list); }
             curl_easy_cleanup(curl);
 
             if (res != CURLE_OK) {
                 std::string err_msg = curl_easy_strerror(res);
-                if (!log_var.empty()) {
-                    interp.set_variable(log_var, err_msg);
-                }
+                if (!log_var.empty()) { interp.set_variable(log_var, err_msg); }
                 if (!status_var.empty()) {
-                    interp.set_variable(status_var,
-                        std::to_string(static_cast<int>(res)) + ";\"" + err_msg + "\"");
+                    interp.set_variable(status_var, std::to_string(static_cast<int>(res)) + ";\"" + err_msg + "\"");
                 } else {
                     interp.set_fatal_error("file(DOWNLOAD) failed for \"" + url + "\": " + err_msg);
                 }
@@ -1654,9 +1543,13 @@ void register_file_builtins(Interpreter& interp) {
                     computed = kiln::md5(dl_data.buffer).to_string();
                 }
                 if (computed != hash_value) {
-                    std::string err = "file(DOWNLOAD) hash mismatch for \"" + url + "\"\n"
-                                      "  expected: " + hash_value + "\n"
-                                      "  actual:   " + computed;
+                    std::string err = "file(DOWNLOAD) hash mismatch for \"" + url
+                                      + "\"\n"
+                                        "  expected: "
+                                      + hash_value
+                                      + "\n"
+                                        "  actual:   "
+                                      + computed;
                     if (!status_var.empty()) {
                         interp.set_variable(status_var, "1;\"Hash mismatch\"");
                     } else {
@@ -1682,12 +1575,9 @@ void register_file_builtins(Interpreter& interp) {
             }
 
             if (!log_var.empty()) {
-                interp.set_variable(log_var, "Downloaded " + url + " (" +
-                                    std::to_string(dl_data.buffer.size()) + " bytes)");
+                interp.set_variable(log_var, "Downloaded " + url + " (" + std::to_string(dl_data.buffer.size()) + " bytes)");
             }
-            if (!status_var.empty()) {
-                interp.set_variable(status_var, "0;\"No error\"");
-            }
+            if (!status_var.empty()) { interp.set_variable(status_var, "0;\"No error\""); }
         } else if (ci_equals(operation, "ARCHIVE_CREATE")) {
             // file(ARCHIVE_CREATE OUTPUT <archive> PATHS <paths>...
             //      [FORMAT <format>] [COMPRESSION <type> [COMPRESSION_LEVEL <level>]]
@@ -1717,9 +1607,7 @@ void register_file_builtins(Interpreter& interp) {
 
             // Resolve output path relative to binary dir
             std::filesystem::path out_path = output_file;
-            if (!out_path.is_absolute()) {
-                out_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_BINARY_DIR")) / out_path;
-            }
+            if (!out_path.is_absolute()) { out_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_BINARY_DIR")) / out_path; }
             std::filesystem::create_directories(out_path.parent_path());
 
             // Determine archive format
@@ -1730,7 +1618,7 @@ void register_file_builtins(Interpreter& interp) {
             auto ci_eq = [](std::string_view a, std::string_view b) {
                 if (a.size() != b.size()) return false;
                 for (size_t i = 0; i < a.size(); ++i)
-                    if (std::tolower((unsigned char)a[i]) != std::tolower((unsigned char)b[i])) return false;
+                    if (std::tolower((unsigned char) a[i]) != std::tolower((unsigned char) b[i])) return false;
                 return true;
             };
 
@@ -1753,7 +1641,7 @@ void register_file_builtins(Interpreter& interp) {
             // Determine compression
             if (!compression_str.empty()) {
                 std::string comp_lower = compression_str;
-                for (auto& c : comp_lower) c = std::tolower((unsigned char)c);
+                for (auto& c : comp_lower) c = std::tolower((unsigned char) c);
 
                 if (comp_lower == "zstd") {
                     archive_write_add_filter_zstd(a);
@@ -1804,9 +1692,7 @@ void register_file_builtins(Interpreter& interp) {
 
             for (const auto& p : paths) {
                 std::filesystem::path file_path = p;
-                if (!file_path.is_absolute()) {
-                    file_path = work_dir / file_path;
-                }
+                if (!file_path.is_absolute()) { file_path = work_dir / file_path; }
 
                 if (!std::filesystem::exists(file_path)) {
                     archive_write_close(a);
@@ -1818,9 +1704,7 @@ void register_file_builtins(Interpreter& interp) {
                 // Collect all files (recurse into directories)
                 std::vector<std::filesystem::path> file_list;
                 if (std::filesystem::is_directory(file_path)) {
-                    for (auto& entry : std::filesystem::recursive_directory_iterator(file_path)) {
-                        file_list.push_back(entry.path());
-                    }
+                    for (auto& entry : std::filesystem::recursive_directory_iterator(file_path)) { file_list.push_back(entry.path()); }
                 } else {
                     file_list.push_back(file_path);
                 }
@@ -1829,9 +1713,7 @@ void register_file_builtins(Interpreter& interp) {
                     // Compute archive entry name relative to work_dir
                     std::string entry_name = std::filesystem::relative(fp, work_dir).string();
 
-                    if (verbose) {
-                        std::cerr << entry_name << "\n";
-                    }
+                    if (verbose) { std::cerr << entry_name << "\n"; }
 
                     auto* entry = archive_entry_new();
                     archive_entry_set_pathname(entry, entry_name.c_str());
@@ -1849,8 +1731,7 @@ void register_file_builtins(Interpreter& interp) {
                         // Set mtime from file or override
                         auto ftime = std::filesystem::last_write_time(fp);
                         auto sys_time = std::chrono::clock_cast<std::chrono::system_clock>(ftime);
-                        auto epoch = std::chrono::duration_cast<std::chrono::seconds>(
-                            sys_time.time_since_epoch()).count();
+                        auto epoch = std::chrono::duration_cast<std::chrono::seconds>(sys_time.time_since_epoch()).count();
                         archive_entry_set_mtime(entry, epoch, 0);
 
                         archive_write_header(a, entry);
@@ -1899,9 +1780,7 @@ void register_file_builtins(Interpreter& interp) {
 
             // Resolve input path
             std::filesystem::path in_path = input_file;
-            if (!in_path.is_absolute()) {
-                in_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / in_path;
-            }
+            if (!in_path.is_absolute()) { in_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / in_path; }
 
             if (!std::filesystem::exists(in_path)) {
                 interp.set_fatal_error("file(ARCHIVE_EXTRACT) input file does not exist: " + in_path.string());
@@ -1919,9 +1798,7 @@ void register_file_builtins(Interpreter& interp) {
                 dest_path = interp.get_variable("CMAKE_CURRENT_BINARY_DIR");
             }
 
-            if (!list_only) {
-                std::filesystem::create_directories(dest_path);
-            }
+            if (!list_only) { std::filesystem::create_directories(dest_path); }
 
             // Open archive for reading
             struct archive* a = archive_read_new();
@@ -1940,11 +1817,9 @@ void register_file_builtins(Interpreter& interp) {
             struct archive* ext = nullptr;
             if (!list_only) {
                 ext = archive_write_disk_new();
-                int flags = ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_ACL | ARCHIVE_EXTRACT_FFLAGS |
-                            ARCHIVE_EXTRACT_SECURE_NODOTDOT | ARCHIVE_EXTRACT_SECURE_SYMLINKS;
-                if (!touch) {
-                    flags |= ARCHIVE_EXTRACT_TIME;
-                }
+                int flags = ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_ACL | ARCHIVE_EXTRACT_FFLAGS | ARCHIVE_EXTRACT_SECURE_NODOTDOT
+                            | ARCHIVE_EXTRACT_SECURE_SYMLINKS;
+                if (!touch) { flags |= ARCHIVE_EXTRACT_TIME; }
                 archive_write_disk_set_options(ext, flags);
                 archive_write_disk_set_standard_lookup(ext);
             }
@@ -1974,9 +1849,7 @@ void register_file_builtins(Interpreter& interp) {
                     continue;
                 }
 
-                if (verbose) {
-                    std::cerr << pathname << "\n";
-                }
+                if (verbose) { std::cerr << pathname << "\n"; }
 
                 // Set destination path
                 std::filesystem::path full_path = dest_path / pathname;
@@ -2059,9 +1932,7 @@ void register_file_builtins(Interpreter& interp) {
 
         std::error_code ec;
         std::filesystem::create_directories(path, ec);
-        if (ec) {
-            interp.set_fatal_error("file(MAKE_DIRECTORY) could not create directory: " + path + " (" + ec.message() + ")");
-        }
+        if (ec) { interp.set_fatal_error("file(MAKE_DIRECTORY) could not create directory: " + path + " (" + ec.message() + ")"); }
     });
 }
 

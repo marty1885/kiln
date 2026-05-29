@@ -25,9 +25,7 @@ Target* find_target_in_context(const ExportContext& ctx, const std::string& name
 // Convert string to uppercase
 static std::string to_upper(const std::string& str) {
     std::string result = str;
-    for (char& c : result) {
-        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    }
+    for (char& c : result) { c = static_cast<char>(std::toupper(static_cast<unsigned char>(c))); }
     return result;
 }
 
@@ -39,26 +37,20 @@ static std::string to_upper(const std::string& str) {
 //   - absolute ("/opt/et/cm-umode/lib") → stripped down to the install_prefix
 //     so ${_IMPORT_PREFIX} substitutes for the prefix portion at consume time.
 //     If the absolute path doesn't sit under install_prefix we leave it alone.
-static std::string resolve_install_dest_under_prefix(const std::string& dest,
-                                                     const std::string& fallback,
+static std::string resolve_install_dest_under_prefix(const std::string& dest, const std::string& fallback,
                                                      const std::string& install_prefix) {
     std::string raw = dest.empty() ? fallback : dest;
     if (raw.empty()) return std::string{};
-    if (raw.front() != '/') {
-        return std::string("${_IMPORT_PREFIX}/") + raw;
-    }
+    if (raw.front() != '/') { return std::string("${_IMPORT_PREFIX}/") + raw; }
     if (!install_prefix.empty()) {
         std::error_code ec;
         auto rel = std::filesystem::relative(raw, install_prefix, ec);
-        if (!ec && !rel.empty() && rel.native().rfind("..", 0) != 0) {
-            return std::string("${_IMPORT_PREFIX}/") + rel.generic_string();
-        }
+        if (!ec && !rel.empty() && rel.native().rfind("..", 0) != 0) { return std::string("${_IMPORT_PREFIX}/") + rel.generic_string(); }
     }
-    return raw;  // outside the install tree — emit verbatim
+    return raw; // outside the install tree — emit verbatim
 }
 
-static std::string generate_import_prefix_code(const std::string& destination,
-                                                const std::string& install_prefix = {}) {
+static std::string generate_import_prefix_code(const std::string& destination, const std::string& install_prefix = {}) {
     std::ostringstream ss;
 
     // Compute the destination's depth *relative to the install prefix*. If the
@@ -72,24 +64,18 @@ static std::string generate_import_prefix_code(const std::string& destination,
         std::filesystem::path prefix_path(install_prefix);
         std::error_code ec;
         auto rel = std::filesystem::relative(dest_path, prefix_path, ec);
-        if (!ec && !rel.empty() && rel.native().rfind("..", 0) != 0) {
-            rel_path = rel;
-        }
+        if (!ec && !rel.empty() && rel.native().rfind("..", 0) != 0) { rel_path = rel; }
     }
     int depth = 0;
     for (const auto& part : rel_path) {
-        if (!part.empty() && part != ".") {
-            depth++;
-        }
+        if (!part.empty() && part != ".") { depth++; }
     }
 
     // First, get the directory containing this file
     ss << "get_filename_component(_IMPORT_PREFIX \"${CMAKE_CURRENT_LIST_FILE}\" PATH)\n";
 
     // Navigate up to the install prefix
-    for (int i = 0; i < depth; ++i) {
-        ss << "get_filename_component(_IMPORT_PREFIX \"${_IMPORT_PREFIX}\" PATH)\n";
-    }
+    for (int i = 0; i < depth; ++i) { ss << "get_filename_component(_IMPORT_PREFIX \"${_IMPORT_PREFIX}\" PATH)\n"; }
 
     // Verify we ended up at a valid path
     ss << "if(_IMPORT_PREFIX STREQUAL \"/\")\n";
@@ -122,10 +108,7 @@ std::string generate_cmake_header() {
 }
 
 // Generate expected targets check to protect against multiple inclusion
-std::string generate_expected_targets_check(
-    const std::vector<Target*>& targets,
-    const std::string& namespace_prefix
-) {
+std::string generate_expected_targets_check(const std::vector<Target*>& targets, const std::string& namespace_prefix) {
     std::ostringstream ss;
 
     // Build list of expected target names
@@ -167,18 +150,18 @@ std::string generate_cmake_footer() {
 // Convert TargetType to the CMake IMPORTED library type string
 std::string target_type_to_imported_type(TargetType type) {
     switch (type) {
-        case TargetType::EXECUTABLE:
-            return "EXECUTABLE";
-        case TargetType::SHARED_LIBRARY:
-            return "SHARED";
-        case TargetType::STATIC_LIBRARY:
-            return "STATIC";
-        case TargetType::OBJECT_LIBRARY:
-            return "OBJECT";
-        case TargetType::INTERFACE_LIBRARY:
-            return "INTERFACE";
-        default:
-            return "UNKNOWN";
+    case TargetType::EXECUTABLE:
+        return "EXECUTABLE";
+    case TargetType::SHARED_LIBRARY:
+        return "SHARED";
+    case TargetType::STATIC_LIBRARY:
+        return "STATIC";
+    case TargetType::OBJECT_LIBRARY:
+        return "OBJECT";
+    case TargetType::INTERFACE_LIBRARY:
+        return "INTERFACE";
+    default:
+        return "UNKNOWN";
     }
 }
 
@@ -191,9 +174,7 @@ std::string escape_cmake_string(const std::string& str) {
     std::string result;
     result.reserve(str.size());
     for (char c : str) {
-        if (c == '"' || c == '\\') {
-            result += '\\';
-        }
+        if (c == '"' || c == '\\') { result += '\\'; }
         result += c;
     }
     return result;
@@ -210,10 +191,7 @@ std::string format_cmake_list(const std::vector<std::string>& values) {
 }
 
 // Create a GenexEvaluationContext for export evaluation
-GenexEvaluationContext make_export_genex_context(
-    const Target* target,
-    const ExportContext& export_ctx
-) {
+GenexEvaluationContext make_export_genex_context(const Target* target, const ExportContext& export_ctx) {
     GenexEvaluationContext ctx;
     ctx.build_type = export_ctx.build_type;
     ctx.system_name = export_ctx.system_name;
@@ -225,22 +203,15 @@ GenexEvaluationContext make_export_genex_context(
     ctx.target_aliases = export_ctx.target_aliases;
     ctx.current_target = target;
     ctx.install_prefix = export_ctx.install_prefix;
-    ctx.phase = export_ctx.for_install ? GenexEvaluationContext::Phase::INSTALL
-                                       : GenexEvaluationContext::Phase::BUILD;
+    ctx.phase = export_ctx.for_install ? GenexEvaluationContext::Phase::INSTALL : GenexEvaluationContext::Phase::BUILD;
     return ctx;
 }
 
 // Evaluate a property list with generator expressions for export
-std::vector<std::string> evaluate_export_property(
-    const Target& target,
-    const std::string& prop_name,
-    const ExportContext& export_ctx
-) {
+std::vector<std::string> evaluate_export_property(const Target& target, const std::string& prop_name, const ExportContext& export_ctx) {
     // Get the INTERFACE property values
     auto values = target.get_property_list(prop_name, TargetPropertyScope::INTERFACE);
-    if (values.empty()) {
-        return {};
-    }
+    if (values.empty()) { return {}; }
 
     auto ctx = make_export_genex_context(&target, export_ctx);
     GenexEvaluator evaluator(ctx);
@@ -256,10 +227,7 @@ std::vector<std::string> evaluate_export_property(
 
 } // anonymous namespace
 
-std::string generate_export_content(
-    const ExportContext& ctx,
-    const std::vector<Target*>& targets
-) {
+std::string generate_export_content(const ExportContext& ctx, const std::vector<Target*>& targets) {
     std::ostringstream ss;
 
     // CMake header with version check and policies
@@ -278,16 +246,14 @@ std::string generate_export_content(
     // Determine config suffix for per-configuration properties
     std::string config = ctx.config.empty() ? ctx.build_type : ctx.config;
     if (config.empty()) {
-        config = "Debug";  // Default fallback
+        config = "Debug"; // Default fallback
     }
     std::string config_suffix = "_" + to_upper(config);
     std::string config_upper = to_upper(config);
 
     // Build a set of exported target names for internal reference checking
     std::set<std::string> exported_names;
-    for (const auto* target : targets) {
-        exported_names.insert(target->get_name());
-    }
+    for (const auto* target : targets) { exported_names.insert(target->get_name()); }
 
     // Generate IMPORTED target definitions
     for (const auto* target : targets) {
@@ -298,9 +264,7 @@ std::string generate_export_content(
         TargetType type = target->get_type();
 
         // Skip CUSTOM targets - they can't be exported
-        if (type == TargetType::CUSTOM) {
-            continue;
-        }
+        if (type == TargetType::CUSTOM) { continue; }
 
         std::string import_type = target_type_to_imported_type(type);
 
@@ -320,8 +284,7 @@ std::string generate_export_content(
 
         // Set IMPORTED_CONFIGURATIONS first (for non-interface targets)
         if (type != TargetType::INTERFACE_LIBRARY) {
-            ss << "set_property(TARGET " << exported_name
-               << " APPEND PROPERTY IMPORTED_CONFIGURATIONS " << config_upper << ")\n\n";
+            ss << "set_property(TARGET " << exported_name << " APPEND PROPERTY IMPORTED_CONFIGURATIONS " << config_upper << ")\n\n";
         }
 
         // Set target properties
@@ -339,16 +302,13 @@ std::string generate_export_content(
                 const auto* d = (dit != ctx.target_install_dests.end()) ? &dit->second : nullptr;
 
                 if (type == TargetType::EXECUTABLE) {
-                    std::string dir = resolve_install_dest_under_prefix(
-                        d ? d->runtime_dest : std::string{}, "bin", ctx.install_prefix);
+                    std::string dir = resolve_install_dest_under_prefix(d ? d->runtime_dest : std::string{}, "bin", ctx.install_prefix);
                     if (!dir.empty()) location = dir + "/" + output_name;
                 } else if (type == TargetType::SHARED_LIBRARY) {
-                    std::string dir = resolve_install_dest_under_prefix(
-                        d ? d->library_dest : std::string{}, "lib", ctx.install_prefix);
+                    std::string dir = resolve_install_dest_under_prefix(d ? d->library_dest : std::string{}, "lib", ctx.install_prefix);
                     if (!dir.empty()) location = dir + "/lib" + output_name + ".so";
                 } else if (type == TargetType::STATIC_LIBRARY) {
-                    std::string dir = resolve_install_dest_under_prefix(
-                        d ? d->archive_dest : std::string{}, "lib", ctx.install_prefix);
+                    std::string dir = resolve_install_dest_under_prefix(d ? d->archive_dest : std::string{}, "lib", ctx.install_prefix);
                     if (!dir.empty()) location = dir + "/lib" + output_name + ".a";
                 } else if (type == TargetType::OBJECT_LIBRARY) {
                     // Object libraries are trickier - they have multiple .o files
@@ -380,28 +340,21 @@ std::string generate_export_content(
                 // Real CMake rewrites both forms to ${_IMPORT_PREFIX}/<rel> so
                 // the export stays relocatable. Absolute paths outside the
                 // install tree (system includes etc.) pass through unchanged.
-                if (ctx.for_install && !path.empty()
-                    && path.compare(0, 16, "${_IMPORT_PREFIX}") != 0) {
+                if (ctx.for_install && !path.empty() && path.compare(0, 16, "${_IMPORT_PREFIX}") != 0) {
                     path = resolve_install_dest_under_prefix(path, std::string{}, ctx.install_prefix);
                 }
                 include_str += path;
             }
-            if (!include_str.empty()) {
-                ss << "  INTERFACE_INCLUDE_DIRECTORIES \"" << escape_cmake_string(include_str) << "\"\n";
-            }
+            if (!include_str.empty()) { ss << "  INTERFACE_INCLUDE_DIRECTORIES \"" << escape_cmake_string(include_str) << "\"\n"; }
         }
 
         // INTERFACE_COMPILE_DEFINITIONS
         auto defs = evaluate_export_property(*target, "COMPILE_DEFINITIONS", ctx);
-        if (!defs.empty()) {
-            ss << "  INTERFACE_COMPILE_DEFINITIONS \"" << escape_cmake_string(format_cmake_list(defs)) << "\"\n";
-        }
+        if (!defs.empty()) { ss << "  INTERFACE_COMPILE_DEFINITIONS \"" << escape_cmake_string(format_cmake_list(defs)) << "\"\n"; }
 
         // INTERFACE_COMPILE_OPTIONS
         auto opts = evaluate_export_property(*target, "COMPILE_OPTIONS", ctx);
-        if (!opts.empty()) {
-            ss << "  INTERFACE_COMPILE_OPTIONS \"" << escape_cmake_string(format_cmake_list(opts)) << "\"\n";
-        }
+        if (!opts.empty()) { ss << "  INTERFACE_COMPILE_OPTIONS \"" << escape_cmake_string(format_cmake_list(opts)) << "\"\n"; }
 
         // INTERFACE_LINK_LIBRARIES
         auto libs = evaluate_export_property(*target, "LINK_LIBRARIES", ctx);
@@ -447,15 +400,11 @@ std::string generate_export_content(
 
         // INTERFACE_LINK_OPTIONS
         auto link_opts = evaluate_export_property(*target, "LINK_OPTIONS", ctx);
-        if (!link_opts.empty()) {
-            ss << "  INTERFACE_LINK_OPTIONS \"" << escape_cmake_string(format_cmake_list(link_opts)) << "\"\n";
-        }
+        if (!link_opts.empty()) { ss << "  INTERFACE_LINK_OPTIONS \"" << escape_cmake_string(format_cmake_list(link_opts)) << "\"\n"; }
 
         // INTERFACE_COMPILE_FEATURES
         auto features = evaluate_export_property(*target, "COMPILE_FEATURES", ctx);
-        if (!features.empty()) {
-            ss << "  INTERFACE_COMPILE_FEATURES \"" << escape_cmake_string(format_cmake_list(features)) << "\"\n";
-        }
+        if (!features.empty()) { ss << "  INTERFACE_COMPILE_FEATURES \"" << escape_cmake_string(format_cmake_list(features)) << "\"\n"; }
 
         ss << ")\n\n";
     }
@@ -472,18 +421,13 @@ std::string generate_export_content(
     return ss.str();
 }
 
-std::string generate_config_export_content(
-    const ExportContext& ctx,
-    const std::vector<Target*>& targets,
-    const std::string& install_prefix
-) {
+std::string generate_config_export_content(const ExportContext& ctx, const std::vector<Target*>& targets,
+                                           const std::string& install_prefix) {
     std::ostringstream ss;
 
     // Determine config name
     std::string config = ctx.config.empty() ? ctx.build_type : ctx.config;
-    if (config.empty()) {
-        config = "noconfig";
-    }
+    if (config.empty()) { config = "noconfig"; }
     std::string config_upper = to_upper(config);
     std::string config_suffix = "_" + config_upper;
 
@@ -519,9 +463,7 @@ std::string generate_config_export_content(
         TargetType type = target->get_type();
 
         // Skip interface libraries (no per-config properties needed)
-        if (type == TargetType::INTERFACE_LIBRARY || type == TargetType::CUSTOM) {
-            continue;
-        }
+        if (type == TargetType::INTERFACE_LIBRARY || type == TargetType::CUSTOM) { continue; }
 
         // Per-target evaluator for property reads
         auto target_ctx = genex_ctx;
@@ -536,8 +478,7 @@ std::string generate_config_export_content(
         const auto* d = (dit != ctx.target_install_dests.end()) ? &dit->second : nullptr;
 
         if (type == TargetType::EXECUTABLE) {
-            std::string dir = resolve_install_dest_under_prefix(
-                d ? d->runtime_dest : std::string{}, "bin", ctx.install_prefix);
+            std::string dir = resolve_install_dest_under_prefix(d ? d->runtime_dest : std::string{}, "bin", ctx.install_prefix);
             if (!dir.empty()) location = dir + "/" + target->get_output_name();
         } else if (type == TargetType::SHARED_LIBRARY) {
             std::string soversion = eval.evaluate_target_property(*target, "SOVERSION");
@@ -548,12 +489,10 @@ std::string generate_config_export_content(
             } else if (!soversion.empty()) {
                 lib_name += "." + soversion;
             }
-            std::string dir = resolve_install_dest_under_prefix(
-                d ? d->library_dest : std::string{}, "lib", ctx.install_prefix);
+            std::string dir = resolve_install_dest_under_prefix(d ? d->library_dest : std::string{}, "lib", ctx.install_prefix);
             if (!dir.empty()) location = dir + "/" + lib_name;
         } else if (type == TargetType::STATIC_LIBRARY) {
-            std::string dir = resolve_install_dest_under_prefix(
-                d ? d->archive_dest : std::string{}, "lib", ctx.install_prefix);
+            std::string dir = resolve_install_dest_under_prefix(d ? d->archive_dest : std::string{}, "lib", ctx.install_prefix);
             if (!dir.empty()) location = dir + "/lib" + target->get_output_name() + ".a";
         }
 
@@ -569,9 +508,7 @@ std::string generate_config_export_content(
                 std::string version = eval.evaluate_target_property(*target, "VERSION");
                 if (!soversion.empty() || !version.empty()) {
                     std::string soname = "lib" + target->get_output_name() + ".so";
-                    if (!soversion.empty()) {
-                        soname += "." + soversion;
-                    }
+                    if (!soversion.empty()) { soname += "." + soversion; }
                     ss << "  IMPORTED_SONAME" << config_suffix << " \"" << soname << "\"\n";
                 }
             }

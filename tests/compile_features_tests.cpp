@@ -147,12 +147,10 @@ TEST_CASE("CompileFeatures - comprehensive feature list", "[compile_features]") 
 
     SECTION("All C++11 features are present") {
         // Just check a representative sample
-        std::vector<std::string> cpp11_features = {
-            "cxx_alias_templates", "cxx_alignas", "cxx_alignof",
-            "cxx_attributes", "cxx_auto_type", "cxx_constexpr",
-            "cxx_decltype", "cxx_defaulted_functions", "cxx_deleted_functions",
-            "cxx_final", "cxx_override", "cxx_nullptr", "cxx_rvalue_references"
-        };
+        std::vector<std::string> cpp11_features = {"cxx_alias_templates",   "cxx_alignas",   "cxx_alignof",  "cxx_attributes",
+                                                   "cxx_auto_type",         "cxx_constexpr", "cxx_decltype", "cxx_defaulted_functions",
+                                                   "cxx_deleted_functions", "cxx_final",     "cxx_override", "cxx_nullptr",
+                                                   "cxx_rvalue_references"};
 
         for (const auto& feat : cpp11_features) {
             CHECK(features.is_known_feature(feat));
@@ -163,12 +161,15 @@ TEST_CASE("CompileFeatures - comprehensive feature list", "[compile_features]") 
     }
 
     SECTION("All C++14 features are present") {
-        std::vector<std::string> cpp14_features = {
-            "cxx_aggregate_default_initializers", "cxx_attribute_deprecated",
-            "cxx_binary_literals", "cxx_decltype_auto", "cxx_generic_lambdas",
-            "cxx_lambda_init_captures", "cxx_relaxed_constexpr",
-            "cxx_return_type_deduction", "cxx_variable_templates"
-        };
+        std::vector<std::string> cpp14_features = {"cxx_aggregate_default_initializers",
+                                                   "cxx_attribute_deprecated",
+                                                   "cxx_binary_literals",
+                                                   "cxx_decltype_auto",
+                                                   "cxx_generic_lambdas",
+                                                   "cxx_lambda_init_captures",
+                                                   "cxx_relaxed_constexpr",
+                                                   "cxx_return_type_deduction",
+                                                   "cxx_variable_templates"};
 
         for (const auto& feat : cpp14_features) {
             CHECK(features.is_known_feature(feat));

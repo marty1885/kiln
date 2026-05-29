@@ -21,11 +21,14 @@ bool matches_glob(const std::string& text, const std::string& pattern) {
     size_t star_p = std::string::npos, star_t = 0;
     while (ti < text.size()) {
         if (pi < pattern.size() && (pattern[pi] == '?' || pattern[pi] == text[ti])) {
-            ++ti; ++pi;
+            ++ti;
+            ++pi;
         } else if (pi < pattern.size() && pattern[pi] == '*') {
-            star_p = pi++; star_t = ti;
+            star_p = pi++;
+            star_t = ti;
         } else if (star_p != std::string::npos) {
-            pi = star_p + 1; ti = ++star_t;
+            pi = star_p + 1;
+            ti = ++star_t;
         } else {
             return false;
         }
@@ -81,15 +84,24 @@ mode_t parse_cmake_perms(const std::vector<std::string>& cmake_perms, mode_t def
     if (cmake_perms.empty()) return default_mode;
     mode_t mode = 0;
     for (const auto& perm : cmake_perms) {
-        if      (perm == "OWNER_READ")    mode |= S_IRUSR;
-        else if (perm == "OWNER_WRITE")   mode |= S_IWUSR;
-        else if (perm == "OWNER_EXECUTE") mode |= S_IXUSR;
-        else if (perm == "GROUP_READ")    mode |= S_IRGRP;
-        else if (perm == "GROUP_WRITE")   mode |= S_IWGRP;
-        else if (perm == "GROUP_EXECUTE") mode |= S_IXGRP;
-        else if (perm == "WORLD_READ")    mode |= S_IROTH;
-        else if (perm == "WORLD_WRITE")   mode |= S_IWOTH;
-        else if (perm == "WORLD_EXECUTE") mode |= S_IXOTH;
+        if (perm == "OWNER_READ")
+            mode |= S_IRUSR;
+        else if (perm == "OWNER_WRITE")
+            mode |= S_IWUSR;
+        else if (perm == "OWNER_EXECUTE")
+            mode |= S_IXUSR;
+        else if (perm == "GROUP_READ")
+            mode |= S_IRGRP;
+        else if (perm == "GROUP_WRITE")
+            mode |= S_IWGRP;
+        else if (perm == "GROUP_EXECUTE")
+            mode |= S_IXGRP;
+        else if (perm == "WORLD_READ")
+            mode |= S_IROTH;
+        else if (perm == "WORLD_WRITE")
+            mode |= S_IWOTH;
+        else if (perm == "WORLD_EXECUTE")
+            mode |= S_IXOTH;
     }
     return mode;
 }
@@ -127,19 +139,13 @@ InstallOp make_symlink_op(const std::string& dest_rel, const std::string& target
 //   libfoo.so.1   -> libfoo.so.1.2.3
 //   libfoo.so     -> libfoo.so.1
 // dest_dir is the install-relative directory the .so chain lives in.
-std::expected<std::vector<InstallOp>, std::string> compute_lib_symlinks(
-    const std::filesystem::path& artifact_filename,
-    const std::string& dest_dir_rel,
-    const std::string& soversion,
-    const std::string& version,
-    const InstallDestination& dest_meta
-) {
+std::expected<std::vector<InstallOp>, std::string> compute_lib_symlinks(const std::filesystem::path& artifact_filename,
+                                                                        const std::string& dest_dir_rel, const std::string& soversion,
+                                                                        const std::string& version, const InstallDestination& dest_meta) {
     std::vector<InstallOp> ops;
     std::string filename = artifact_filename.string();
     size_t so_pos = filename.find(".so");
-    if (so_pos == std::string::npos) {
-        return std::unexpected("invalid shared library filename: " + filename);
-    }
+    if (so_pos == std::string::npos) { return std::unexpected("invalid shared library filename: " + filename); }
     std::string basename = filename.substr(0, so_pos);
     std::string ext = ".so";
     std::filesystem::path dir = dest_dir_rel;
@@ -166,19 +172,14 @@ std::expected<std::vector<InstallOp>, std::string> compute_lib_symlinks(
     return ops;
 }
 
-std::expected<void, std::string> resolve_targets_rule(
-    Interpreter* interp,
-    const InstallTargetsRule& rule,
-    std::vector<InstallOp>& out_ops
-) {
+std::expected<void, std::string> resolve_targets_rule(Interpreter* interp, const InstallTargetsRule& rule,
+                                                      std::vector<InstallOp>& out_ops) {
     auto genex_ctx = GenexEvaluationContext::from_interpreter(*interp, interp->get_targets());
     genex_ctx.phase = GenexEvaluationContext::Phase::INSTALL;
 
     for (const auto& target_name : rule.targets) {
         auto* target = interp->find_target(target_name);
-        if (!target) {
-            return std::unexpected("unknown target in install(TARGETS): " + target_name);
-        }
+        if (!target) { return std::unexpected("unknown target in install(TARGETS): " + target_name); }
 
         std::filesystem::path artifact_path;
         const InstallDestination* dest = nullptr;
@@ -186,26 +187,26 @@ std::expected<void, std::string> resolve_targets_rule(
         bool is_shared = false;
 
         switch (target->get_type()) {
-            case TargetType::EXECUTABLE:
-                artifact_path = target->get_output_path();
-                dest = &rule.runtime_dest;
-                default_perms = 0755;
-                break;
-            case TargetType::SHARED_LIBRARY:
-                artifact_path = target->get_output_path();
-                dest = &rule.library_dest;
-                default_perms = 0755;
-                is_shared = true;
-                break;
-            case TargetType::STATIC_LIBRARY:
-                artifact_path = target->get_output_path();
-                dest = &rule.archive_dest;
-                default_perms = 0644;
-                break;
-            case TargetType::INTERFACE_LIBRARY:
-                continue;
-            default:
-                continue;
+        case TargetType::EXECUTABLE:
+            artifact_path = target->get_output_path();
+            dest = &rule.runtime_dest;
+            default_perms = 0755;
+            break;
+        case TargetType::SHARED_LIBRARY:
+            artifact_path = target->get_output_path();
+            dest = &rule.library_dest;
+            default_perms = 0755;
+            is_shared = true;
+            break;
+        case TargetType::STATIC_LIBRARY:
+            artifact_path = target->get_output_path();
+            dest = &rule.archive_dest;
+            default_perms = 0644;
+            break;
+        case TargetType::INTERFACE_LIBRARY:
+            continue;
+        default:
+            continue;
         }
 
         if (dest->destination.empty()) continue;
@@ -241,9 +242,7 @@ std::expected<void, std::string> resolve_targets_rule(
                 while (std::getline(ss, header, ';')) {
                     if (header.empty()) continue;
                     std::filesystem::path header_path = header;
-                    if (!header_path.is_absolute()) {
-                        header_path = std::filesystem::path(target->get_source_dir()) / header_path;
-                    }
+                    if (!header_path.is_absolute()) { header_path = std::filesystem::path(target->get_source_dir()) / header_path; }
                     std::filesystem::path header_dest = std::filesystem::path(rule.public_header_dest.destination) / header_path.filename();
                     InstallOp op = make_copy_file_op(header_path.string(), header_dest.generic_string(), header_perms);
                     apply_destination(op, rule.public_header_dest);
@@ -261,9 +260,7 @@ void resolve_files_rule(const InstallFilesRule& rule, std::vector<InstallOp>& ou
     std::filesystem::path dest_dir = rule.destination.destination;
     for (const auto& source_file : rule.files) {
         std::filesystem::path source = source_file;
-        std::filesystem::path dest = rule.rename.empty()
-            ? dest_dir / source.filename()
-            : dest_dir / rule.rename;
+        std::filesystem::path dest = rule.rename.empty() ? dest_dir / source.filename() : dest_dir / rule.rename;
         InstallOp op = make_copy_file_op(source.string(), dest.generic_string(), perms);
         apply_destination(op, rule.destination);
         out_ops.push_back(std::move(op));
@@ -291,13 +288,8 @@ void resolve_directory_rule(const InstallDirectoryRule& rule, std::vector<Instal
     }
 }
 
-std::expected<void, std::string> resolve_export_rule(
-    Interpreter* interp,
-    const InstallExportRule& rule,
-    const std::string& default_prefix,
-    const std::string& current_config,
-    std::vector<InstallOp>& out_ops
-) {
+std::expected<void, std::string> resolve_export_rule(Interpreter* interp, const InstallExportRule& rule, const std::string& default_prefix,
+                                                     const std::string& current_config, std::vector<InstallOp>& out_ops) {
     const auto& export_sets = interp->get_export_sets();
     auto it = export_sets.find(rule.export_name);
     if (it == export_sets.end() || it->second.empty()) return {};
@@ -381,19 +373,12 @@ bool op_filtered_out(const InstallOp& op, const std::string& current_config, con
 }
 
 std::expected<void, std::string> chmod_path(const std::filesystem::path& path, mode_t mode) {
-    if (chmod(path.string().c_str(), mode) != 0) {
-        return std::unexpected("failed to set permissions on " + path.string());
-    }
+    if (chmod(path.string().c_str(), mode) != 0) { return std::unexpected("failed to set permissions on " + path.string()); }
     return {};
 }
 
-std::expected<void, std::string> copy_one_file(
-    const std::filesystem::path& src,
-    const std::filesystem::path& dest,
-    mode_t perms,
-    bool optional,
-    const OutputCtx& out
-) {
+std::expected<void, std::string> copy_one_file(const std::filesystem::path& src, const std::filesystem::path& dest, mode_t perms,
+                                               bool optional, const OutputCtx& out) {
     if (!std::filesystem::exists(src)) {
         if (optional) return {};
         return std::unexpected("source file does not exist: " + src.string());
@@ -461,8 +446,7 @@ std::expected<void, std::string> execute_write_content(const InstallOp& op, cons
         if (!perms_or) return std::unexpected(perms_or.error());
         want_perms = *perms_or;
     }
-    if (std::filesystem::exists(dest)
-        && string_matches_file_content(dest, op.content)
+    if (std::filesystem::exists(dest) && string_matches_file_content(dest, op.content)
         && (!want_perms || file_has_perms(dest, *want_perms))) {
         print_action(out, "Up-to-date", dest.string());
         return {};
@@ -503,16 +487,20 @@ std::expected<void, std::string> execute_copy_directory(const InstallOp& op, con
 
         bool matches = op.patterns.empty();
         for (const auto& pat : op.patterns) {
-            if (matches_glob(file_path.filename().string(), pat)) { matches = true; break; }
+            if (matches_glob(file_path.filename().string(), pat)) {
+                matches = true;
+                break;
+            }
         }
         for (const auto& pat : op.excludes) {
-            if (matches_glob(file_path.filename().string(), pat)) { matches = false; break; }
+            if (matches_glob(file_path.filename().string(), pat)) {
+                matches = false;
+                break;
+            }
         }
         if (!matches) continue;
 
-        std::filesystem::path dest = op.preserve_dir_name
-            ? (base_dest / src_path.filename() / relative)
-            : (base_dest / relative);
+        std::filesystem::path dest = op.preserve_dir_name ? (base_dest / src_path.filename() / relative) : (base_dest / relative);
 
         mode_t perms;
         if (op.use_source_permissions) {
@@ -528,13 +516,9 @@ std::expected<void, std::string> execute_copy_directory(const InstallOp& op, con
 
 } // namespace
 
-std::expected<InstallPlan, std::string> build_install_plan(
-    Interpreter* interp,
-    const std::vector<std::shared_ptr<InstallRule>>& rules,
-    const std::string& default_prefix,
-    const std::string& current_config,
-    const OutputCtx& out
-) {
+std::expected<InstallPlan, std::string> build_install_plan(Interpreter* interp, const std::vector<std::shared_ptr<InstallRule>>& rules,
+                                                           const std::string& default_prefix, const std::string& current_config,
+                                                           const OutputCtx& out) {
     InstallPlan plan;
     plan.version = INSTALL_PLAN_VERSION;
     plan.config = current_config;
@@ -542,35 +526,32 @@ std::expected<InstallPlan, std::string> build_install_plan(
 
     for (const auto& rule : rules) {
         switch (rule->type) {
-            case InstallRuleType::TARGETS:
-                if (auto r = resolve_targets_rule(interp, *rule->targets_rule, plan.ops); !r) return std::unexpected(r.error());
-                break;
-            case InstallRuleType::FILES:
-            case InstallRuleType::PROGRAMS:
-                resolve_files_rule(*rule->files_rule, plan.ops);
-                break;
-            case InstallRuleType::DIRECTORY:
-                resolve_directory_rule(*rule->directory_rule, plan.ops);
-                break;
-            case InstallRuleType::EXPORT:
-                if (auto r = resolve_export_rule(interp, *rule->export_rule, default_prefix, current_config, plan.ops); !r) return std::unexpected(r.error());
-                break;
-            case InstallRuleType::SCRIPT:
-            case InstallRuleType::CODE:
-                print_message(out, "WARNING", "install(SCRIPT/CODE) is not yet implemented; skipping");
-                break;
+        case InstallRuleType::TARGETS:
+            if (auto r = resolve_targets_rule(interp, *rule->targets_rule, plan.ops); !r) return std::unexpected(r.error());
+            break;
+        case InstallRuleType::FILES:
+        case InstallRuleType::PROGRAMS:
+            resolve_files_rule(*rule->files_rule, plan.ops);
+            break;
+        case InstallRuleType::DIRECTORY:
+            resolve_directory_rule(*rule->directory_rule, plan.ops);
+            break;
+        case InstallRuleType::EXPORT:
+            if (auto r = resolve_export_rule(interp, *rule->export_rule, default_prefix, current_config, plan.ops); !r)
+                return std::unexpected(r.error());
+            break;
+        case InstallRuleType::SCRIPT:
+        case InstallRuleType::CODE:
+            print_message(out, "WARNING", "install(SCRIPT/CODE) is not yet implemented; skipping");
+            break;
         }
     }
     return plan;
 }
 
-std::expected<void, std::string> execute_install_plan(
-    const InstallPlan& plan,
-    const std::string& install_prefix,
-    const std::string& current_config,
-    const std::string& component_filter,
-    const OutputCtx& out
-) {
+std::expected<void, std::string> execute_install_plan(const InstallPlan& plan, const std::string& install_prefix,
+                                                      const std::string& current_config, const std::string& component_filter,
+                                                      const OutputCtx& out) {
     std::filesystem::path prefix = install_prefix;
 
     // Pre-flight: stat every copy_file source. Catches the wiped-build-dir case
@@ -578,9 +559,7 @@ std::expected<void, std::string> execute_install_plan(
     std::vector<std::string> missing;
     for (const auto& op : plan.ops) {
         if (op_filtered_out(op, current_config, component_filter)) continue;
-        if (op.kind == "copy_file" && !op.optional && !std::filesystem::exists(op.src)) {
-            missing.push_back(op.src);
-        }
+        if (op.kind == "copy_file" && !op.optional && !std::filesystem::exists(op.src)) { missing.push_back(op.src); }
     }
     if (!missing.empty()) {
         std::string msg = "install plan references missing build artifacts (run `kiln build` first):";
@@ -591,11 +570,16 @@ std::expected<void, std::string> execute_install_plan(
     for (const auto& op : plan.ops) {
         if (op_filtered_out(op, current_config, component_filter)) continue;
         std::expected<void, std::string> r;
-        if      (op.kind == "copy_file")      r = execute_copy_file(op, prefix, out);
-        else if (op.kind == "symlink")        r = execute_symlink(op, prefix, out);
-        else if (op.kind == "write_content")  r = execute_write_content(op, prefix, out);
-        else if (op.kind == "copy_directory") r = execute_copy_directory(op, prefix, out);
-        else                                  r = std::unexpected("unknown install op kind: " + op.kind);
+        if (op.kind == "copy_file")
+            r = execute_copy_file(op, prefix, out);
+        else if (op.kind == "symlink")
+            r = execute_symlink(op, prefix, out);
+        else if (op.kind == "write_content")
+            r = execute_write_content(op, prefix, out);
+        else if (op.kind == "copy_directory")
+            r = execute_copy_directory(op, prefix, out);
+        else
+            r = std::unexpected("unknown install op kind: " + op.kind);
         if (!r) return r;
     }
     return {};

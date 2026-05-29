@@ -22,18 +22,14 @@ static std::unordered_map<std::string, std::vector<std::string>> s_python_import
 // Helper: Get file mtime or nullopt if doesn't exist
 static std::optional<int64_t> get_file_mtime(const std::string& path) {
     struct stat st;
-    if (stat(path.c_str(), &st) == 0) {
-        return st.st_mtime;
-    }
+    if (stat(path.c_str(), &st) == 0) { return st.st_mtime; }
     return std::nullopt;
 }
 
 // Helper: Get directory mtime or nullopt if doesn't exist
 static std::optional<int64_t> get_dir_mtime(const std::string& path) {
     struct stat st;
-    if (stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
-        return st.st_mtime;
-    }
+    if (stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) { return st.st_mtime; }
     return std::nullopt;
 }
 
@@ -59,19 +55,16 @@ static void append_path_env(const char* var, std::vector<std::string>& dirs) {
 // Helper: Get standard pkgconfig directories
 static std::vector<std::string> get_pkgconfig_search_dirs() {
     std::vector<std::string> dirs = {
-        "/usr/lib/pkgconfig", "/usr/lib64/pkgconfig", "/usr/share/pkgconfig",
+        "/usr/lib/pkgconfig",       "/usr/lib64/pkgconfig",       "/usr/share/pkgconfig",
         "/usr/local/lib/pkgconfig", "/usr/local/lib64/pkgconfig", "/usr/local/share/pkgconfig",
     };
     append_path_env("PKG_CONFIG_PATH", dirs);
-    append_path_env("PKG_CONFIG_LIBDIR", dirs);  // overrides default paths if set
+    append_path_env("PKG_CONFIG_LIBDIR", dirs); // overrides default paths if set
     return dirs;
 }
 
 // Helper: Compute cache signature for external command (pkg-config, etc.)
-static std::string compute_command_signature(
-    const std::vector<std::vector<std::string>>& commands,
-    const ProcessOptions& options
-) {
+static std::string compute_command_signature(const std::vector<std::vector<std::string>>& commands, const ProcessOptions& options) {
     std::ostringstream oss;
 
     // Include command and all arguments
@@ -85,20 +78,12 @@ static std::string compute_command_signature(
     oss << "|";
 
     // Include working directory
-    if (!options.working_dir.empty()) {
-        oss << "wd:" << options.working_dir << "|";
-    }
+    if (!options.working_dir.empty()) { oss << "wd:" << options.working_dir << "|"; }
 
     // Include relevant environment variables
-    if (const char* pkg_path = std::getenv("PKG_CONFIG_PATH")) {
-        oss << "PKG_CONFIG_PATH:" << pkg_path << "|";
-    }
-    if (const char* sysroot = std::getenv("PKG_CONFIG_SYSROOT_DIR")) {
-        oss << "PKG_CONFIG_SYSROOT_DIR:" << sysroot << "|";
-    }
-    if (const char* libdir = std::getenv("PKG_CONFIG_LIBDIR")) {
-        oss << "PKG_CONFIG_LIBDIR:" << libdir << "|";
-    }
+    if (const char* pkg_path = std::getenv("PKG_CONFIG_PATH")) { oss << "PKG_CONFIG_PATH:" << pkg_path << "|"; }
+    if (const char* sysroot = std::getenv("PKG_CONFIG_SYSROOT_DIR")) { oss << "PKG_CONFIG_SYSROOT_DIR:" << sysroot << "|"; }
+    if (const char* libdir = std::getenv("PKG_CONFIG_LIBDIR")) { oss << "PKG_CONFIG_LIBDIR:" << libdir << "|"; }
 
     return oss.str();
 }
@@ -165,7 +150,10 @@ static bool is_import_only_script(const std::vector<std::string>& cmd) {
             // Must have at least one identifier character
             bool has_ident = false;
             for (char c : rest) {
-                if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') { has_ident = true; break; }
+                if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') {
+                    has_ident = true;
+                    break;
+                }
             }
             if (!has_ident) return false;
         } else if (stmt.starts_with("from ")) {
@@ -180,13 +168,13 @@ static bool is_import_only_script(const std::vector<std::string>& cmd) {
                 if (imp_pos == std::string_view::npos) return false;
             }
             for (char c : rest) {
-                if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '.' && c != ',' &&
-                    c != ' ' && c != '\t' && c != '*' && c != '(' && c != ')') {
+                if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '.' && c != ',' && c != ' ' && c != '\t' && c != '*'
+                    && c != '(' && c != ')') {
                     return false;
                 }
             }
         } else {
-            return false;  // Not an import statement
+            return false; // Not an import statement
         }
         found_any = true;
     }
@@ -195,8 +183,7 @@ static bool is_import_only_script(const std::vector<std::string>& cmd) {
 }
 
 // Helper: Get Python sys.path directories for a given binary (cached per session)
-static const std::vector<std::string>& get_python_import_dirs(
-    const std::string& binary_key, const std::string& invoked_path) {
+static const std::vector<std::string>& get_python_import_dirs(const std::string& binary_key, const std::string& invoked_path) {
     auto it = s_python_import_dirs.find(binary_key);
     if (it != s_python_import_dirs.end()) return it->second;
 
@@ -215,7 +202,7 @@ static const std::vector<std::string>& get_python_import_dirs(
         std::string line;
         while (std::getline(iss, line)) {
             auto stripped = rstrip(line);
-            if (!stripped.empty()) dirs.emplace_back(stripped);  // Skip cwd placeholder
+            if (!stripped.empty()) dirs.emplace_back(stripped); // Skip cwd placeholder
         }
     }
 
@@ -225,10 +212,8 @@ static const std::vector<std::string>& get_python_import_dirs(
 
 // Helper: Compute cache signature for a Python import-only script
 // Includes env vars that affect Python's import resolution
-static std::string compute_python_import_signature(
-    const std::string& binary_key,
-    const std::string& script,
-    const std::string& working_dir) {
+static std::string compute_python_import_signature(const std::string& binary_key, const std::string& script,
+                                                   const std::string& working_dir) {
     std::string sig = "python_import:" + binary_key + "|" + script + "|cwd:";
     if (!working_dir.empty()) {
         sig += working_dir;
@@ -241,9 +226,7 @@ static std::string compute_python_import_signature(
         sig += '|';
         sig += var;
         sig += ':';
-        if (const char* val = std::getenv(var)) {
-            sig += val;
-        }
+        if (const char* val = std::getenv(var)) { sig += val; }
     }
     return sig;
 }
@@ -265,11 +248,10 @@ static bool is_safe_python_script(const std::vector<std::string>& cmd) {
     // Step 1: Blocklist rejection — block non-deterministic or dangerous operations.
     // os.getcwd() and os.path pure functions are safe (cwd is included in cache key).
     static const std::array<std::string_view, 10> blocklist = {
-        "__import__", "exec(", "eval(", "open(",
-        "subprocess",
-        "environ",          // os.environ — depends on env vars
-        "listdir", "scandir", "os.walk(",  // filesystem enumeration
-        "os.stat(",         // filesystem metadata
+        "__import__", "exec(",   "eval(",    "open(", "subprocess",
+        "environ",                           // os.environ — depends on env vars
+        "listdir",    "scandir", "os.walk(", // filesystem enumeration
+        "os.stat(",                          // filesystem metadata
     };
     for (auto bl : blocklist) {
         if (script.find(bl) != std::string::npos) return false;
@@ -277,8 +259,8 @@ static bool is_safe_python_script(const std::vector<std::string>& cmd) {
 
     // Step 2: Extract all imported module names
     static const std::unordered_set<std::string> safe_modules = {
-        "sys", "sysconfig", "distutils", "struct", "re", "importlib",
-        "os", "pathlib",  // safe with cwd in cache key; dangerous ops caught by blocklist
+        "sys", "sysconfig", "distutils", "struct",
+        "re",  "importlib", "os",        "pathlib", // safe with cwd in cache key; dangerous ops caught by blocklist
     };
 
     // Scan for import statements
@@ -358,7 +340,9 @@ static bool is_safe_python_script(const std::vector<std::string>& cmd) {
 
                 // Read module name (may be dotted)
                 auto name_start = p;
-                while (p < sv.size() && sv[p] != ' ' && sv[p] != '\t' && sv[p] != ',' && sv[p] != '\n' && sv[p] != '\r' && sv[p] != ';' && sv[p] != '#') ++p;
+                while (p < sv.size() && sv[p] != ' ' && sv[p] != '\t' && sv[p] != ',' && sv[p] != '\n' && sv[p] != '\r' && sv[p] != ';'
+                       && sv[p] != '#')
+                    ++p;
                 if (p == name_start) break;
 
                 std::string_view full_name = sv.substr(name_start, p - name_start);
@@ -412,8 +396,7 @@ static std::string validate_python_binary(const std::string& invoked_path, Cache
     if (vres.exit_codes.empty() || vres.exit_codes[0] != 0) return "";
 
     // Python 2 prints to stderr, Python 3 to stdout
-    std::string current_version = std::string(rstrip(
-        vres.captured_stdout.empty() ? vres.captured_stderr : vres.captured_stdout));
+    std::string current_version = std::string(rstrip(vres.captured_stdout.empty() ? vres.captured_stderr : vres.captured_stdout));
 
     // Check stored version from disk cache
     std::string version_key = "python_version:" + binary_key;
@@ -438,9 +421,8 @@ static std::string validate_python_binary(const std::string& invoked_path, Cache
 
 // Helper: Compute cache signature for a Python command
 // Includes effective cwd so os.getcwd()/os.path operations are correctly keyed
-static std::string compute_python_cache_signature(const std::string& binary_key,
-                                                   const std::vector<std::string>& cmd,
-                                                   const std::string& working_dir) {
+static std::string compute_python_cache_signature(const std::string& binary_key, const std::vector<std::string>& cmd,
+                                                  const std::string& working_dir) {
     std::string sig = "python:" + binary_key + "|";
     for (size_t i = 1; i < cmd.size(); ++i) {
         if (i > 1) sig += " ";
@@ -464,9 +446,7 @@ static std::map<std::string, std::optional<int64_t>> get_tracked_dir_mtimes(cons
 
     if (is_pkgconfig_command(cmd)) {
         auto dirs = get_pkgconfig_search_dirs();
-        for (const auto& dir : dirs) {
-            mtimes[dir] = get_dir_mtime(dir);
-        }
+        for (const auto& dir : dirs) { mtimes[dir] = get_dir_mtime(dir); }
     }
     // Future: Add tracking for other command types (compilers, etc.)
 
@@ -486,14 +466,9 @@ static bool validate_command_cache(const ExternalCommandCacheEntry& entry) {
 // On miss, executes and stores. `validate_dirs` enables tracked-dir mtime checking
 // against an existing entry. `populate_extras` (optional) is called with a fresh
 // entry before insert — typically to fill tracked_dir_mtimes for the new entry.
-static PipelineResult cached_or_execute(
-    CacheStore& cache,
-    const std::string& signature,
-    bool validate_dirs,
-    const std::function<void(ExternalCommandCacheEntry&)>& populate_extras,
-    const std::vector<std::vector<std::string>>& commands,
-    const ProcessOptions& options
-) {
+static PipelineResult cached_or_execute(CacheStore& cache, const std::string& signature, bool validate_dirs,
+                                        const std::function<void(ExternalCommandCacheEntry&)>& populate_extras,
+                                        const std::vector<std::vector<std::string>>& commands, const ProcessOptions& options) {
     PipelineResult res;
     auto cached = cache.lookup<CacheSubsystem::ExternalCommand>(signature);
     if (cached && (!validate_dirs || validate_command_cache(*cached))) {
@@ -611,12 +586,8 @@ static bool translate_cmake_self_invocation(std::vector<std::string>& cmd, const
         new_cmd.push_back("--config");
         new_cmd.push_back(config);
     }
-    for (const auto& def : definitions) {
-        new_cmd.push_back(def);
-    }
-    for (const auto& target : targets) {
-        new_cmd.push_back(target);
-    }
+    for (const auto& def : definitions) { new_cmd.push_back(def); }
+    for (const auto& target : targets) { new_cmd.push_back(target); }
 
     cmd = std::move(new_cmd);
     return true;
@@ -670,8 +641,7 @@ void register_process_builtins(Interpreter& interp) {
 
         // CMake supports COMMAND_ERROR_IS_FATAL with values ANY|LAST|NONE.
         // Treat ANY and LAST identically (fatal on any non-zero exit), NONE as no-op.
-        if (ci_equals(command_error_is_fatal_mode, "ANY") ||
-            ci_equals(command_error_is_fatal_mode, "LAST")) {
+        if (ci_equals(command_error_is_fatal_mode, "ANY") || ci_equals(command_error_is_fatal_mode, "LAST")) {
             command_error_is_fatal = true;
         }
 
@@ -682,9 +652,7 @@ void register_process_builtins(Interpreter& interp) {
 
         // Translate cmake-style self-invocations to kiln semantics
         // e.g. execute_process(COMMAND ${CMAKE_COMMAND} -G "..." .) → kiln -C .
-        if (commands.size() == 1 && !commands[0].empty()) {
-            translate_cmake_self_invocation(commands[0], interp);
-        }
+        if (commands.size() == 1 && !commands[0].empty()) { translate_cmake_self_invocation(commands[0], interp); }
 
         int64_t profile_start = 0;
         bool profiling = g_profiling_enabled.load(std::memory_order_relaxed);
@@ -725,8 +693,7 @@ void register_process_builtins(Interpreter& interp) {
         bool no_file_redirect = output_file.empty() && error_file.empty() && input_file.empty();
         bool captures_output = !output_variable.empty() || !result_variable.empty();
         bool is_pkgconfig = !commands.empty() && !commands[0].empty() && is_pkgconfig_command(commands[0][0]);
-        bool is_single_python = !commands.empty() && !commands[0].empty() &&
-                                commands.size() == 1 &&  // Single command, no pipes
+        bool is_single_python = !commands.empty() && !commands[0].empty() && commands.size() == 1 && // Single command, no pipes
                                 is_python_interpreter(commands[0][0]);
         bool is_python_import = is_single_python && is_import_only_script(commands[0]);
         bool is_python = is_single_python && !is_python_import && is_safe_python_script(commands[0]);
@@ -743,9 +710,9 @@ void register_process_builtins(Interpreter& interp) {
             if (validate_python_binary(cmd[0], cache).empty()) {
                 res = execute_pipeline(commands, options);
             } else {
-                std::string signature = compute_python_import_signature(
-                    binary_key, find_python_c_script(cmd), working_dir);
-                res = cached_or_execute(cache, signature, /*validate_dirs=*/true,
+                std::string signature = compute_python_import_signature(binary_key, find_python_c_script(cmd), working_dir);
+                res = cached_or_execute(
+                    cache, signature, /*validate_dirs=*/true,
                     [&](ExternalCommandCacheEntry& e) {
                         // Lazily get sys.path dirs (once per binary per session)
                         for (const auto& dir : get_python_import_dirs(binary_key, cmd[0])) {
@@ -762,7 +729,10 @@ void register_process_builtins(Interpreter& interp) {
             // Check for -V flag — serve from in-session state if already validated
             bool is_version_query = false;
             for (size_t i = 1; i < cmd.size(); ++i) {
-                if (cmd[i] == "-V" || cmd[i] == "--version") { is_version_query = true; break; }
+                if (cmd[i] == "-V" || cmd[i] == "--version") {
+                    is_version_query = true;
+                    break;
+                }
             }
 
             if (is_version_query) {
@@ -789,17 +759,14 @@ void register_process_builtins(Interpreter& interp) {
                 res = execute_pipeline(commands, options);
             } else {
                 std::string signature = compute_python_cache_signature(binary_key, cmd, working_dir);
-                res = cached_or_execute(cache, signature, /*validate_dirs=*/false,
-                                        nullptr, commands, options);
+                res = cached_or_execute(cache, signature, /*validate_dirs=*/false, nullptr, commands, options);
             }
         } else if (can_cache && is_pkgconfig) {
             auto& cache = interp.get_cache_store();
             std::string signature = compute_command_signature(commands, options);
-            res = cached_or_execute(cache, signature, /*validate_dirs=*/true,
-                [&](ExternalCommandCacheEntry& e) {
-                    e.tracked_dir_mtimes = get_tracked_dir_mtimes(commands[0][0]);
-                },
-                commands, options);
+            res = cached_or_execute(
+                cache, signature, /*validate_dirs=*/true,
+                [&](ExternalCommandCacheEntry& e) { e.tracked_dir_mtimes = get_tracked_dir_mtimes(commands[0][0]); }, commands, options);
         } else {
             // Not cacheable - execute normally
             res = execute_pipeline(commands, options);
@@ -813,12 +780,8 @@ void register_process_builtins(Interpreter& interp) {
             return;
         }
 
-        if (!output_variable.empty()) {
-            interp.set_variable(output_variable, res.captured_stdout);
-        }
-        if (!error_variable.empty()) {
-            interp.set_variable(error_variable, res.captured_stderr);
-        }
+        if (!output_variable.empty()) { interp.set_variable(output_variable, res.captured_stdout); }
+        if (!error_variable.empty()) { interp.set_variable(error_variable, res.captured_stderr); }
 
         if (!result_variable.empty()) {
             interp.set_variable(result_variable, res.exit_codes.empty() ? "-1" : std::to_string(res.exit_codes.back()));
@@ -844,8 +807,7 @@ void register_process_builtins(Interpreter& interp) {
 
         if (profiling) {
             auto dur = Profiler::instance().now_us() - profile_start;
-            Profiler::instance().add_complete(profile_name, "configure", profile_start, dur,
-                Profiler::Args({{"cmd", profile_cmd}}));
+            Profiler::instance().add_complete(profile_name, "configure", profile_start, dur, Profiler::Args({{"cmd", profile_cmd}}));
         }
     });
 
@@ -871,9 +833,7 @@ void register_process_builtins(Interpreter& interp) {
             // Check if second arg is not a keyword
             static const std::vector<std::string> keywords = {"CONFIGURATION", "PARALLEL_LEVEL", "TARGET", "PROJECT_NAME"};
             bool second_is_keyword = std::find(keywords.begin(), keywords.end(), args[1]) != keywords.end();
-            if (!second_is_keyword) {
-                is_legacy = true;
-            }
+            if (!second_is_keyword) { is_legacy = true; }
         }
 
         if (is_legacy) {
@@ -925,9 +885,7 @@ void register_process_builtins(Interpreter& interp) {
             }
         }
 
-        if (has_project_name) {
-            interp.print_message("WARNING", "build_command: PROJECT_NAME is deprecated and has no effect");
-        }
+        if (has_project_name) { interp.print_message("WARNING", "build_command: PROJECT_NAME is deprecated and has no effect"); }
 
         // Build command parts as vector, then join
         std::vector<std::string> cmd_parts;
@@ -943,9 +901,7 @@ void register_process_builtins(Interpreter& interp) {
             cmd_parts.push_back(parallel);
         }
 
-        for (const auto& target : targets) {
-            cmd_parts.push_back(target);
-        }
+        for (const auto& target : targets) { cmd_parts.push_back(target); }
 
         interp.set_variable(variable, join_command(cmd_parts));
     });
@@ -960,9 +916,7 @@ void register_process_builtins(Interpreter& interp) {
         // Parse: exec_program(exe [dir] [ARGS ...] [OUTPUT_VARIABLE var] [RETURN_VALUE var])
         // The first arg is the executable. The second arg is the working directory
         // ONLY if it's not a keyword.
-        static const auto is_keyword = [](const std::string& s) {
-            return s == "ARGS" || s == "OUTPUT_VARIABLE" || s == "RETURN_VALUE";
-        };
+        static const auto is_keyword = [](const std::string& s) { return s == "ARGS" || s == "OUTPUT_VARIABLE" || s == "RETURN_VALUE"; };
 
         std::string executable = args[0];
         std::string working_dir;
@@ -1026,16 +980,14 @@ void register_process_builtins(Interpreter& interp) {
             options.error_quiet = true;
         }
 
-        std::vector<std::vector<std::string>> commands = { command };
+        std::vector<std::vector<std::string>> commands = {command};
         PipelineResult res = execute_pipeline(commands, options);
 
         if (!output_variable.empty()) {
             // exec_program combines stdout+stderr into one variable
             std::string combined = res.captured_stdout + res.captured_stderr;
             // Strip trailing newline like CMake does
-            while (!combined.empty() && combined.back() == '\n') {
-                combined.pop_back();
-            }
+            while (!combined.empty() && combined.back() == '\n') { combined.pop_back(); }
             interp.set_variable(output_variable, combined);
         }
 

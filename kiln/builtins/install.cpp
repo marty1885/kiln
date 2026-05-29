@@ -13,20 +13,24 @@ namespace {
 // Map install TYPE keyword to default destination directory.
 // Checks CMAKE_INSTALL_*DIR variables first, falling back to GNUInstallDirs defaults.
 std::string resolve_install_type(Interpreter& interp, const std::string& type) {
-    static const struct { const char* type; const char* var; const char* fallback; } mappings[] = {
-        {"BIN",         "CMAKE_INSTALL_BINDIR",         "bin"},
-        {"SBIN",        "CMAKE_INSTALL_SBINDIR",        "sbin"},
-        {"LIB",         "CMAKE_INSTALL_LIBDIR",         "lib"},
-        {"INCLUDE",     "CMAKE_INSTALL_INCLUDEDIR",     "include"},
-        {"SYSCONF",     "CMAKE_INSTALL_SYSCONFDIR",     "etc"},
+    static const struct {
+        const char* type;
+        const char* var;
+        const char* fallback;
+    } mappings[] = {
+        {"BIN", "CMAKE_INSTALL_BINDIR", "bin"},
+        {"SBIN", "CMAKE_INSTALL_SBINDIR", "sbin"},
+        {"LIB", "CMAKE_INSTALL_LIBDIR", "lib"},
+        {"INCLUDE", "CMAKE_INSTALL_INCLUDEDIR", "include"},
+        {"SYSCONF", "CMAKE_INSTALL_SYSCONFDIR", "etc"},
         {"SHAREDSTATE", "CMAKE_INSTALL_SHAREDSTATEDIR", "com"},
-        {"LOCALSTATE",  "CMAKE_INSTALL_LOCALSTATEDIR",  "var"},
-        {"RUNSTATE",    "CMAKE_INSTALL_RUNSTATEDIR",    "run"},
-        {"DATA",        "CMAKE_INSTALL_DATADIR",        "share"},
-        {"INFO",        "CMAKE_INSTALL_INFODIR",        "share/info"},
-        {"LOCALE",      "CMAKE_INSTALL_LOCALEDIR",      "share/locale"},
-        {"MAN",         "CMAKE_INSTALL_MANDIR",         "share/man"},
-        {"DOC",         "CMAKE_INSTALL_DOCDIR",         "share/doc"},
+        {"LOCALSTATE", "CMAKE_INSTALL_LOCALSTATEDIR", "var"},
+        {"RUNSTATE", "CMAKE_INSTALL_RUNSTATEDIR", "run"},
+        {"DATA", "CMAKE_INSTALL_DATADIR", "share"},
+        {"INFO", "CMAKE_INSTALL_INFODIR", "share/info"},
+        {"LOCALE", "CMAKE_INSTALL_LOCALEDIR", "share/locale"},
+        {"MAN", "CMAKE_INSTALL_MANDIR", "share/man"},
+        {"DOC", "CMAKE_INSTALL_DOCDIR", "share/doc"},
     };
     for (const auto& m : mappings) {
         if (type == m.type) {
@@ -38,11 +42,7 @@ std::string resolve_install_type(Interpreter& interp, const std::string& type) {
 }
 
 // Parse common destination properties
-void parse_destination_properties(
-    CommandParser& parser,
-    InstallDestination& dest,
-    const std::string& keyword_prefix = ""
-) {
+void parse_destination_properties(CommandParser& parser, InstallDestination& dest, const std::string& keyword_prefix = "") {
     std::string dest_keyword = keyword_prefix.empty() ? "DESTINATION" : keyword_prefix + "_DESTINATION";
     std::string perm_keyword = keyword_prefix.empty() ? "PERMISSIONS" : keyword_prefix + "_PERMISSIONS";
 
@@ -55,12 +55,8 @@ void parse_destination_properties(
 }
 
 // Parse install(TARGETS ...) command
-void parse_install_targets(
-    Interpreter& interp,
-    const std::vector<std::string>& args,
-    const std::string& src_dir,
-    const std::string& bin_dir
-) {
+void parse_install_targets(Interpreter& interp, const std::vector<std::string>& args, const std::string& src_dir,
+                           const std::string& bin_dir) {
     // Skip first argument (TARGETS keyword)
     std::vector<std::string> parse_args(args.begin() + 1, args.end());
 
@@ -74,11 +70,9 @@ void parse_install_targets(
     while (i < parse_args.size()) {
         const auto& arg = parse_args[i];
         // Stop at first keyword
-        if (arg == "EXPORT" || arg == "ARCHIVE" || arg == "LIBRARY" || arg == "RUNTIME" ||
-            arg == "BUNDLE" || arg == "PUBLIC_HEADER" || arg == "PRIVATE_HEADER" ||
-            arg == "INCLUDES" ||
-            arg == "DESTINATION" || arg == "PERMISSIONS" || arg == "CONFIGURATIONS" ||
-            arg == "COMPONENT" || arg == "OPTIONAL" || arg == "EXCLUDE_FROM_ALL") {
+        if (arg == "EXPORT" || arg == "ARCHIVE" || arg == "LIBRARY" || arg == "RUNTIME" || arg == "BUNDLE" || arg == "PUBLIC_HEADER"
+            || arg == "PRIVATE_HEADER" || arg == "INCLUDES" || arg == "DESTINATION" || arg == "PERMISSIONS" || arg == "CONFIGURATIONS"
+            || arg == "COMPONENT" || arg == "OPTIONAL" || arg == "EXCLUDE_FROM_ALL") {
             break;
         }
         rule->targets.push_back(arg);
@@ -89,8 +83,9 @@ void parse_install_targets(
         // CMake silently accepts install(TARGETS) with no targets
         // (e.g. when a variable expands to empty)
         interp.print_message("WARNING",
-            "install(TARGETS) called with no targets "
-            "(undocumented CMake behavior, accepted for compatibility)", true);
+                             "install(TARGETS) called with no targets "
+                             "(undocumented CMake behavior, accepted for compatibility)",
+                             true);
         return;
     }
 
@@ -127,15 +122,21 @@ void parse_install_targets(
             }
             export_name = remaining_args[i + 1];
             i += 2;
-        } else if (arg == "ARCHIVE" || arg == "LIBRARY" || arg == "RUNTIME" ||
-            arg == "BUNDLE" || arg == "PUBLIC_HEADER" || arg == "PRIVATE_HEADER") {
+        } else if (arg == "ARCHIVE" || arg == "LIBRARY" || arg == "RUNTIME" || arg == "BUNDLE" || arg == "PUBLIC_HEADER"
+                   || arg == "PRIVATE_HEADER") {
             current_dest_type = arg;
-            if (arg == "ARCHIVE") current_dest = &rule->archive_dest;
-            else if (arg == "LIBRARY") current_dest = &rule->library_dest;
-            else if (arg == "RUNTIME") current_dest = &rule->runtime_dest;
-            else if (arg == "BUNDLE") current_dest = &rule->bundle_dest;
-            else if (arg == "PUBLIC_HEADER") current_dest = &rule->public_header_dest;
-            else if (arg == "PRIVATE_HEADER") current_dest = &rule->private_header_dest;
+            if (arg == "ARCHIVE")
+                current_dest = &rule->archive_dest;
+            else if (arg == "LIBRARY")
+                current_dest = &rule->library_dest;
+            else if (arg == "RUNTIME")
+                current_dest = &rule->runtime_dest;
+            else if (arg == "BUNDLE")
+                current_dest = &rule->bundle_dest;
+            else if (arg == "PUBLIC_HEADER")
+                current_dest = &rule->public_header_dest;
+            else if (arg == "PRIVATE_HEADER")
+                current_dest = &rule->private_header_dest;
             ++i;
         } else if (arg == "INCLUDES") {
             // Expect: INCLUDES DESTINATION dir1 [dir2 ...]
@@ -147,11 +148,9 @@ void parse_install_targets(
             // Consume destinations until next keyword
             while (i < remaining_args.size()) {
                 const auto& a = remaining_args[i];
-                if (a == "EXPORT" || a == "ARCHIVE" || a == "LIBRARY" || a == "RUNTIME" ||
-                    a == "BUNDLE" || a == "PUBLIC_HEADER" || a == "PRIVATE_HEADER" ||
-                    a == "INCLUDES" ||
-                    a == "DESTINATION" || a == "PERMISSIONS" || a == "CONFIGURATIONS" ||
-                    a == "COMPONENT" || a == "OPTIONAL" || a == "EXCLUDE_FROM_ALL") {
+                if (a == "EXPORT" || a == "ARCHIVE" || a == "LIBRARY" || a == "RUNTIME" || a == "BUNDLE" || a == "PUBLIC_HEADER"
+                    || a == "PRIVATE_HEADER" || a == "INCLUDES" || a == "DESTINATION" || a == "PERMISSIONS" || a == "CONFIGURATIONS"
+                    || a == "COMPONENT" || a == "OPTIONAL" || a == "EXCLUDE_FROM_ALL") {
                     break;
                 }
                 includes_destinations.push_back(a);
@@ -178,24 +177,19 @@ void parse_install_targets(
             i += 2;
         } else if (arg == "PERMISSIONS" && current_dest) {
             ++i;
-            while (i < remaining_args.size() &&
-                   remaining_args[i].find("_") != std::string::npos &&
-                   (remaining_args[i].find("OWNER_") == 0 ||
-                    remaining_args[i].find("GROUP_") == 0 ||
-                    remaining_args[i].find("WORLD_") == 0)) {
+            while (i < remaining_args.size() && remaining_args[i].find("_") != std::string::npos
+                   && (remaining_args[i].find("OWNER_") == 0 || remaining_args[i].find("GROUP_") == 0
+                       || remaining_args[i].find("WORLD_") == 0)) {
                 current_dest->permissions.push_back(remaining_args[i]);
                 ++i;
             }
         } else if (arg == "CONFIGURATIONS" && current_dest) {
             ++i;
-            while (i < remaining_args.size() &&
-                   remaining_args[i] != "EXPORT" && remaining_args[i] != "ARCHIVE" &&
-                   remaining_args[i] != "LIBRARY" && remaining_args[i] != "RUNTIME" &&
-                   remaining_args[i] != "BUNDLE" &&
-                   remaining_args[i] != "PUBLIC_HEADER" && remaining_args[i] != "PRIVATE_HEADER" &&
-                   remaining_args[i] != "DESTINATION" && remaining_args[i] != "PERMISSIONS" &&
-                   remaining_args[i] != "COMPONENT" && remaining_args[i] != "OPTIONAL" &&
-                   remaining_args[i] != "EXCLUDE_FROM_ALL") {
+            while (i < remaining_args.size() && remaining_args[i] != "EXPORT" && remaining_args[i] != "ARCHIVE"
+                   && remaining_args[i] != "LIBRARY" && remaining_args[i] != "RUNTIME" && remaining_args[i] != "BUNDLE"
+                   && remaining_args[i] != "PUBLIC_HEADER" && remaining_args[i] != "PRIVATE_HEADER" && remaining_args[i] != "DESTINATION"
+                   && remaining_args[i] != "PERMISSIONS" && remaining_args[i] != "COMPONENT" && remaining_args[i] != "OPTIONAL"
+                   && remaining_args[i] != "EXCLUDE_FROM_ALL") {
                 current_dest->configurations.push_back(remaining_args[i]);
                 ++i;
             }
@@ -224,15 +218,9 @@ void parse_install_targets(
         auto v = interp.get_variable(var);
         return v.empty() ? std::string(fallback) : v;
     };
-    if (rule->runtime_dest.destination.empty()) {
-        rule->runtime_dest.destination = var_or("CMAKE_INSTALL_BINDIR", "bin");
-    }
-    if (rule->library_dest.destination.empty()) {
-        rule->library_dest.destination = var_or("CMAKE_INSTALL_LIBDIR", "lib");
-    }
-    if (rule->archive_dest.destination.empty()) {
-        rule->archive_dest.destination = var_or("CMAKE_INSTALL_LIBDIR", "lib");
-    }
+    if (rule->runtime_dest.destination.empty()) { rule->runtime_dest.destination = var_or("CMAKE_INSTALL_BINDIR", "bin"); }
+    if (rule->library_dest.destination.empty()) { rule->library_dest.destination = var_or("CMAKE_INSTALL_LIBDIR", "lib"); }
+    if (rule->archive_dest.destination.empty()) { rule->archive_dest.destination = var_or("CMAKE_INSTALL_LIBDIR", "lib"); }
 
     // Apply INCLUDES DESTINATION to each target's INTERFACE_INCLUDE_DIRECTORIES,
     // wrapped in $<INSTALL_INTERFACE:...> so the value only takes effect
@@ -240,9 +228,7 @@ void parse_install_targets(
     if (!includes_destinations.empty()) {
         std::vector<std::string> wrapped;
         wrapped.reserve(includes_destinations.size());
-        for (const auto& d : includes_destinations) {
-            wrapped.push_back("$<INSTALL_INTERFACE:" + d + ">");
-        }
+        for (const auto& d : includes_destinations) { wrapped.push_back("$<INSTALL_INTERFACE:" + d + ">"); }
         for (const auto& target_name : rule->targets) {
             if (auto* t = interp.find_target(target_name)) {
                 t->append_property("INCLUDE_DIRECTORIES", wrapped, PropertyVisibility::INTERFACE);
@@ -253,10 +239,8 @@ void parse_install_targets(
     // Add targets to the export set
     if (!export_name.empty()) {
         for (const auto& target_name : rule->targets) {
-            interp.add_to_export_set(export_name, target_name, src_dir, bin_dir,
-                                     rule->archive_dest.destination,
-                                     rule->library_dest.destination,
-                                     rule->runtime_dest.destination);
+            interp.add_to_export_set(export_name, target_name, src_dir, bin_dir, rule->archive_dest.destination,
+                                     rule->library_dest.destination, rule->runtime_dest.destination);
         }
     }
 
@@ -271,13 +255,8 @@ void parse_install_targets(
 }
 
 // Parse install(FILES ...) or install(PROGRAMS ...)
-void parse_install_files(
-    Interpreter& interp,
-    const std::vector<std::string>& args,
-    const std::string& src_dir,
-    const std::string& bin_dir,
-    bool is_programs
-) {
+void parse_install_files(Interpreter& interp, const std::vector<std::string>& args, const std::string& src_dir, const std::string& bin_dir,
+                         bool is_programs) {
     const char* mode = is_programs ? "PROGRAMS" : "FILES";
 
     // Skip first argument (FILES/PROGRAMS keyword)
@@ -303,8 +282,8 @@ void parse_install_files(
 
     // No files provided - CMake silently accepts this (undocumented behavior)
     if (raw_files.empty()) {
-        interp.print_message("WARNING",
-            "install(" + std::string(mode) + ") called with no files - ignoring (undocumented CMake behavior)", true);
+        interp.print_message("WARNING", "install(" + std::string(mode) + ") called with no files - ignoring (undocumented CMake behavior)",
+                             true);
         return;
     }
 
@@ -332,9 +311,7 @@ void parse_install_files(
     // Resolve file paths to absolute
     for (const auto& f : raw_files) {
         std::filesystem::path file_path = f;
-        if (!file_path.is_absolute()) {
-            file_path = std::filesystem::path(src_dir) / file_path;
-        }
+        if (!file_path.is_absolute()) { file_path = std::filesystem::path(src_dir) / file_path; }
         rule->files.push_back(file_path.lexically_normal().string());
     }
 
@@ -349,12 +326,8 @@ void parse_install_files(
 }
 
 // Parse install(DIRECTORY ...)
-void parse_install_directory(
-    Interpreter& interp,
-    const std::vector<std::string>& args,
-    const std::string& src_dir,
-    const std::string& bin_dir
-) {
+void parse_install_directory(Interpreter& interp, const std::vector<std::string>& args, const std::string& src_dir,
+                             const std::string& bin_dir) {
     // Skip first argument (DIRECTORY keyword)
     std::vector<std::string> parse_args(args.begin() + 1, args.end());
 
@@ -364,18 +337,14 @@ void parse_install_directory(
     size_t i = 0;
     while (i < parse_args.size()) {
         const auto& arg = parse_args[i];
-        if (arg == "DESTINATION" || arg == "TYPE" || arg == "FILE_PERMISSIONS" ||
-            arg == "DIRECTORY_PERMISSIONS" || arg == "USE_SOURCE_PERMISSIONS" ||
-            arg == "FILES_MATCHING" || arg == "PATTERN" ||
-            arg == "CONFIGURATIONS" || arg == "COMPONENT" || arg == "OPTIONAL" ||
-            arg == "EXCLUDE_FROM_ALL") {
+        if (arg == "DESTINATION" || arg == "TYPE" || arg == "FILE_PERMISSIONS" || arg == "DIRECTORY_PERMISSIONS"
+            || arg == "USE_SOURCE_PERMISSIONS" || arg == "FILES_MATCHING" || arg == "PATTERN" || arg == "CONFIGURATIONS"
+            || arg == "COMPONENT" || arg == "OPTIONAL" || arg == "EXCLUDE_FROM_ALL") {
             break;
         }
         // Resolve relative paths
         std::filesystem::path dir_path = arg;
-        if (!dir_path.is_absolute()) {
-            dir_path = std::filesystem::path(src_dir) / dir_path;
-        }
+        if (!dir_path.is_absolute()) { dir_path = std::filesystem::path(src_dir) / dir_path; }
         rule->directories.push_back(dir_path.lexically_normal().string());
         ++i;
     }
@@ -384,8 +353,9 @@ void parse_install_directory(
         // CMake silently accepts install(DIRECTORY) with no directories
         // (e.g. when a variable expands to empty)
         interp.print_message("WARNING",
-            "install(DIRECTORY) called with no directories "
-            "(undocumented CMake behavior, accepted for compatibility)", true);
+                             "install(DIRECTORY) called with no directories "
+                             "(undocumented CMake behavior, accepted for compatibility)",
+                             true);
         return;
     }
 
@@ -450,10 +420,9 @@ void parse_install_directory(
             i += 2;
         } else if (arg == "CONFIGURATIONS") {
             ++i;
-            while (i < remaining_args.size() &&
-                   remaining_args[i] != "DESTINATION" && remaining_args[i] != "PATTERN" &&
-                   remaining_args[i] != "COMPONENT" && remaining_args[i] != "OPTIONAL" &&
-                   remaining_args[i] != "EXCLUDE_FROM_ALL" && remaining_args[i] != "USE_SOURCE_PERMISSIONS") {
+            while (i < remaining_args.size() && remaining_args[i] != "DESTINATION" && remaining_args[i] != "PATTERN"
+                   && remaining_args[i] != "COMPONENT" && remaining_args[i] != "OPTIONAL" && remaining_args[i] != "EXCLUDE_FROM_ALL"
+                   && remaining_args[i] != "USE_SOURCE_PERMISSIONS") {
                 rule->destination.configurations.push_back(remaining_args[i]);
                 ++i;
             }
@@ -487,14 +456,13 @@ void parse_install_directory(
 // CMake syntax: install([[SCRIPT <file>] [CODE <code>]]...
 //                       [ALL_COMPONENTS | COMPONENT <component>]
 //                       [EXCLUDE_FROM_ALL])
-void parse_install_script(
-    Interpreter& interp,
-    const std::vector<std::string>& args,
-    const std::string& src_dir,
-    const std::string& bin_dir
-) {
+void parse_install_script(Interpreter& interp, const std::vector<std::string>& args, const std::string& src_dir,
+                          const std::string& bin_dir) {
     // Collect script/code entries and shared options
-    struct Entry { bool is_script; std::string content; };
+    struct Entry {
+        bool is_script;
+        std::string content;
+    };
     std::vector<Entry> entries;
     std::string component;
     bool all_components = false;
@@ -505,17 +473,20 @@ void parse_install_script(
         const auto& arg = args[i];
         if (arg == "SCRIPT") {
             if (i + 1 >= args.size()) {
-                interp.set_fatal_error("install(SCRIPT) requires a file path"); return;
+                interp.set_fatal_error("install(SCRIPT) requires a file path");
+                return;
             }
             entries.push_back({true, args[++i]});
         } else if (arg == "CODE") {
             if (i + 1 >= args.size()) {
-                interp.set_fatal_error("install(CODE) requires a code string"); return;
+                interp.set_fatal_error("install(CODE) requires a code string");
+                return;
             }
             entries.push_back({false, args[++i]});
         } else if (arg == "COMPONENT") {
             if (i + 1 >= args.size()) {
-                interp.set_fatal_error("install(SCRIPT/CODE) COMPONENT requires a value"); return;
+                interp.set_fatal_error("install(SCRIPT/CODE) COMPONENT requires a value");
+                return;
             }
             component = args[++i];
         } else if (arg == "ALL_COMPONENTS") {
@@ -523,20 +494,23 @@ void parse_install_script(
         } else if (arg == "EXCLUDE_FROM_ALL") {
             exclude_from_all = true;
         } else {
-            interp.set_fatal_error("install(SCRIPT/CODE): unexpected argument '" + arg + "'"); return;
+            interp.set_fatal_error("install(SCRIPT/CODE): unexpected argument '" + arg + "'");
+            return;
         }
         ++i;
     }
 
     if (entries.empty()) {
-        interp.set_fatal_error("install(SCRIPT/CODE) requires at least one SCRIPT or CODE entry"); return;
+        interp.set_fatal_error("install(SCRIPT/CODE) requires at least one SCRIPT or CODE entry");
+        return;
     }
 
     if (all_components && !component.empty()) {
-        interp.set_fatal_error("install(SCRIPT/CODE): ALL_COMPONENTS and COMPONENT are mutually exclusive"); return;
+        interp.set_fatal_error("install(SCRIPT/CODE): ALL_COMPONENTS and COMPONENT are mutually exclusive");
+        return;
     }
 
-    (void)exclude_from_all; // Stored but not used during interpretation
+    (void) exclude_from_all; // Stored but not used during interpretation
 
     // Create an install rule for each entry, sharing the same component
     for (const auto& entry : entries) {
@@ -545,9 +519,7 @@ void parse_install_script(
 
         if (entry.is_script) {
             std::filesystem::path script_path = entry.content;
-            if (!script_path.is_absolute()) {
-                script_path = std::filesystem::path(src_dir) / script_path;
-            }
+            if (!script_path.is_absolute()) { script_path = std::filesystem::path(src_dir) / script_path; }
             rule->script_path = script_path.lexically_normal().string();
         } else {
             rule->code = entry.content;
@@ -564,12 +536,8 @@ void parse_install_script(
 }
 
 // Parse install(EXPORT ...)
-void parse_install_export(
-    Interpreter& interp,
-    const std::vector<std::string>& args,
-    const std::string& src_dir,
-    const std::string& bin_dir
-) {
+void parse_install_export(Interpreter& interp, const std::vector<std::string>& args, const std::string& src_dir,
+                          const std::string& bin_dir) {
     // Skip first argument (EXPORT keyword)
     std::vector<std::string> parse_args(args.begin() + 1, args.end());
 
@@ -587,8 +555,9 @@ void parse_install_export(
         // CMake silently accepts install(EXPORT) with no export name
         // (e.g. when a variable expands to empty)
         interp.print_message("WARNING",
-            "install(EXPORT) called with no export name "
-            "(undocumented CMake behavior, accepted for compatibility)", true);
+                             "install(EXPORT) called with no export name "
+                             "(undocumented CMake behavior, accepted for compatibility)",
+                             true);
         return;
     }
 
@@ -597,8 +566,7 @@ void parse_install_export(
     auto it = export_sets.find(rule->export_name);
     if (it == export_sets.end() || it->second.empty()) {
         interp.print_message("WARNING",
-            "install(EXPORT) export set '" + rule->export_name +
-            "' has no targets - no export file will be generated");
+                             "install(EXPORT) export set '" + rule->export_name + "' has no targets - no export file will be generated");
         return;
     }
 
@@ -610,8 +578,7 @@ void parse_install_export(
             targets_to_export.push_back(target);
         } else {
             interp.print_message("WARNING",
-                "install(EXPORT) target '" + entry.target_name +
-                "' in export set '" + rule->export_name + "' not found");
+                                 "install(EXPORT) target '" + entry.target_name + "' in export set '" + rule->export_name + "' not found");
         }
     }
 
@@ -705,8 +672,7 @@ void register_install_builtins(Interpreter& interp) {
             const auto& export_sets = interp.get_export_sets();
             auto it = export_sets.find(export_set_name);
             if (it == export_sets.end() || it->second.empty()) {
-                interp.print_message("WARNING",
-                    "export(EXPORT) export set '" + export_set_name + "' has no targets");
+                interp.print_message("WARNING", "export(EXPORT) export set '" + export_set_name + "' has no targets");
                 return;
             }
 
@@ -714,36 +680,29 @@ void register_install_builtins(Interpreter& interp) {
             std::vector<Target*> targets_to_export;
             for (const auto& entry : it->second) {
                 auto* target = interp.find_target(entry.target_name);
-                if (target) {
-                    targets_to_export.push_back(target);
-                }
+                if (target) { targets_to_export.push_back(target); }
             }
 
             if (targets_to_export.empty()) {
-                interp.print_message("WARNING",
-                    "export(EXPORT) no valid targets found in export set '" + export_set_name + "'");
+                interp.print_message("WARNING", "export(EXPORT) no valid targets found in export set '" + export_set_name + "'");
                 return;
             }
 
             // Default file name
-            if (file_path.empty()) {
-                file_path = export_set_name + ".cmake";
-            }
+            if (file_path.empty()) { file_path = export_set_name + ".cmake"; }
 
             // Resolve file path relative to binary dir
             std::filesystem::path output_file = file_path;
-            if (!output_file.is_absolute()) {
-                output_file = std::filesystem::path(bin_dir) / output_file;
-            }
+            if (!output_file.is_absolute()) { output_file = std::filesystem::path(bin_dir) / output_file; }
 
             // Generate export content
             ExportContext ctx;
-            ctx.for_install = false;  // Build-tree export
+            ctx.for_install = false; // Build-tree export
             ctx.namespace_prefix = namespace_prefix;
             ctx.destination = "";
             ctx.install_prefix = interp.get_variable("CMAKE_INSTALL_PREFIX");
             ctx.build_type = interp.get_variable("CMAKE_BUILD_TYPE");
-            ctx.config = interp.get_variable("CMAKE_BUILD_TYPE");  // Per-config properties
+            ctx.config = interp.get_variable("CMAKE_BUILD_TYPE"); // Per-config properties
             ctx.system_name = interp.get_variable("CMAKE_SYSTEM_NAME");
             ctx.cxx_compiler_id = interp.get_variable("CMAKE_CXX_COMPILER_ID");
             ctx.c_compiler_id = interp.get_variable("CMAKE_C_COMPILER_ID");
@@ -777,7 +736,7 @@ void register_install_builtins(Interpreter& interp) {
         std::string namespace_prefix;
         bool append = false;
 
-        size_t i = 1;  // Skip "TARGETS"
+        size_t i = 1; // Skip "TARGETS"
         while (i < args.size()) {
             const auto& arg = args[i];
             if (arg == "FILE") {
@@ -826,18 +785,16 @@ void register_install_builtins(Interpreter& interp) {
 
         // Resolve file path relative to binary dir
         std::filesystem::path output_file = file_path;
-        if (!output_file.is_absolute()) {
-            output_file = std::filesystem::path(bin_dir) / output_file;
-        }
+        if (!output_file.is_absolute()) { output_file = std::filesystem::path(bin_dir) / output_file; }
 
         // Generate export content
         ExportContext ctx;
-        ctx.for_install = false;  // Build-tree export
+        ctx.for_install = false; // Build-tree export
         ctx.namespace_prefix = namespace_prefix;
         ctx.destination = "";
         ctx.install_prefix = interp.get_variable("CMAKE_INSTALL_PREFIX");
         ctx.build_type = interp.get_variable("CMAKE_BUILD_TYPE");
-        ctx.config = interp.get_variable("CMAKE_BUILD_TYPE");  // Per-config properties
+        ctx.config = interp.get_variable("CMAKE_BUILD_TYPE"); // Per-config properties
         ctx.system_name = interp.get_variable("CMAKE_SYSTEM_NAME");
         ctx.cxx_compiler_id = interp.get_variable("CMAKE_CXX_COMPILER_ID");
         ctx.c_compiler_id = interp.get_variable("CMAKE_C_COMPILER_ID");
@@ -851,9 +808,7 @@ void register_install_builtins(Interpreter& interp) {
         // Write to file
         std::filesystem::create_directories(output_file.parent_path());
         std::ios_base::openmode mode = std::ios::out;
-        if (append) {
-            mode |= std::ios::app;
-        }
+        if (append) { mode |= std::ios::app; }
         std::ofstream out(output_file, mode);
         if (!out) {
             interp.set_fatal_error("export(TARGETS): failed to open file for writing: " + output_file.string());

@@ -16,20 +16,16 @@ struct PolicyInfo {
 };
 
 enum class CMakePolicy : uint8_t {
-    CMP0037,  // 3.0:  Target names should not be reserved and should match a validity pattern
-    CMP0126,  // 3.21: set(CACHE) removes local variables
-    CMP0148,  // 3.27: FindPythonInterp/FindPythonLibs removed
-    CMP0167,  // 3.30: Boost find_package config-first
-    CMP0173,  // 3.31: CMakeFindFrameworks.cmake is deprecated
+    CMP0037, // 3.0:  Target names should not be reserved and should match a validity pattern
+    CMP0126, // 3.21: set(CACHE) removes local variables
+    CMP0148, // 3.27: FindPythonInterp/FindPythonLibs removed
+    CMP0167, // 3.30: Boost find_package config-first
+    CMP0173, // 3.31: CMakeFindFrameworks.cmake is deprecated
     COUNT
 };
 
 inline constexpr PolicyInfo policy_info[] = {
-    {"CMP0037", "3.0"},
-    {"CMP0126", "3.21"},
-    {"CMP0148", "3.27"},
-    {"CMP0167", "3.30"},
-    {"CMP0173", "3.31"},
+    {"CMP0037", "3.0"}, {"CMP0126", "3.21"}, {"CMP0148", "3.27"}, {"CMP0167", "3.30"}, {"CMP0173", "3.31"},
 };
 static_assert(std::size(policy_info) == size_t(CMakePolicy::COUNT));
 
@@ -58,8 +54,7 @@ struct PolicyStack {
     // later ones → OLD.
     void set_defaults_for_version(std::string_view version) {
         for (size_t i = 0; i < size_t(CMakePolicy::COUNT); ++i) {
-            current_[i] = compare_versions(version, policy_info[i].introduced) >= 0
-                ? PolicyState::NEW : PolicyState::OLD;
+            current_[i] = compare_versions(version, policy_info[i].introduced) >= 0 ? PolicyState::NEW : PolicyState::OLD;
         }
     }
 
@@ -77,8 +72,7 @@ struct PolicyStack {
 // Parse "CMP0126" → enum. Returns nullopt for unknown policies.
 inline std::optional<CMakePolicy> parse_cmake_policy(std::string_view name) {
     for (size_t i = 0; i < size_t(CMakePolicy::COUNT); ++i) {
-        if (name == policy_info[i].name)
-            return static_cast<CMakePolicy>(i);
+        if (name == policy_info[i].name) return static_cast<CMakePolicy>(i);
     }
     return std::nullopt;
 }

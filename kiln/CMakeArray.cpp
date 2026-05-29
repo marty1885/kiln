@@ -7,9 +7,7 @@
 namespace kiln {
 
 std::vector<std::string> CMakeArray::split_by_semicolon(const std::string& str) {
-    if (str.empty()) {
-        return {};
-    }
+    if (str.empty()) { return {}; }
 
     // CMake's list() does NOT track genex nesting -- semicolons inside $<...>
     // are still separators. Only \; is treated as an escaped (non-separator) semicolon.
@@ -61,17 +59,11 @@ size_t CMakeArray::count_elements(std::string_view str) {
     return count;
 }
 
-CMakeArray::CMakeArray(const std::string& semicolon_separated)
-    : items_(split_by_semicolon(semicolon_separated)) {
-}
+CMakeArray::CMakeArray(const std::string& semicolon_separated) : items_(split_by_semicolon(semicolon_separated)) {}
 
-CMakeArray::CMakeArray(const std::vector<std::string>& items)
-    : items_(items) {
-}
+CMakeArray::CMakeArray(const std::vector<std::string>& items) : items_(items) {}
 
-CMakeArray::CMakeArray(std::initializer_list<std::string> items)
-    : items_(items) {
-}
+CMakeArray::CMakeArray(std::initializer_list<std::string> items) : items_(items) {}
 
 std::string CMakeArray::to_string() const {
     std::string res;
@@ -128,25 +120,19 @@ static bool natural_compare(const std::string& a, const std::string& b) {
             auto opt_a = parse_number<unsigned long long>(num_a);
             auto opt_b = parse_number<unsigned long long>(num_b);
             if (opt_a && opt_b) {
-                if (*opt_a != *opt_b) {
-                    return *opt_a < *opt_b;
-                }
+                if (*opt_a != *opt_b) { return *opt_a < *opt_b; }
                 // If numerically equal, longer strings (more leading zeros) come first
                 // This handles "00" vs "0" - "00" (length 2) comes before "0" (length 1)
                 if (num_a.size() != num_b.size()) {
-                    return num_a.size() > num_b.size();  // Longer first!
+                    return num_a.size() > num_b.size(); // Longer first!
                 }
             } else {
                 // If numeric conversion fails, fall back to string comparison
-                if (num_a != num_b) {
-                    return num_a < num_b;
-                }
+                if (num_a != num_b) { return num_a < num_b; }
             }
         } else {
             // Lexicographic comparison
-            if (a[i] != b[j]) {
-                return a[i] < b[j];
-            }
+            if (a[i] != b[j]) { return a[i] < b[j]; }
             i++;
             j++;
         }
@@ -160,7 +146,7 @@ void CMakeArray::sort(bool natural, bool descending) {
     if (natural) {
         if (descending) {
             std::sort(items_.begin(), items_.end(), [](const std::string& a, const std::string& b) {
-                return natural_compare(b, a);  // Reverse comparison for descending
+                return natural_compare(b, a); // Reverse comparison for descending
             });
         } else {
             std::sort(items_.begin(), items_.end(), natural_compare);
@@ -199,8 +185,7 @@ bool CMakeArray::contains(const std::string& item) const {
 
 // --- CMakeArrayView ---
 
-CMakeArrayView::CMakeArrayView(std::string_view semicolon_separated)
-    : source_(semicolon_separated) {
+CMakeArrayView::CMakeArrayView(std::string_view semicolon_separated) : source_(semicolon_separated) {
     if (source_.empty()) return;
 
     // CMake does NOT track genex nesting for list splitting.
@@ -221,9 +206,7 @@ size_t CMakeArrayView::size() const {
 }
 
 std::string_view CMakeArrayView::at(size_t idx) const {
-    if (idx >= size()) {
-        throw std::out_of_range("CMakeArrayView::at: index out of range");
-    }
+    if (idx >= size()) { throw std::out_of_range("CMakeArrayView::at: index out of range"); }
     return element_at(idx);
 }
 
@@ -240,4 +223,4 @@ std::string_view CMakeArrayView::element_at(size_t i) const {
     return source_.substr(start, end - start);
 }
 
-}
+} // namespace kiln

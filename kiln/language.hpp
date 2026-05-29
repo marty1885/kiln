@@ -4,14 +4,7 @@
 
 namespace kiln {
 
-enum class Language {
-    C,
-    CXX,
-    CUDA,
-    ASM,
-    HEADER,
-    UNKNOWN
-};
+enum class Language { C, CXX, CUDA, ASM, HEADER, UNKNOWN };
 
 // Canonical CMake-facing name for a language ("C", "CXX", "CUDA", "ASM",
 // "HEADER", "UNKNOWN").
@@ -26,7 +19,7 @@ struct LanguageInfo {
     std::string_view name;
     bool is_compileable;
     bool is_header;
-    bool is_module_interface = false;  // True for .ixx, .cppm, etc.
+    bool is_module_interface = false; // True for .ixx, .cppm, etc.
 };
 
 class LanguageClassifier {

@@ -26,12 +26,10 @@ public:
     using Args = std::optional<std::map<std::string, std::string>>;
 
     // Record a complete duration event ("X" phase in Chrome trace format).
-    void add_complete(std::string name, std::string cat,
-                      int64_t start_us, int64_t duration_us, Args args = std::nullopt);
+    void add_complete(std::string name, std::string cat, int64_t start_us, int64_t duration_us, Args args = std::nullopt);
 
     // Record a complete duration event with explicit thread ID.
-    void add_complete(std::string name, std::string cat,
-                      int64_t start_us, int64_t duration_us, int64_t tid, Args args = std::nullopt);
+    void add_complete(std::string name, std::string cat, int64_t start_us, int64_t duration_us, int64_t tid, Args args = std::nullopt);
 
     // Get current timestamp in microseconds since profiler epoch.
     int64_t now_us() const;

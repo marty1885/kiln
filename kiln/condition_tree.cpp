@@ -9,8 +9,7 @@ namespace {
 
 // Check if an argument is a bare unquoted string literal (no variable references).
 bool is_bare_literal(const Argument& arg) {
-    return !arg.quoted && arg.parts.size() == 1 &&
-           std::holds_alternative<std::string>(arg.parts[0]);
+    return !arg.quoted && arg.parts.size() == 1 && std::holds_alternative<std::string>(arg.parts[0]);
 }
 
 // Get the string value of a bare literal argument.
@@ -65,28 +64,45 @@ std::optional<ConditionNode::Type> keyword_to_type(const std::string& upper) {
 bool is_binary_op(ConditionNode::Type t) {
     using T = ConditionNode::Type;
     switch (t) {
-        case T::EQUAL: case T::NOT_EQUAL: case T::LESS: case T::GREATER:
-        case T::LESS_EQUAL: case T::GREATER_EQUAL:
-        case T::STREQUAL: case T::STRLESS: case T::STRGREATER:
-        case T::STRLESS_EQUAL: case T::STRGREATER_EQUAL:
-        case T::VERSION_EQUAL: case T::VERSION_LESS: case T::VERSION_GREATER:
-        case T::VERSION_LESS_EQUAL: case T::VERSION_GREATER_EQUAL:
-        case T::MATCHES: case T::IN_LIST: case T::IS_NEWER_THAN:
-            return true;
-        default:
-            return false;
+    case T::EQUAL:
+    case T::NOT_EQUAL:
+    case T::LESS:
+    case T::GREATER:
+    case T::LESS_EQUAL:
+    case T::GREATER_EQUAL:
+    case T::STREQUAL:
+    case T::STRLESS:
+    case T::STRGREATER:
+    case T::STRLESS_EQUAL:
+    case T::STRGREATER_EQUAL:
+    case T::VERSION_EQUAL:
+    case T::VERSION_LESS:
+    case T::VERSION_GREATER:
+    case T::VERSION_LESS_EQUAL:
+    case T::VERSION_GREATER_EQUAL:
+    case T::MATCHES:
+    case T::IN_LIST:
+    case T::IS_NEWER_THAN:
+        return true;
+    default:
+        return false;
     }
 }
 
 bool is_unary_op(ConditionNode::Type t) {
     using T = ConditionNode::Type;
     switch (t) {
-        case T::DEFINED: case T::TARGET: case T::EXISTS:
-        case T::IS_DIRECTORY: case T::IS_ABSOLUTE: case T::IS_SYMLINK:
-        case T::COMMAND: case T::POLICY:
-            return true;
-        default:
-            return false;
+    case T::DEFINED:
+    case T::TARGET:
+    case T::EXISTS:
+    case T::IS_DIRECTORY:
+    case T::IS_ABSOLUTE:
+    case T::IS_SYMLINK:
+    case T::COMMAND:
+    case T::POLICY:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -167,7 +183,7 @@ struct TreeBuilder {
                 auto next = classify_at(pos + 1);
                 if (failed) return std::nullopt;
                 if (next.has_value() && *next != ConditionNode::Type::AND && *next != ConditionNode::Type::OR) {
-                    pos++; // consume NOT
+                    pos++;                      // consume NOT
                     auto operand = parse_not(); // right-associative
                     if (!operand || failed) return std::nullopt;
                     ConditionNode node{ConditionNode::Type::NOT, *operand, 0};
@@ -245,8 +261,7 @@ struct TreeBuilder {
             if (!inner || failed) return std::nullopt;
 
             // Expect ")"
-            if (pos >= condition.size() || !is_bare_literal(condition[pos]) ||
-                get_literal_string(condition[pos]) != ")") {
+            if (pos >= condition.size() || !is_bare_literal(condition[pos]) || get_literal_string(condition[pos]) != ")") {
                 failed = true;
                 return std::nullopt;
             }
@@ -284,9 +299,7 @@ struct TreeBuilder {
 
 } // anonymous namespace
 
-std::optional<ConditionAST> build_condition_tree(
-    const std::vector<Argument>& condition,
-    const TokenClassifier& classify) {
+std::optional<ConditionAST> build_condition_tree(const std::vector<Argument>& condition, const TokenClassifier& classify) {
     if (condition.empty()) {
         return std::nullopt; // Empty condition handled separately
     }
@@ -295,9 +308,7 @@ std::optional<ConditionAST> build_condition_tree(
     TreeBuilder builder{condition, classify, ast.nodes};
 
     auto root = builder.parse_or();
-    if (!root || builder.failed) {
-        return std::nullopt;
-    }
+    if (!root || builder.failed) { return std::nullopt; }
 
     // Check that all tokens were consumed
     if (builder.pos < condition.size()) {
@@ -310,9 +321,7 @@ std::optional<ConditionAST> build_condition_tree(
 TokenClassifier make_parse_time_classifier() {
     return [](const Argument& arg, size_t /*pos*/) -> std::optional<ConditionNode::Type> {
         // Quoted args are never keywords
-        if (arg.quoted) {
-            return ConditionNode::Type::PRIMARY;
-        }
+        if (arg.quoted) { return ConditionNode::Type::PRIMARY; }
 
         // Must be a bare string literal (no variable references)
         if (arg.parts.size() != 1 || !std::holds_alternative<std::string>(arg.parts[0])) {

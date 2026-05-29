@@ -14,68 +14,68 @@
 namespace kiln {
 
 namespace {
-    // Helper function to strip whitespace
-    std::string strip(const std::string& str) {
-        return std::string(kiln::strip(str));
-    }
-
-    // Helper function to extract basename from file path
-    std::string get_basename(const std::string& path) {
-        size_t last_slash = path.find_last_of("/\\");
-        if (last_slash == std::string::npos) {
-            return path;
-        }
-        return path.substr(last_slash + 1);
-    }
-
-    // Locate the [start, sep_or_end) byte range of element `target` in a
-    // semicolon-separated list. `sep_or_end` is the position of the ';' that
-    // terminates the element, or src.size() if it is the last element.
-    // Returns nullopt if `target` is out of range. Respects \;-escaping.
-    std::optional<std::pair<size_t, size_t>>
-    element_extent(std::string_view src, size_t target) {
-        if (src.empty()) return std::nullopt;
-        size_t pos = 0, idx = 0, cur = 0;
-        while (cur <= src.size()) {
-            const void* f = (cur < src.size())
-                ? std::memchr(src.data() + cur, ';', src.size() - cur)
-                : nullptr;
-            if (!f) {
-                if (idx == target) return std::make_pair(pos, src.size());
-                return std::nullopt;
-            }
-            size_t s = static_cast<const char*>(f) - src.data();
-            if (s > 0 && src[s - 1] == '\\') { cur = s + 1; continue; }
-            if (idx == target) return std::make_pair(pos, s);
-            ++idx;
-            pos = s + 1;
-            cur = pos;
-        }
-        return std::nullopt;
-    }
-
-    // Locate the byte offset where element `target` begins. For
-    // target == element_count this returns src.size() (the append position).
-    // Returns nullopt if `target` is past one-after-last.
-    std::optional<size_t>
-    element_insert_pos(std::string_view src, size_t target) {
-        if (target == 0) return 0;
-        if (src.empty()) return std::nullopt;
-        size_t idx = 0, cur = 0;
-        while (cur < src.size()) {
-            const void* f = std::memchr(src.data() + cur, ';', src.size() - cur);
-            if (!f) break;
-            size_t s = static_cast<const char*>(f) - src.data();
-            if (s > 0 && src[s - 1] == '\\') { cur = s + 1; continue; }
-            ++idx;
-            cur = s + 1;
-            if (idx == target) return cur;
-        }
-        // Hit end of string. Element count is idx + 1; valid append index is that.
-        if (target == idx + 1) return src.size();
-        return std::nullopt;
-    }
+// Helper function to strip whitespace
+std::string strip(const std::string& str) {
+    return std::string(kiln::strip(str));
 }
+
+// Helper function to extract basename from file path
+std::string get_basename(const std::string& path) {
+    size_t last_slash = path.find_last_of("/\\");
+    if (last_slash == std::string::npos) { return path; }
+    return path.substr(last_slash + 1);
+}
+
+// Locate the [start, sep_or_end) byte range of element `target` in a
+// semicolon-separated list. `sep_or_end` is the position of the ';' that
+// terminates the element, or src.size() if it is the last element.
+// Returns nullopt if `target` is out of range. Respects \;-escaping.
+std::optional<std::pair<size_t, size_t>> element_extent(std::string_view src, size_t target) {
+    if (src.empty()) return std::nullopt;
+    size_t pos = 0, idx = 0, cur = 0;
+    while (cur <= src.size()) {
+        const void* f = (cur < src.size()) ? std::memchr(src.data() + cur, ';', src.size() - cur) : nullptr;
+        if (!f) {
+            if (idx == target) return std::make_pair(pos, src.size());
+            return std::nullopt;
+        }
+        size_t s = static_cast<const char*>(f) - src.data();
+        if (s > 0 && src[s - 1] == '\\') {
+            cur = s + 1;
+            continue;
+        }
+        if (idx == target) return std::make_pair(pos, s);
+        ++idx;
+        pos = s + 1;
+        cur = pos;
+    }
+    return std::nullopt;
+}
+
+// Locate the byte offset where element `target` begins. For
+// target == element_count this returns src.size() (the append position).
+// Returns nullopt if `target` is past one-after-last.
+std::optional<size_t> element_insert_pos(std::string_view src, size_t target) {
+    if (target == 0) return 0;
+    if (src.empty()) return std::nullopt;
+    size_t idx = 0, cur = 0;
+    while (cur < src.size()) {
+        const void* f = std::memchr(src.data() + cur, ';', src.size() - cur);
+        if (!f) break;
+        size_t s = static_cast<const char*>(f) - src.data();
+        if (s > 0 && src[s - 1] == '\\') {
+            cur = s + 1;
+            continue;
+        }
+        ++idx;
+        cur = s + 1;
+        if (idx == target) return cur;
+    }
+    // Hit end of string. Element count is idx + 1; valid append index is that.
+    if (target == idx + 1) return src.size();
+    return std::nullopt;
+}
+} // namespace
 
 void register_list_builtins(Interpreter& interp) {
     interp.add_builtin("list", [](Interpreter& interp, const std::vector<std::string>& args) {
@@ -85,7 +85,8 @@ void register_list_builtins(Interpreter& interp) {
         }
 
         std::string operation = args[0];
-        std::transform(operation.begin(), operation.end(), operation.begin(), [](unsigned char c){ return (c >= 'a' && c <= 'z') ? static_cast<unsigned char>(c - 32) : c; });
+        std::transform(operation.begin(), operation.end(), operation.begin(),
+                       [](unsigned char c) { return (c >= 'a' && c <= 'z') ? static_cast<unsigned char>(c - 32) : c; });
 
         std::vector<std::string> sub_args(args.begin() + 1, args.end());
 
@@ -103,8 +104,7 @@ void register_list_builtins(Interpreter& interp) {
             // Use the progressive index: first call scans (same cost as
             // count_elements), repeated LENGTH on the same value is O(1).
             auto* lidx = interp.get_variables().const_list_index_for_read(sub_args[0]);
-            size_t count = lidx ? lidx->total(*len_view)
-                                : CMakeArray::count_elements(*len_view);
+            size_t count = lidx ? lidx->total(*len_view) : CMakeArray::count_elements(*len_view);
             interp.set_variable(sub_args[1], std::to_string(count));
         } else if (operation == "GET") {
             // list(GET <list> <index> [<index> ...] <output variable>)
@@ -162,7 +162,10 @@ void register_list_builtins(Interpreter& interp) {
             // computed lazily — for the common all-non-negative case we skip
             // the full string scan that count_elements does.
             size_t num_indices = sub_args.size() - 2; // exclude list_var and out_var
-            struct IndexRequest { size_t orig_pos; long resolved; };
+            struct IndexRequest {
+                size_t orig_pos;
+                long resolved;
+            };
             IndexRequest buf[8];
             std::vector<IndexRequest> heap_buf;
             IndexRequest* requests = buf;
@@ -188,7 +191,7 @@ void register_list_builtins(Interpreter& interp) {
 
             // Sort by resolved index for single-pass iteration
             std::sort(requests, requests + num_indices,
-                [](const IndexRequest& a, const IndexRequest& b) { return a.resolved < b.resolved; });
+                      [](const IndexRequest& a, const IndexRequest& b) { return a.resolved < b.resolved; });
 
             // Single-pass collection
             std::string results[8];
@@ -215,8 +218,7 @@ void register_list_builtins(Interpreter& interp) {
                     auto val = *it;
                     // Handle all requests for this same index
                     // Unescape \; to ; in extracted elements (CMake behavior)
-                    auto unescaped = (val.find('\\') != std::string_view::npos)
-                        ? unescape_list_element(val) : std::string(val);
+                    auto unescaped = (val.find('\\') != std::string_view::npos) ? unescape_list_element(val) : std::string(val);
                     while (req_i < num_indices && requests[req_i].resolved == target_idx) {
                         result_arr[requests[req_i].orig_pos] = unescaped;
                         ++req_i;
@@ -270,9 +272,7 @@ void register_list_builtins(Interpreter& interp) {
                     if (!val->empty()) val->push_back(';');
                     val->append(sub_args[i]);
                 }
-                if (interp.has_variable_watches()) {
-                    interp.fire_variable_watch(sub_args[0], "MODIFIED_ACCESS", *val);
-                }
+                if (interp.has_variable_watches()) { interp.fire_variable_watch(sub_args[0], "MODIFIED_ACCESS", *val); }
             } else {
                 // Slow path: must read with cache fallback (when the local variable
                 // is unset, CMake exposes the cache value via `${VAR}` so list(APPEND)
@@ -314,9 +314,7 @@ void register_list_builtins(Interpreter& interp) {
             // CMake silently does nothing when popping from empty/undefined lists,
             // setting output variables to empty.
             if (list.empty()) {
-                for (const auto& out_var : out_vars) {
-                    interp.set_variable(out_var, "");
-                }
+                for (const auto& out_var : out_vars) { interp.set_variable(out_var, ""); }
                 return;
             }
 
@@ -329,14 +327,10 @@ void register_list_builtins(Interpreter& interp) {
                 interp.set_variable(out_vars[i], list[idx]);
             }
             // Any remaining output vars get empty
-            for (size_t i = list.size(); i < out_vars.size(); ++i) {
-                interp.set_variable(out_vars[i], "");
-            }
+            for (size_t i = list.size(); i < out_vars.size(); ++i) { interp.set_variable(out_vars[i], ""); }
 
             // Remove elements from the list
-            for (size_t i = 0; i < num_to_pop; ++i) {
-                list.erase(list.size() - 1);
-            }
+            for (size_t i = 0; i < num_to_pop; ++i) { list.erase(list.size() - 1); }
 
             entry.set(list.to_string());
         } else if (operation == "POP_FRONT") {
@@ -352,22 +346,15 @@ void register_list_builtins(Interpreter& interp) {
 
             // CMake silently does nothing when popping from empty/undefined lists
             if (list.empty()) {
-                for (const auto& out_var : out_vars) {
-                    interp.set_variable(out_var, "");
-                }
+                for (const auto& out_var : out_vars) { interp.set_variable(out_var, ""); }
                 return;
             }
 
             size_t num_to_pop = std::min(out_vars.empty() ? 1 : out_vars.size(), list.size());
 
             // Store popped values in output variables
-            for (size_t i = 0; i < std::min(out_vars.size(), list.size()); ++i) {
-                interp.set_variable(out_vars[i], list[i]);
-            }
-            for (size_t i = list.size(); i < out_vars.size(); ++i) {
-                interp.set_variable(out_vars[i], "");
-            }
-
+            for (size_t i = 0; i < std::min(out_vars.size(), list.size()); ++i) { interp.set_variable(out_vars[i], list[i]); }
+            for (size_t i = list.size(); i < out_vars.size(); ++i) { interp.set_variable(out_vars[i], ""); }
 
             list.erase_range(0, num_to_pop);
 
@@ -413,7 +400,10 @@ void register_list_builtins(Interpreter& interp) {
                 } else if (*start == src.size()) {
                     result.reserve(src.size() + 1 + joined_size);
                     result.append(src.data(), src.size());
-                    for (const auto& it : items) { result += ';'; result += it; }
+                    for (const auto& it : items) {
+                        result += ';';
+                        result += it;
+                    }
                 } else {
                     result.reserve(src.size() + joined_size + 1);
                     result.append(src.data(), *start);
@@ -462,7 +452,7 @@ void register_list_builtins(Interpreter& interp) {
 
             if (!compare_mode.empty()) {
                 std::transform(compare_mode.begin(), compare_mode.end(), compare_mode.begin(),
-                              [](unsigned char c){ return std::toupper(c); });
+                               [](unsigned char c) { return std::toupper(c); });
                 if (compare_mode == "NATURAL") {
                     natural = true;
                 } else if (compare_mode == "STRING") {
@@ -476,8 +466,7 @@ void register_list_builtins(Interpreter& interp) {
             }
 
             if (!order_mode.empty()) {
-                std::transform(order_mode.begin(), order_mode.end(), order_mode.begin(),
-                              [](unsigned char c){ return std::toupper(c); });
+                std::transform(order_mode.begin(), order_mode.end(), order_mode.begin(), [](unsigned char c) { return std::toupper(c); });
                 if (order_mode == "DESCENDING") {
                     descending = true;
                 } else if (order_mode != "ASCENDING") {
@@ -495,9 +484,7 @@ void register_list_builtins(Interpreter& interp) {
                 std::sort(vec.begin(), vec.end(), [descending](const std::string& a, const std::string& b) {
                     std::string basename_a = get_basename(a);
                     std::string basename_b = get_basename(b);
-                    if (descending) {
-                        return basename_a > basename_b;
-                    }
+                    if (descending) { return basename_a > basename_b; }
                     return basename_a < basename_b;
                 });
                 list = CMakeArray(vec);
@@ -545,8 +532,7 @@ void register_list_builtins(Interpreter& interp) {
                 size_t total;
                 bool need_total = (start < 0) || (length < 0);
                 if (need_total) {
-                    total = lidx ? lidx->total(list_str)
-                                 : CMakeArray::count_elements(list_str);
+                    total = lidx ? lidx->total(list_str) : CMakeArray::count_elements(list_str);
                     if (start < 0) start = static_cast<long>(total) + start;
                 } else {
                     total = 0; // computed on demand below if needed for the range check
@@ -565,8 +551,7 @@ void register_list_builtins(Interpreter& interp) {
                         interp.set_fatal_error("list(SUBLIST) start index out of range");
                         return;
                     }
-                    count = (length < 0) ? total - s
-                                         : std::min(static_cast<size_t>(length), total - s);
+                    count = (length < 0) ? total - s : std::min(static_cast<size_t>(length), total - s);
                 } else {
                     count = static_cast<size_t>(length);
                 }
@@ -619,10 +604,11 @@ void register_list_builtins(Interpreter& interp) {
                 size_t idx = 0;
                 for (auto item : CMakeArrayIterator(*list_view)) {
                     // Unescape \; before comparing (CMake compares unescaped values)
-                    bool match = (item.find('\\') != std::string_view::npos)
-                        ? unescape_list_element(item) == value
-                        : item == value;
-                    if (match) { found_index = static_cast<long>(idx); break; }
+                    bool match = (item.find('\\') != std::string_view::npos) ? unescape_list_element(item) == value : item == value;
+                    if (match) {
+                        found_index = static_cast<long>(idx);
+                        break;
+                    }
                     ++idx;
                 }
             }
@@ -684,8 +670,7 @@ void register_list_builtins(Interpreter& interp) {
                         // Drop the element and its trailing ';'.
                         result.reserve(src.size() - (sep_or_end + 1 - start));
                         result.append(src.data(), start);
-                        result.append(src.data() + sep_or_end + 1,
-                                      src.size() - sep_or_end - 1);
+                        result.append(src.data() + sep_or_end + 1, src.size() - sep_or_end - 1);
                     }
                     entry.set(std::move(result));
                     return;
@@ -702,9 +687,7 @@ void register_list_builtins(Interpreter& interp) {
                     return;
                 }
                 long idx = *idx_opt;
-                if (idx < 0) {
-                    idx = static_cast<long>(list.size()) + idx;
-                }
+                if (idx < 0) { idx = static_cast<long>(list.size()) + idx; }
                 if (idx < 0 || static_cast<size_t>(idx) >= list.size()) {
                     interp.set_fatal_error("list(REMOVE_AT) index out of range: " + idx_str);
                     return;
@@ -713,9 +696,7 @@ void register_list_builtins(Interpreter& interp) {
             }
 
             std::sort(positive_indices.begin(), positive_indices.end(), std::greater<size_t>());
-            for (size_t idx : positive_indices) {
-                list.erase(idx);
-            }
+            for (size_t idx : positive_indices) { list.erase(idx); }
             entry.set(list.to_string());
         } else if (operation == "FILTER") {
             CommandParser parser("list", "FILTER");
@@ -726,8 +707,8 @@ void register_list_builtins(Interpreter& interp) {
             parser.positional(pattern, "regex pattern");
             PARSE_OR_RETURN(parser, interp, sub_args);
 
-            std::transform(mode.begin(), mode.end(), mode.begin(), [](unsigned char c){ return std::toupper(c); });
-            std::transform(regex_mode.begin(), regex_mode.end(), regex_mode.begin(), [](unsigned char c){ return std::toupper(c); });
+            std::transform(mode.begin(), mode.end(), mode.begin(), [](unsigned char c) { return std::toupper(c); });
+            std::transform(regex_mode.begin(), regex_mode.end(), regex_mode.begin(), [](unsigned char c) { return std::toupper(c); });
 
             if (mode != "INCLUDE" && mode != "EXCLUDE") {
                 interp.set_fatal_error("list(FILTER) mode must be INCLUDE or EXCLUDE");
@@ -739,9 +720,7 @@ void register_list_builtins(Interpreter& interp) {
                 return;
             }
 
-            thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) {
-                return Regex::from_cmake_regex(p);
-            });
+            thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) { return Regex::from_cmake_regex(p); });
             auto rx = cache.get(pattern);
             if (!rx) {
                 interp.set_fatal_error("list(FILTER) invalid regex: " + rx.error());
@@ -769,7 +748,7 @@ void register_list_builtins(Interpreter& interp) {
 
             std::string list_var = sub_args[0];
             std::string action = sub_args[1];
-            std::transform(action.begin(), action.end(), action.begin(), [](unsigned char c){ return std::toupper(c); });
+            std::transform(action.begin(), action.end(), action.begin(), [](unsigned char c) { return std::toupper(c); });
 
             // Parse remaining arguments
             std::string output_var;
@@ -781,7 +760,7 @@ void register_list_builtins(Interpreter& interp) {
             while (i < sub_args.size()) {
                 std::string arg = sub_args[i];
                 std::string arg_upper = arg;
-                std::transform(arg_upper.begin(), arg_upper.end(), arg_upper.begin(), [](unsigned char c){ return std::toupper(c); });
+                std::transform(arg_upper.begin(), arg_upper.end(), arg_upper.begin(), [](unsigned char c) { return std::toupper(c); });
 
                 if (arg_upper == "OUTPUT_VARIABLE") {
                     if (i + 1 >= sub_args.size()) {
@@ -796,7 +775,8 @@ void register_list_builtins(Interpreter& interp) {
                     while (i < sub_args.size()) {
                         std::string next = sub_args[i];
                         std::string next_upper = next;
-                        std::transform(next_upper.begin(), next_upper.end(), next_upper.begin(), [](unsigned char c){ return std::toupper(c); });
+                        std::transform(next_upper.begin(), next_upper.end(), next_upper.begin(),
+                                       [](unsigned char c) { return std::toupper(c); });
                         if (next_upper == "OUTPUT_VARIABLE" || next_upper == "FOR" || next_upper == "REGEX") {
                             --i; // Back up so the outer loop processes this keyword
                             break;
@@ -815,7 +795,8 @@ void register_list_builtins(Interpreter& interp) {
                     while (i < sub_args.size() && selector_params.size() < 3) {
                         std::string next = sub_args[i];
                         std::string next_upper = next;
-                        std::transform(next_upper.begin(), next_upper.end(), next_upper.begin(), [](unsigned char c){ return std::toupper(c); });
+                        std::transform(next_upper.begin(), next_upper.end(), next_upper.begin(),
+                                       [](unsigned char c) { return std::toupper(c); });
                         if (next_upper == "OUTPUT_VARIABLE" || next_upper == "AT" || next_upper == "REGEX") {
                             --i; // Back up so the outer loop processes this keyword
                             break;
@@ -827,7 +808,7 @@ void register_list_builtins(Interpreter& interp) {
                         interp.set_fatal_error("list(TRANSFORM) FOR requires at least start and stop");
                         return;
                     }
-                    --i;  // Compensate for the outer ++i
+                    --i; // Compensate for the outer ++i
                 } else if (arg_upper == "REGEX") {
                     selector_mode = arg_upper;
                     if (i + 1 >= sub_args.size()) {
@@ -861,9 +842,9 @@ void register_list_builtins(Interpreter& interp) {
                     }
                     element = action_args[0] + element;
                 } else if (action == "TOLOWER") {
-                    std::transform(element.begin(), element.end(), element.begin(), [](unsigned char c){ return std::tolower(c); });
+                    std::transform(element.begin(), element.end(), element.begin(), [](unsigned char c) { return std::tolower(c); });
                 } else if (action == "TOUPPER") {
-                    std::transform(element.begin(), element.end(), element.begin(), [](unsigned char c){ return std::toupper(c); });
+                    std::transform(element.begin(), element.end(), element.begin(), [](unsigned char c) { return std::toupper(c); });
                 } else if (action == "STRIP") {
                     element = strip(element);
                 } else if (action == "REPLACE") {
@@ -871,9 +852,7 @@ void register_list_builtins(Interpreter& interp) {
                         interp.set_fatal_error("list(TRANSFORM REPLACE) requires regex and replacement string");
                         return false;
                     }
-                    thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) {
-                        return Regex::from_cmake_regex(p);
-                    });
+                    thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) { return Regex::from_cmake_regex(p); });
                     auto rx = cache.get(action_args[0]);
                     if (!rx) {
                         interp.set_fatal_error("list(TRANSFORM REPLACE) invalid regex: " + rx.error());
@@ -909,9 +888,7 @@ void register_list_builtins(Interpreter& interp) {
                         return;
                     }
                     long idx = *idx_opt;
-                    if (idx < 0) {
-                        idx = static_cast<long>(result.size()) + idx;
-                    }
+                    if (idx < 0) { idx = static_cast<long>(result.size()) + idx; }
                     if (idx >= 0 && static_cast<size_t>(idx) < vec.size()) {
                         if (!transform_element(vec[idx])) return;
                     }
@@ -923,9 +900,7 @@ void register_list_builtins(Interpreter& interp) {
                     interp.set_fatal_error("list(TRANSFORM) REGEX requires a pattern");
                     return;
                 }
-                thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) {
-                    return Regex::from_cmake_regex_match(p);
-                });
+                thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) { return Regex::from_cmake_regex_match(p); });
                 auto rx = cache.get(selector_params[0]);
                 if (!rx) {
                     interp.set_fatal_error("list(TRANSFORM) invalid REGEX selector: " + rx.error());
@@ -970,12 +945,8 @@ void register_list_builtins(Interpreter& interp) {
                     }
 
                     // Handle negative indices
-                    if (start < 0) {
-                        start = static_cast<long>(result.size()) + start;
-                    }
-                    if (stop < 0) {
-                        stop = static_cast<long>(result.size()) + stop;
-                    }
+                    if (start < 0) { start = static_cast<long>(result.size()) + start; }
+                    if (stop < 0) { stop = static_cast<long>(result.size()) + stop; }
 
                     auto vec = result.to_vector();
 

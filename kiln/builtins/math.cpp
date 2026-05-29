@@ -22,9 +22,7 @@ public:
         if (pos_ >= expr_.size()) return 0;
         int64_t result = parse_bitwise_or();
         skip_whitespace();
-        if (pos_ < expr_.size()) {
-            throw std::runtime_error(std::string("Unexpected character in expression: '") + expr_[pos_] + "'");
-        }
+        if (pos_ < expr_.size()) { throw std::runtime_error(std::string("Unexpected character in expression: '") + expr_[pos_] + "'"); }
         return result;
     }
 
@@ -33,13 +31,10 @@ private:
     size_t pos_;
 
     void skip_whitespace() {
-        while (pos_ < expr_.size() && (expr_[pos_] == ' ' || expr_[pos_] == '\t' ||
-               expr_[pos_] == '\n' || expr_[pos_] == '\r')) ++pos_;
+        while (pos_ < expr_.size() && (expr_[pos_] == ' ' || expr_[pos_] == '\t' || expr_[pos_] == '\n' || expr_[pos_] == '\r')) ++pos_;
     }
 
-    char peek() const {
-        return pos_ < expr_.size() ? expr_[pos_] : '\0';
-    }
+    char peek() const { return pos_ < expr_.size() ? expr_[pos_] : '\0'; }
 
     int64_t parse_bitwise_or() {
         int64_t left = parse_bitwise_xor();
@@ -90,9 +85,14 @@ private:
         for (;;) {
             skip_whitespace();
             char c = peek();
-            if (c == '+') { ++pos_; left += parse_multiplicative(); }
-            else if (c == '-') { ++pos_; left -= parse_multiplicative(); }
-            else break;
+            if (c == '+') {
+                ++pos_;
+                left += parse_multiplicative();
+            } else if (c == '-') {
+                ++pos_;
+                left -= parse_multiplicative();
+            } else
+                break;
         }
         return left;
     }
@@ -125,9 +125,18 @@ private:
     int64_t parse_unary() {
         skip_whitespace();
         char c = peek();
-        if (c == '+') { ++pos_; return parse_unary(); }
-        if (c == '-') { ++pos_; return -parse_unary(); }
-        if (c == '~') { ++pos_; return ~parse_unary(); }
+        if (c == '+') {
+            ++pos_;
+            return parse_unary();
+        }
+        if (c == '-') {
+            ++pos_;
+            return -parse_unary();
+        }
+        if (c == '~') {
+            ++pos_;
+            return ~parse_unary();
+        }
         return parse_primary();
     }
 
@@ -144,13 +153,9 @@ private:
             return result;
         }
 
-        if (std::isdigit(static_cast<unsigned char>(c))) {
-            return parse_number();
-        }
+        if (std::isdigit(static_cast<unsigned char>(c))) { return parse_number(); }
 
-        if (c == '\0') {
-            throw std::runtime_error("Unexpected end of expression");
-        }
+        if (c == '\0') { throw std::runtime_error("Unexpected end of expression"); }
         throw std::runtime_error(std::string("Invalid character in expression: '") + c + "'");
     }
 
@@ -158,12 +163,9 @@ private:
         const char* start = expr_.data() + pos_;
 
         // Check for hex prefix
-        if (pos_ + 1 < expr_.size() && expr_[pos_] == '0' &&
-            (expr_[pos_ + 1] == 'x' || expr_[pos_ + 1] == 'X')) {
+        if (pos_ + 1 < expr_.size() && expr_[pos_] == '0' && (expr_[pos_ + 1] == 'x' || expr_[pos_ + 1] == 'X')) {
             pos_ += 2;
-            while (pos_ < expr_.size() && std::isxdigit(static_cast<unsigned char>(expr_[pos_]))) {
-                ++pos_;
-            }
+            while (pos_ < expr_.size() && std::isxdigit(static_cast<unsigned char>(expr_[pos_]))) { ++pos_; }
             const char* end = expr_.data() + pos_;
             // from_chars for hex doesn't expect "0x" prefix — skip it
             int64_t val;
@@ -175,15 +177,11 @@ private:
         }
 
         // Decimal
-        while (pos_ < expr_.size() && std::isdigit(static_cast<unsigned char>(expr_[pos_]))) {
-            ++pos_;
-        }
+        while (pos_ < expr_.size() && std::isdigit(static_cast<unsigned char>(expr_[pos_]))) { ++pos_; }
         const char* end = expr_.data() + pos_;
         int64_t val;
         auto r = std::from_chars(start, end, val, 10);
-        if (r.ec != std::errc{} || r.ptr != end) {
-            throw std::runtime_error(std::string("Invalid number: ") + std::string(start, end));
-        }
+        if (r.ec != std::errc{} || r.ptr != end) { throw std::runtime_error(std::string("Invalid number: ") + std::string(start, end)); }
         return val;
     }
 };
@@ -230,8 +228,10 @@ std::optional<PreParsedMath> classify_math(const std::vector<Argument>& args) {
         if (!kw || *kw != "OUTPUT_FORMAT") return std::nullopt;
         auto fmt = as_static_literal(args[4]);
         if (!fmt) return std::nullopt;
-        if (*fmt == "HEXADECIMAL") hex = true;
-        else if (*fmt != "DECIMAL") return std::nullopt;
+        if (*fmt == "HEXADECIMAL")
+            hex = true;
+        else if (*fmt != "DECIMAL")
+            return std::nullopt;
     }
 
     PreParsedMath pp;
@@ -260,19 +260,22 @@ std::optional<PreParsedMath> classify_math(const std::vector<Argument>& args) {
         size_t i = 0;
         while (i < s.size()) {
             char c = s[i];
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') { ++i; continue; }
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                ++i;
+                continue;
+            }
 
             if (state == ExpectOperand) {
                 bool neg = false;
                 while (c == '+' || c == '-') {
                     if (c == '-') neg = !neg;
                     ++i;
-                    while (i < s.size() && (s[i]==' '||s[i]=='\t')) ++i;
+                    while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) ++i;
                     if (i >= s.size()) return std::nullopt;
                     c = s[i];
                 }
                 if (c < '0' || c > '9') return std::nullopt;
-                if (c == '0' && i + 1 < s.size() && (s[i+1]=='x' || s[i+1]=='X')) return std::nullopt;
+                if (c == '0' && i + 1 < s.size() && (s[i + 1] == 'x' || s[i + 1] == 'X')) return std::nullopt;
                 int64_t v = 0;
                 while (i < s.size() && s[i] >= '0' && s[i] <= '9') {
                     v = v * 10 + (s[i] - '0');
@@ -320,8 +323,8 @@ static bool resolve_var_to_int(Interpreter& interp, const VariableReference& ref
 
     // Trim ASCII whitespace — CMake math accepts " 42 " style.
     size_t b = 0, e = value_sv.size();
-    while (b < e && (value_sv[b]==' '||value_sv[b]=='\t')) ++b;
-    while (e > b && (value_sv[e-1]==' '||value_sv[e-1]=='\t')) --e;
+    while (b < e && (value_sv[b] == ' ' || value_sv[b] == '\t')) ++b;
+    while (e > b && (value_sv[e - 1] == ' ' || value_sv[e - 1] == '\t')) --e;
     if (b == e) return false;
 
     const char* start = value_sv.data() + b;
@@ -345,9 +348,7 @@ static bool resolve_var_to_int(Interpreter& interp, const VariableReference& ref
     return true;
 }
 
-bool try_execute_pre_parsed_math(Interpreter& interp,
-                                  const PreParsedMath& pp,
-                                  const std::vector<Argument>& args) {
+bool try_execute_pre_parsed_math(Interpreter& interp, const PreParsedMath& pp, const std::vector<Argument>& args) {
     constexpr size_t MAX_INLINE = 16;
     int64_t stack_vals[MAX_INLINE];
     std::vector<int64_t> heap_vals;
@@ -379,10 +380,15 @@ bool try_execute_pre_parsed_math(Interpreter& interp,
     for (size_t i = 0; i < pp.ops.size(); ++i) {
         char o = pp.ops[i];
         int64_t rhs = vals[i + 1];
-        if (o == '*') { cur *= rhs; }
-        else if (o == '/') { if (rhs == 0) return false; cur /= rhs; }
-        else if (o == '%') { if (rhs == 0) return false; cur %= rhs; }
-        else {
+        if (o == '*') {
+            cur *= rhs;
+        } else if (o == '/') {
+            if (rhs == 0) return false;
+            cur /= rhs;
+        } else if (o == '%') {
+            if (rhs == 0) return false;
+            cur %= rhs;
+        } else {
             // + or -: emit current term, start new one.
             vals[out_n - 1] = cur;
             hi_ops.push_back(o);
@@ -394,10 +400,12 @@ bool try_execute_pre_parsed_math(Interpreter& interp,
 
     int64_t result = vals[0];
     for (size_t i = 0; i < hi_ops.size(); ++i) {
-        if (hi_ops[i] == '+') result += vals[i + 1];
-        else result -= vals[i + 1];
+        if (hi_ops[i] == '+')
+            result += vals[i + 1];
+        else
+            result -= vals[i + 1];
     }
-    (void)n;
+    (void) n;
 
     std::string result_str;
     if (pp.hex_output) {
@@ -476,9 +484,7 @@ void register_math_builtins(Interpreter& interp) {
             }
 
             interp.set_variable(var_name, result_str);
-        } catch (const std::exception& e) {
-            interp.set_fatal_error(std::string("math(EXPR) error: ") + e.what());
-        }
+        } catch (const std::exception& e) { interp.set_fatal_error(std::string("math(EXPR) error: ") + e.what()); }
     });
 }
 

@@ -9,22 +9,19 @@
 #include <vector>
 
 namespace kiln {
-struct Hash256
-{
+struct Hash256 {
     unsigned char bytes[32];
 
     std::string to_string() const;
 };
 
-struct Hash160
-{
+struct Hash160 {
     unsigned char bytes[20];
 
     std::string to_string() const;
 };
 
-struct Hash128
-{
+struct Hash128 {
     unsigned char bytes[16];
 
     std::string to_string() const;
@@ -36,9 +33,8 @@ struct Hash128
  * you are using OpenSSL and it has SHA3 in hardware mode. Otherwise BLAKE2b is
  * faster in software.
  */
-Hash256 blake2b(const void *data, size_t len, const void* key, size_t keylen);
-inline Hash256 blake2b(std::string_view str, std::string_view key="")
-{
+Hash256 blake2b(const void* data, size_t len, const void* key, size_t keylen);
+inline Hash256 blake2b(std::string_view str, std::string_view key = "") {
     return blake2b(str.data(), str.size(), key.data(), key.size());
 }
 
@@ -46,8 +42,7 @@ inline Hash256 blake2b(std::string_view str, std::string_view key="")
  * @brief Compute the SHA256 hash of the given data
  */
 Hash256 sha256(const void* data, size_t len);
-inline Hash256 sha256(std::string_view str)
-{
+inline Hash256 sha256(std::string_view str) {
     return sha256(str.data(), str.size());
 }
 
@@ -55,14 +50,12 @@ inline Hash256 sha256(std::string_view str)
  * @brief Compute the SHA1 hash of the given data
  */
 Hash160 sha1(const void* data, size_t len);
-inline Hash160 sha1(std::string_view str)
-{
+inline Hash160 sha1(std::string_view str) {
     return sha1(str.data(), str.size());
 }
 
 Hash128 md5(const void* data, size_t len);
-inline Hash128 md5(std::string_view str)
-{
+inline Hash128 md5(std::string_view str) {
     return md5(str.data(), str.size());
 }
 
@@ -245,4 +238,4 @@ inline int compare_versions(std::string_view a, std::string_view b) {
     return 0;
 }
 
-}
+} // namespace kiln

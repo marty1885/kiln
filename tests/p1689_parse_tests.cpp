@@ -29,8 +29,7 @@ bool gcc_is_real_gcc() {
     pclose(p);
     if (n == 0) return false;
     std::string out(buf, n);
-    return out.find("clang") == std::string::npos &&
-           (out.find("g++") != std::string::npos || out.find("GCC") != std::string::npos);
+    return out.find("clang") == std::string::npos && (out.find("g++") != std::string::npos || out.find("GCC") != std::string::npos);
 }
 
 } // namespace
@@ -150,11 +149,9 @@ TEST_CASE("P1689 parse: real g++ output round-trips", "[p1689][gcc]") {
 
     auto run_scan = [&](const fs::path& src, const fs::path& obj, const fs::path& ddi) {
         std::string cmd = "g++ -fmodules-ts -std=c++20 -fdeps-format=p1689r5"
-                          " -fdeps-file=" + ddi.string() +
-                          " -fdeps-target=" + obj.string() +
-                          " -E -MD -MF " + (ddi.string() + ".d") +
-                          " -x c++ " + src.string() +
-                          " -o /dev/null 2>/dev/null";
+                          " -fdeps-file="
+                          + ddi.string() + " -fdeps-target=" + obj.string() + " -E -MD -MF " + (ddi.string() + ".d") + " -x c++ "
+                          + src.string() + " -o /dev/null 2>/dev/null";
         return std::system(cmd.c_str());
     };
 

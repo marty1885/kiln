@@ -38,9 +38,7 @@ TEST_CASE("CMakeArray: to_string round-trips", "[cmake_array]") {
 
     CMakeArray arr2(arr.to_string());
     REQUIRE(arr2.size() == arr.size());
-    for (size_t i = 0; i < arr.size(); ++i) {
-        CHECK(arr2[i] == arr[i]);
-    }
+    for (size_t i = 0; i < arr.size(); ++i) { CHECK(arr2[i] == arr[i]); }
 }
 
 TEST_CASE("CMakeArray: to_vector", "[cmake_array]") {
@@ -176,9 +174,7 @@ TEST_CASE("CMakeArrayView: range-for iteration", "[cmake_array]") {
     std::string src = "one;two;three";
     CMakeArrayView view(src);
     std::vector<std::string_view> items;
-    for (auto sv : view) {
-        items.push_back(sv);
-    }
+    for (auto sv : view) { items.push_back(sv); }
     REQUIRE(items.size() == 3);
     CHECK(items[0] == "one");
     CHECK(items[1] == "two");
@@ -220,17 +216,13 @@ TEST_CASE("CMakeArrayView: leading semicolons produce empty elements", "[cmake_a
 
 TEST_CASE("CMakeArrayView: equivalence with CMakeArray", "[cmake_array]") {
     std::vector<std::string> test_strings = {
-        "", "a", "a;b;c", "$<1:a;b>;c", ";a;b;", ";;",
-        "hello", "x;y;z;w;v", "$<AND:$<1:a;b>;$<0:c;d>>;e"
-    };
+        "", "a", "a;b;c", "$<1:a;b>;c", ";a;b;", ";;", "hello", "x;y;z;w;v", "$<AND:$<1:a;b>;$<0:c;d>>;e"};
     for (const auto& s : test_strings) {
         CMakeArray arr(s);
         CMakeArrayView view(s);
 
         INFO("Testing string: \"" << s << "\"");
         REQUIRE(arr.size() == view.size());
-        for (size_t i = 0; i < arr.size(); ++i) {
-            CHECK(arr[i] == view[i]);
-        }
+        for (size_t i = 0; i < arr.size(); ++i) { CHECK(arr[i] == view[i]); }
     }
 }

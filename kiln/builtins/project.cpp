@@ -30,10 +30,9 @@ bool is_falsy_for_cmakedefine(const std::string& val) {
     if (val.empty()) return true;
 
     // False constants (case-insensitive)
-    if (val == "0" || ci_equals(val, "OFF") || ci_equals(val, "NO") ||
-        ci_equals(val, "FALSE") || ci_equals(val, "N") || ci_equals(val, "IGNORE") ||
-        ci_equals(val, "NOTFOUND") ||
-        (val.size() >= 9 && ci_equals(std::string_view(val).substr(val.size() - 9), "-NOTFOUND"))) {
+    if (val == "0" || ci_equals(val, "OFF") || ci_equals(val, "NO") || ci_equals(val, "FALSE") || ci_equals(val, "N")
+        || ci_equals(val, "IGNORE") || ci_equals(val, "NOTFOUND")
+        || (val.size() >= 9 && ci_equals(std::string_view(val).substr(val.size() - 9), "-NOTFOUND"))) {
         return true;
     }
 
@@ -60,8 +59,10 @@ std::string substitute_at_vars(Interpreter& interp, const std::string& content, 
                     std::string value = interp.get_variable(var_name);
                     if (escape_quotes) {
                         for (char c : value) {
-                            if (c == '"') result += "\\\"";
-                            else result += c;
+                            if (c == '"')
+                                result += "\\\"";
+                            else
+                                result += c;
                         }
                     } else {
                         result += value;
@@ -107,8 +108,10 @@ std::string substitute_dollar_vars(Interpreter& interp, const std::string& conte
 
                         if (escape_quotes) {
                             for (char c : value) {
-                                if (c == '"') result += "\\\"";
-                                else result += c;
+                                if (c == '"')
+                                    result += "\\\"";
+                                else
+                                    result += c;
                             }
                         } else {
                             result += value;
@@ -149,10 +152,8 @@ std::string process_cmakedefine(Interpreter& interp, const std::string& content)
             std::string value = interp.get_variable(var_name);
             bool is_true = !is_falsy_for_cmakedefine(value);
 
-            result << leading << "#" << hash_space << "define " << var_name
-                   << " " << (is_true ? "1" : "0");
-        }
-        else if (cmakedefine_re.match(line, captures)) {
+            result << leading << "#" << hash_space << "define " << var_name << " " << (is_true ? "1" : "0");
+        } else if (cmakedefine_re.match(line, captures)) {
             std::string leading = captures[1];
             std::string hash_space = captures[2];
             std::string var_name = captures[3];
@@ -166,8 +167,7 @@ std::string process_cmakedefine(Interpreter& interp, const std::string& content)
             if (is_defined) {
                 if (kiln::strip(rest).empty()) {
                     // No value after variable name
-                    if (value.empty() || value == "ON" || value == "TRUE" ||
-                        value == "YES" || value == "1") {
+                    if (value.empty() || value == "ON" || value == "TRUE" || value == "YES" || value == "1") {
                         result << leading << "#" << hash_space << "define " << var_name;
                     } else {
                         result << leading << "#" << hash_space << "define " << var_name << " " << value;
@@ -178,8 +178,7 @@ std::string process_cmakedefine(Interpreter& interp, const std::string& content)
             } else {
                 result << "/* " << leading << "#" << hash_space << "undef " << var_name << " */";
             }
-        }
-        else {
+        } else {
             result << line;
         }
     }
@@ -200,11 +199,15 @@ std::string convert_newlines(const std::string& content, const std::string& styl
                 continue; // Skip \r before \n
             }
             // Standalone \r
-            if (use_crlf) result += "\r\n";
-            else result += '\n';
+            if (use_crlf)
+                result += "\r\n";
+            else
+                result += '\n';
         } else if (content[i] == '\n') {
-            if (use_crlf) result += "\r\n";
-            else result += '\n';
+            if (use_crlf)
+                result += "\r\n";
+            else
+                result += '\n';
         } else {
             result += content[i];
         }
@@ -221,17 +224,14 @@ void register_project_builtins(Interpreter& interp) {
             if (args[i] == "VERSION" && i + 1 < args.size()) {
                 std::string version = args[i + 1];
                 // Handle VERSION x...y range syntax — use the minimum
-                if (auto dots = version.find("..."); dots != std::string::npos) {
-                    version = version.substr(0, dots);
-                }
+                if (auto dots = version.find("..."); dots != std::string::npos) { version = version.substr(0, dots); }
                 interp.set_variable("CMAKE_MINIMUM_REQUIRED_VERSION", version);
 
                 // Check that the requested version doesn't exceed what we support
                 auto our_version = interp.get_variable("CMAKE_VERSION");
                 if (!our_version.empty() && compare_versions(version, our_version) > 0) {
-                    interp.set_fatal_error("CMake " + version +
-                        " or higher is required.  You are running version " +
-                        std::string(our_version));
+                    interp.set_fatal_error("CMake " + version + " or higher is required.  You are running version "
+                                           + std::string(our_version));
                     return;
                 }
 
@@ -255,9 +255,7 @@ void register_project_builtins(Interpreter& interp) {
         interp.set_variable("PROJECT_NAME", project_name);
 
         // CMAKE_PROJECT_NAME tracks the top-level project name
-        if (interp.get_variable("CMAKE_PROJECT_NAME").empty()) {
-            interp.set_variable("CMAKE_PROJECT_NAME", project_name);
-        }
+        if (interp.get_variable("CMAKE_PROJECT_NAME").empty()) { interp.set_variable("CMAKE_PROJECT_NAME", project_name); }
         interp.set_variable("PROJECT_SOURCE_DIR", interp.get_variable("CMAKE_CURRENT_SOURCE_DIR"));
         interp.set_variable("PROJECT_BINARY_DIR", interp.get_variable("CMAKE_CURRENT_BINARY_DIR"));
 
@@ -284,50 +282,43 @@ void register_project_builtins(Interpreter& interp) {
         // nothing (e.g. VERSION ${SOME_EMPTY_VAR}). We match that behavior.
         for (size_t i = 1; i < args.size(); ++i) {
             if (args[i] == "VERSION") {
-                if (i + 1 < args.size() && args[i + 1] != "LANGUAGES" &&
-                    args[i + 1] != "DESCRIPTION" && args[i + 1] != "HOMEPAGE_URL") {
+                if (i + 1 < args.size() && args[i + 1] != "LANGUAGES" && args[i + 1] != "DESCRIPTION" && args[i + 1] != "HOMEPAGE_URL") {
                     version = args[++i];
                 } else {
                     interp.print_message("WARNING",
-                        "VERSION keyword not followed by a value or was followed by a value that expanded to nothing.");
+                                         "VERSION keyword not followed by a value or was followed by a value that expanded to nothing.");
                 }
             } else if (args[i] == "LANGUAGES") {
                 // Collect all languages until next keyword
                 ++i;
-                while (i < args.size() && args[i] != "VERSION" &&
-                       args[i] != "DESCRIPTION" && args[i] != "HOMEPAGE_URL") {
+                while (i < args.size() && args[i] != "VERSION" && args[i] != "DESCRIPTION" && args[i] != "HOMEPAGE_URL") {
                     languages.push_back(args[i++]);
                 }
                 --i; // Adjust for loop increment
             } else if (args[i] == "DESCRIPTION") {
-                if (i + 1 < args.size() && args[i + 1] != "LANGUAGES" &&
-                    args[i + 1] != "VERSION" && args[i + 1] != "HOMEPAGE_URL") {
+                if (i + 1 < args.size() && args[i + 1] != "LANGUAGES" && args[i + 1] != "VERSION" && args[i + 1] != "HOMEPAGE_URL") {
                     description = args[++i];
                 } else {
-                    interp.print_message("WARNING",
-                        "DESCRIPTION keyword not followed by a value or was followed by a value that expanded to nothing.");
+                    interp.print_message(
+                        "WARNING", "DESCRIPTION keyword not followed by a value or was followed by a value that expanded to nothing.");
                 }
             } else if (args[i] == "HOMEPAGE_URL") {
-                if (i + 1 < args.size() && args[i + 1] != "LANGUAGES" &&
-                    args[i + 1] != "VERSION" && args[i + 1] != "DESCRIPTION") {
+                if (i + 1 < args.size() && args[i + 1] != "LANGUAGES" && args[i + 1] != "VERSION" && args[i + 1] != "DESCRIPTION") {
                     homepage_url = args[++i];
                 } else {
-                    interp.print_message("WARNING",
-                        "HOMEPAGE_URL keyword not followed by a value or was followed by a value that expanded to nothing.");
+                    interp.print_message(
+                        "WARNING", "HOMEPAGE_URL keyword not followed by a value or was followed by a value that expanded to nothing.");
                 }
             }
             // If no keyword, treat as language (for backward compatibility)
             // e.g. project(test C CXX) without the LANGUAGES keyword
-            else if (args[i] != "VERSION" && args[i] != "DESCRIPTION" &&
-                     args[i] != "HOMEPAGE_URL" && args[i] != "LANGUAGES") {
+            else if (args[i] != "VERSION" && args[i] != "DESCRIPTION" && args[i] != "HOMEPAGE_URL" && args[i] != "LANGUAGES") {
                 languages.push_back(args[i]);
             }
         }
 
         // Validate languages (default is C and CXX if not specified)
-        if (languages.empty()) {
-            languages = {"C", "CXX"};
-        }
+        if (languages.empty()) { languages = {"C", "CXX"}; }
 
         // CMAKE_PROJECT_<NAME>_INCLUDE_BEFORE: included after project name vars
         // are set but before toolchain/language work. ladybird uses this to
@@ -337,9 +328,7 @@ void register_project_builtins(Interpreter& interp) {
             std::string file = interp.get_variable(var);
             if (file.empty()) return;
             auto res = interp.include_file(file);
-            if (!res) {
-                interp.set_fatal_error("project() failed to load " + var + ": " + file + ": " + res.error().message);
-            }
+            if (!res) { interp.set_fatal_error("project() failed to load " + var + ": " + file + ": " + res.error().message); }
         };
         include_hook("CMAKE_PROJECT_" + project_name + "_INCLUDE_BEFORE");
 
@@ -383,9 +372,7 @@ void register_project_builtins(Interpreter& interp) {
         {
             CMakeArray enabled_langs(interp.get_global_properties()["ENABLED_LANGUAGES"]);
             for (const auto& lang : languages) {
-                if (!enabled_langs.contains(lang)) {
-                    enabled_langs.append(lang);
-                }
+                if (!enabled_langs.contains(lang)) { enabled_langs.append(lang); }
             }
             interp.get_global_properties()["ENABLED_LANGUAGES"] = enabled_langs.to_string();
         }
@@ -409,9 +396,7 @@ void register_project_builtins(Interpreter& interp) {
                     return;
                 }
             }
-            if (!component.empty()) {
-                components.push_back(component);
-            }
+            if (!component.empty()) { components.push_back(component); }
 
             if (components.empty() || components.size() > 4) {
                 interp.set_fatal_error("project() VERSION must have 1-4 components: " + version);
@@ -421,50 +406,38 @@ void register_project_builtins(Interpreter& interp) {
             // Set version variables
             interp.set_variable("PROJECT_VERSION", version);
             interp.set_variable(project_name + "_VERSION", version);
-            if (is_top_level) {
-                interp.set_variable("CMAKE_PROJECT_VERSION", version);
-            }
+            if (is_top_level) { interp.set_variable("CMAKE_PROJECT_VERSION", version); }
 
             const char* suffixes[] = {"_MAJOR", "_MINOR", "_PATCH", "_TWEAK"};
             for (size_t i = 0; i < 4; ++i) {
                 std::string value = (i < components.size()) ? components[i] : "";
                 interp.set_variable("PROJECT_VERSION" + std::string(suffixes[i]), value);
                 interp.set_variable(project_name + "_VERSION" + std::string(suffixes[i]), value);
-                if (is_top_level) {
-                    interp.set_variable("CMAKE_PROJECT_VERSION" + std::string(suffixes[i]), value);
-                }
+                if (is_top_level) { interp.set_variable("CMAKE_PROJECT_VERSION" + std::string(suffixes[i]), value); }
             }
         } else {
             // No VERSION provided - set all version variables to empty string
             interp.set_variable("PROJECT_VERSION", "");
             interp.set_variable(project_name + "_VERSION", "");
-            if (is_top_level) {
-                interp.set_variable("CMAKE_PROJECT_VERSION", "");
-            }
+            if (is_top_level) { interp.set_variable("CMAKE_PROJECT_VERSION", ""); }
 
             const char* suffixes[] = {"_MAJOR", "_MINOR", "_PATCH", "_TWEAK"};
             for (size_t i = 0; i < 4; ++i) {
                 interp.set_variable("PROJECT_VERSION" + std::string(suffixes[i]), "");
                 interp.set_variable(project_name + "_VERSION" + std::string(suffixes[i]), "");
-                if (is_top_level) {
-                    interp.set_variable("CMAKE_PROJECT_VERSION" + std::string(suffixes[i]), "");
-                }
+                if (is_top_level) { interp.set_variable("CMAKE_PROJECT_VERSION" + std::string(suffixes[i]), ""); }
             }
         }
 
         // Set DESCRIPTION variables
         interp.set_variable("PROJECT_DESCRIPTION", description);
         interp.set_variable(project_name + "_DESCRIPTION", description);
-        if (is_top_level) {
-            interp.set_variable("CMAKE_PROJECT_DESCRIPTION", description);
-        }
+        if (is_top_level) { interp.set_variable("CMAKE_PROJECT_DESCRIPTION", description); }
 
         // Set HOMEPAGE_URL variables
         interp.set_variable("PROJECT_HOMEPAGE_URL", homepage_url);
         interp.set_variable(project_name + "_HOMEPAGE_URL", homepage_url);
-        if (is_top_level) {
-            interp.set_variable("CMAKE_PROJECT_HOMEPAGE_URL", homepage_url);
-        }
+        if (is_top_level) { interp.set_variable("CMAKE_PROJECT_HOMEPAGE_URL", homepage_url); }
 
         // CMAKE_PROJECT_<NAME>_INCLUDE / CMAKE_PROJECT_INCLUDE: late hooks,
         // after languages and version vars are populated. Per-name first.
@@ -484,7 +457,7 @@ void register_project_builtins(Interpreter& interp) {
                 return;
             }
             auto policy = parse_cmake_policy(args[1]);
-            if (!policy) return;  // Unknown policies silently ignored
+            if (!policy) return; // Unknown policies silently ignored
             if (args[2] == "OLD") {
                 interp.set_policy(*policy, PolicyState::OLD);
             } else if (args[2] == "NEW") {
@@ -497,8 +470,7 @@ void register_project_builtins(Interpreter& interp) {
             }
             auto policy = parse_cmake_policy(args[1]);
             if (policy) {
-                interp.set_variable(args[2],
-                    interp.get_policy(*policy) == PolicyState::NEW ? "NEW" : "OLD");
+                interp.set_variable(args[2], interp.get_policy(*policy) == PolicyState::NEW ? "NEW" : "OLD");
             } else {
                 // Unknown policy: default to NEW (kiln defaults all policies to NEW
                 // except ones explicitly known to need OLD behavior)
@@ -514,8 +486,7 @@ void register_project_builtins(Interpreter& interp) {
     interp.add_builtin("mark_as_advanced", [](Interpreter&, const std::vector<std::string>&) {});
     interp.add_builtin("include_regular_expression", [](Interpreter&, const std::vector<std::string>& args) {
         if (args.empty()) throw std::runtime_error("include_regular_expression requires at least 1 argument");
-        if (args[0] != "^.*$")
-            throw std::runtime_error("include_regular_expression: only the default \"^.*$\" pattern is supported");
+        if (args[0] != "^.*$") throw std::runtime_error("include_regular_expression: only the default \"^.*$\" pattern is supported");
     });
 
     interp.add_builtin("enable_language", [](Interpreter& interp, const std::vector<std::string>& args) {
@@ -553,9 +524,7 @@ void register_project_builtins(Interpreter& interp) {
                 interp.set_fatal_error("enable_language() " + err);
                 return;
             }
-            if (!enabled_langs.contains(lang)) {
-                enabled_langs.append(lang);
-            }
+            if (!enabled_langs.contains(lang)) { enabled_langs.append(lang); }
         }
 
         // Update global property
@@ -597,17 +566,14 @@ void register_project_builtins(Interpreter& interp) {
                     return;
                 }
                 newline_style = args[++i];
-                if (newline_style != "UNIX" && newline_style != "DOS" &&
-                    newline_style != "WIN32" && newline_style != "LF" &&
-                    newline_style != "CRLF") {
+                if (newline_style != "UNIX" && newline_style != "DOS" && newline_style != "WIN32" && newline_style != "LF"
+                    && newline_style != "CRLF") {
                     interp.set_fatal_error("configure_file() invalid NEWLINE_STYLE: " + newline_style);
                     return;
                 }
             } else if (args[i] == "FILE_PERMISSIONS") {
                 ++i;
-                while (i < args.size() && args[i].find("_") != std::string::npos) {
-                    file_permissions.push_back(args[i++]);
-                }
+                while (i < args.size() && args[i].find("_") != std::string::npos) { file_permissions.push_back(args[i++]); }
                 --i; // Adjust for loop increment
             }
         }
@@ -618,16 +584,13 @@ void register_project_builtins(Interpreter& interp) {
             return;
         }
 
-        if ((no_source_permissions ? 1 : 0) + (use_source_permissions ? 1 : 0) +
-            (!file_permissions.empty() ? 1 : 0) > 1) {
+        if ((no_source_permissions ? 1 : 0) + (use_source_permissions ? 1 : 0) + (!file_permissions.empty() ? 1 : 0) > 1) {
             interp.set_fatal_error("configure_file() permission options are mutually exclusive");
             return;
         }
 
         // Resolve paths
-        if (!input_path.is_absolute()) {
-            input_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / input_path;
-        }
+        if (!input_path.is_absolute()) { input_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / input_path; }
         if (!output_path.is_absolute()) {
             output_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_BINARY_DIR")) / output_path;
         }
@@ -655,15 +618,11 @@ void register_project_builtins(Interpreter& interp) {
             }
 
             // Convert newlines if specified
-            if (!newline_style.empty()) {
-                content = convert_newlines(content, newline_style);
-            }
+            if (!newline_style.empty()) { content = convert_newlines(content, newline_style); }
         }
 
         // CMake's configure_file always ensures a trailing newline
-        if (!content.empty() && content.back() != '\n') {
-            content += '\n';
-        }
+        if (!content.empty() && content.back() != '\n') { content += '\n'; }
 
         // Create output directory if needed
         std::filesystem::create_directories(output_path.parent_path());
@@ -674,19 +633,27 @@ void register_project_builtins(Interpreter& interp) {
         if (!file_permissions.empty()) {
             target_perms = fs::perms::none;
             for (const auto& p : file_permissions) {
-                if (p == "OWNER_READ") target_perms |= fs::perms::owner_read;
-                else if (p == "OWNER_WRITE") target_perms |= fs::perms::owner_write;
-                else if (p == "OWNER_EXECUTE") target_perms |= fs::perms::owner_exec;
-                else if (p == "GROUP_READ") target_perms |= fs::perms::group_read;
-                else if (p == "GROUP_WRITE") target_perms |= fs::perms::group_write;
-                else if (p == "GROUP_EXECUTE") target_perms |= fs::perms::group_exec;
-                else if (p == "WORLD_READ") target_perms |= fs::perms::others_read;
-                else if (p == "WORLD_WRITE") target_perms |= fs::perms::others_write;
-                else if (p == "WORLD_EXECUTE") target_perms |= fs::perms::others_exec;
+                if (p == "OWNER_READ")
+                    target_perms |= fs::perms::owner_read;
+                else if (p == "OWNER_WRITE")
+                    target_perms |= fs::perms::owner_write;
+                else if (p == "OWNER_EXECUTE")
+                    target_perms |= fs::perms::owner_exec;
+                else if (p == "GROUP_READ")
+                    target_perms |= fs::perms::group_read;
+                else if (p == "GROUP_WRITE")
+                    target_perms |= fs::perms::group_write;
+                else if (p == "GROUP_EXECUTE")
+                    target_perms |= fs::perms::group_exec;
+                else if (p == "WORLD_READ")
+                    target_perms |= fs::perms::others_read;
+                else if (p == "WORLD_WRITE")
+                    target_perms |= fs::perms::others_write;
+                else if (p == "WORLD_EXECUTE")
+                    target_perms |= fs::perms::others_exec;
             }
         } else if (no_source_permissions) {
-            target_perms = fs::perms::owner_read | fs::perms::owner_write |
-                          fs::perms::group_read | fs::perms::others_read;
+            target_perms = fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read | fs::perms::others_read;
         } else {
             // USE_SOURCE_PERMISSIONS is the default
             target_perms = fs::status(input_path).permissions();
@@ -699,8 +666,7 @@ void register_project_builtins(Interpreter& interp) {
             // Check content
             std::ifstream existing_file(output_path, std::ios::binary);
             if (existing_file) {
-                std::string existing_content((std::istreambuf_iterator<char>(existing_file)),
-                                           std::istreambuf_iterator<char>());
+                std::string existing_content((std::istreambuf_iterator<char>(existing_file)), std::istreambuf_iterator<char>());
                 existing_file.close();
 
                 Hash256 existing_hash = blake2b(existing_content);
@@ -724,9 +690,7 @@ void register_project_builtins(Interpreter& interp) {
             outfile.close();
         }
 
-        if (perms_changed || content_changed) {
-            fs::permissions(output_path, target_perms);
-        }
+        if (perms_changed || content_changed) { fs::permissions(output_path, target_perms); }
 
         // Mark output as generated source file
         auto& source_props = interp.get_source_properties();
@@ -745,9 +709,7 @@ void register_project_builtins(Interpreter& interp) {
 
         // Resolve directory path
         std::filesystem::path dir_path = directory;
-        if (!dir_path.is_absolute()) {
-            dir_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / dir_path;
-        }
+        if (!dir_path.is_absolute()) { dir_path = std::filesystem::path(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) / dir_path; }
 
         // Check if directory exists
         if (!std::filesystem::exists(dir_path)) {
@@ -769,9 +731,7 @@ void register_project_builtins(Interpreter& interp) {
                 auto lang_info = LanguageClassifier::from_path(entry.path().string());
 
                 // Only include compileable source files (not headers, not unknown)
-                if (lang_info.is_compileable && !lang_info.is_header) {
-                    source_files.append(entry.path().string());
-                }
+                if (lang_info.is_compileable && !lang_info.is_header) { source_files.append(entry.path().string()); }
             }
         } catch (const std::filesystem::filesystem_error& e) {
             interp.set_fatal_error("aux_source_directory() failed to read directory: " + std::string(e.what()));

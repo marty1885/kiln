@@ -26,10 +26,7 @@ void register_source_properties_builtins(Interpreter& interp) {
         size_t i = 0;
 
         // Collect files until DIRECTORY, TARGET_DIRECTORY, or PROPERTIES
-        while (i < args.size() &&
-               args[i] != "DIRECTORY" &&
-               args[i] != "TARGET_DIRECTORY" &&
-               args[i] != "PROPERTIES") {
+        while (i < args.size() && args[i] != "DIRECTORY" && args[i] != "TARGET_DIRECTORY" && args[i] != "PROPERTIES") {
             files.push_back(args[i]);
             ++i;
         }
@@ -48,19 +45,13 @@ void register_source_properties_builtins(Interpreter& interp) {
         while (i < args.size() && args[i] != "PROPERTIES") {
             if (args[i] == "DIRECTORY") {
                 ++i;
-                while (i < args.size() &&
-                       args[i] != "TARGET_DIRECTORY" &&
-                       args[i] != "PROPERTIES" &&
-                       args[i] != "DIRECTORY") {
+                while (i < args.size() && args[i] != "TARGET_DIRECTORY" && args[i] != "PROPERTIES" && args[i] != "DIRECTORY") {
                     directories.push_back(args[i]);
                     ++i;
                 }
             } else if (args[i] == "TARGET_DIRECTORY") {
                 ++i;
-                while (i < args.size() &&
-                       args[i] != "DIRECTORY" &&
-                       args[i] != "PROPERTIES" &&
-                       args[i] != "TARGET_DIRECTORY") {
+                while (i < args.size() && args[i] != "DIRECTORY" && args[i] != "PROPERTIES" && args[i] != "TARGET_DIRECTORY") {
                     target_directories.push_back(args[i]);
                     ++i;
                 }
@@ -108,9 +99,7 @@ void register_source_properties_builtins(Interpreter& interp) {
         } else if (!directories.empty()) {
             // Use specified directories
             std::string current_source_dir = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
-            for (const auto& dir : directories) {
-                base_dirs.push_back(Path::make_absolute_and_normal(current_source_dir, dir));
-            }
+            for (const auto& dir : directories) { base_dirs.push_back(Path::make_absolute_and_normal(current_source_dir, dir)); }
         } else {
             // Default to current source directory
             base_dirs.push_back(interp.get_variable("CMAKE_CURRENT_SOURCE_DIR"));
@@ -142,9 +131,7 @@ void register_source_properties_builtins(Interpreter& interp) {
                     abs_path = Path::make_absolute_and_normal(base_dir, file);
                 }
 
-                for (const auto& [prop_name, prop_value] : properties) {
-                    source_properties[abs_path][prop_name] = prop_value;
-                }
+                for (const auto& [prop_name, prop_value] : properties) { source_properties[abs_path][prop_name] = prop_value; }
             }
         }
     });

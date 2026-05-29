@@ -86,33 +86,43 @@ static void backup_vars_set(std::string key, std::string value) {
 
 // Variables for each language that enable_compiler_for_language() will apply.
 static constexpr std::array c_lang_vars = {
-    "CMAKE_C_COMPILER", "CMAKE_C_COMPILER_ID", "CMAKE_C_COMPILER_VERSION",
-    "CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES", "CMAKE_C_IMPLICIT_LINK_DIRECTORIES",
-    "CMAKE_C_IMPLICIT_LINK_LIBRARIES", "CMAKE_C_STANDARD_DEFAULT",
-    "CMAKE_C90_STANDARD_COMPILE_OPTION", "CMAKE_C99_STANDARD_COMPILE_OPTION",
-    "CMAKE_C11_STANDARD_COMPILE_OPTION", "CMAKE_C17_STANDARD_COMPILE_OPTION",
+    "CMAKE_C_COMPILER",
+    "CMAKE_C_COMPILER_ID",
+    "CMAKE_C_COMPILER_VERSION",
+    "CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES",
+    "CMAKE_C_IMPLICIT_LINK_DIRECTORIES",
+    "CMAKE_C_IMPLICIT_LINK_LIBRARIES",
+    "CMAKE_C_STANDARD_DEFAULT",
+    "CMAKE_C90_STANDARD_COMPILE_OPTION",
+    "CMAKE_C99_STANDARD_COMPILE_OPTION",
+    "CMAKE_C11_STANDARD_COMPILE_OPTION",
+    "CMAKE_C17_STANDARD_COMPILE_OPTION",
     "CMAKE_C23_STANDARD_COMPILE_OPTION",
 };
 static constexpr std::array cxx_lang_vars = {
-    "CMAKE_CXX_COMPILER", "CMAKE_CXX_COMPILER_ID", "CMAKE_CXX_COMPILER_VERSION",
-    "CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES", "CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES",
-    "CMAKE_CXX_IMPLICIT_LINK_LIBRARIES", "CMAKE_CXX_STANDARD_DEFAULT",
-    "CMAKE_CXX98_STANDARD_COMPILE_OPTION", "CMAKE_CXX11_STANDARD_COMPILE_OPTION",
-    "CMAKE_CXX14_STANDARD_COMPILE_OPTION", "CMAKE_CXX17_STANDARD_COMPILE_OPTION",
-    "CMAKE_CXX20_STANDARD_COMPILE_OPTION", "CMAKE_CXX23_STANDARD_COMPILE_OPTION",
+    "CMAKE_CXX_COMPILER",
+    "CMAKE_CXX_COMPILER_ID",
+    "CMAKE_CXX_COMPILER_VERSION",
+    "CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES",
+    "CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES",
+    "CMAKE_CXX_IMPLICIT_LINK_LIBRARIES",
+    "CMAKE_CXX_STANDARD_DEFAULT",
+    "CMAKE_CXX98_STANDARD_COMPILE_OPTION",
+    "CMAKE_CXX11_STANDARD_COMPILE_OPTION",
+    "CMAKE_CXX14_STANDARD_COMPILE_OPTION",
+    "CMAKE_CXX17_STANDARD_COMPILE_OPTION",
+    "CMAKE_CXX20_STANDARD_COMPILE_OPTION",
+    "CMAKE_CXX23_STANDARD_COMPILE_OPTION",
 };
 static constexpr std::array asm_lang_vars = {
-    "CMAKE_ASM_COMPILER", "CMAKE_ASM_COMPILER_ID", "CMAKE_ASM_COMPILER_VERSION",
-    "CMAKE_ASM_FLAGS", "CMAKE_ASM_FLAGS_DEBUG", "CMAKE_ASM_FLAGS_RELEASE",
-    "CMAKE_ASM_FLAGS_RELWITHDEBINFO", "CMAKE_ASM_FLAGS_MINSIZEREL",
+    "CMAKE_ASM_COMPILER",    "CMAKE_ASM_COMPILER_ID",   "CMAKE_ASM_COMPILER_VERSION",     "CMAKE_ASM_FLAGS",
+    "CMAKE_ASM_FLAGS_DEBUG", "CMAKE_ASM_FLAGS_RELEASE", "CMAKE_ASM_FLAGS_RELWITHDEBINFO", "CMAKE_ASM_FLAGS_MINSIZEREL",
 };
 
 // Build a cache key for a compiler binary: "<binary>:<realpath>:<mtime>:<sysroot>:<target>"
 // Cheap to compute (no subprocesses), changes when binary is updated or swapped via
 // symlink, or when sysroot / compiler-target alters the implicit dirs of detection.
-std::string make_compiler_cache_key(const std::string& binary,
-                                    const std::string& sysroot = {},
-                                    const std::string& compiler_target = {}) {
+std::string make_compiler_cache_key(const std::string& binary, const std::string& sysroot = {}, const std::string& compiler_target = {}) {
     // Resolve to absolute path via which(1)-style lookup
     std::error_code ec;
     auto resolved = std::filesystem::canonical(
@@ -125,22 +135,19 @@ std::string make_compiler_cache_key(const std::string& binary,
     if (ec) return binary + ":" + resolved.string() + ":0:" + sysroot + ":" + compiler_target;
 
     auto mtime_val = mtime.time_since_epoch().count();
-    return binary + ":" + resolved.string() + ":" + std::to_string(mtime_val)
-         + ":" + sysroot + ":" + compiler_target;
+    return binary + ":" + resolved.string() + ":" + std::to_string(mtime_val) + ":" + sysroot + ":" + compiler_target;
 }
 
 // Try to load compiler detection from disk cache. Returns nullopt on miss.
 // On hit, validates by running --version and comparing output.
-std::optional<PlatformInfo> try_cached_compiler_detection(
-    CacheStore& cache, const std::string& binary, const std::string& cache_key)
-{
+std::optional<PlatformInfo> try_cached_compiler_detection(CacheStore& cache, const std::string& binary, const std::string& cache_key) {
     auto cached = cache.lookup<CacheSubsystem::CompilerDetection>(cache_key);
     if (!cached) return std::nullopt;
 
     // Validate: run --version and compare (1 subprocess)
     std::string version_output = detail::run_command(binary + " --version 2>&1");
     if (version_output != cached->version_output) {
-        return std::nullopt;  // Compiler changed (e.g. shim switched target)
+        return std::nullopt; // Compiler changed (e.g. shim switched target)
     }
 
     return cached->info;
@@ -150,14 +157,10 @@ std::optional<PlatformInfo> try_cached_compiler_detection(
 // Disk-cached, validates with --version. On miss, runs the full detection.
 // This is the on-demand path used when the user specifies a non-default
 // CMAKE_<LANG>_COMPILER (toolchain file, -DCMAKE_<LANG>_COMPILER=, etc.).
-PlatformInfo detect_compiler_for(
-    CacheStore& cache, const std::string& binary, Language lang,
-    const std::string& sysroot, const std::string& compiler_target)
-{
+PlatformInfo detect_compiler_for(CacheStore& cache, const std::string& binary, Language lang, const std::string& sysroot,
+                                 const std::string& compiler_target) {
     std::string key = make_compiler_cache_key(binary, sysroot, compiler_target);
-    if (auto hit = try_cached_compiler_detection(cache, binary, key)) {
-        return *hit;
-    }
+    if (auto hit = try_cached_compiler_detection(cache, binary, key)) { return *hit; }
     GnuCompiler probe(binary, lang, sysroot, compiler_target);
     PlatformInfo info = probe.detect_platform();
     CompilerDetectionCacheEntry entry;
@@ -171,13 +174,11 @@ PlatformInfo detect_compiler_for(
 // Each compiler family (GCC/Clang/TCC: "-std=cNN"; MSVC: "/std:c++NN")
 // owns its spelling — kiln just asks. Empty results are skipped so a
 // driver can decline a standard it has no flag for.
-void apply_standard_options(Interpreter& interp, const std::string& lang,
-                            const Compiler& compiler) {
+void apply_standard_options(Interpreter& interp, const std::string& lang, const Compiler& compiler) {
     auto set_for = [&](const char* var_prefix, Language l, int std_val) {
         std::string flag = compiler.std_compile_option(l, std_val);
         if (flag.empty()) return;
-        interp.set_variable(std::string("CMAKE_") + var_prefix
-                            + std::to_string(std_val) + "_STANDARD_COMPILE_OPTION", flag);
+        interp.set_variable(std::string("CMAKE_") + var_prefix + std::to_string(std_val) + "_STANDARD_COMPILE_OPTION", flag);
     };
     if (lang == "C") {
         for (int s : {90, 99, 11, 17, 23}) set_for("C", Language::C, s);
@@ -188,18 +189,14 @@ void apply_standard_options(Interpreter& interp, const std::string& lang,
 
 // Populate CMAKE_<LANG>_* variables from a PlatformInfo. Used by the on-demand
 // detection path in enable_compiler_for_language.
-void populate_lang_vars(Interpreter& interp, const std::string& lang,
-                        const std::string& binary, const PlatformInfo& info,
+void populate_lang_vars(Interpreter& interp, const std::string& lang, const std::string& binary, const PlatformInfo& info,
                         const Compiler& compiler) {
     interp.set_variable("CMAKE_" + lang + "_COMPILER", binary);
     interp.set_variable("CMAKE_" + lang + "_COMPILER_ID", info.compiler_id);
     interp.set_variable("CMAKE_" + lang + "_COMPILER_VERSION", info.compiler_version);
-    interp.set_variable("CMAKE_" + lang + "_IMPLICIT_INCLUDE_DIRECTORIES",
-                        CMakeArray(info.implicit_includes).to_string());
-    interp.set_variable("CMAKE_" + lang + "_IMPLICIT_LINK_DIRECTORIES",
-                        CMakeArray(info.implicit_link_dirs).to_string());
-    interp.set_variable("CMAKE_" + lang + "_IMPLICIT_LINK_LIBRARIES",
-                        CMakeArray(info.implicit_link_libs).to_string());
+    interp.set_variable("CMAKE_" + lang + "_IMPLICIT_INCLUDE_DIRECTORIES", CMakeArray(info.implicit_includes).to_string());
+    interp.set_variable("CMAKE_" + lang + "_IMPLICIT_LINK_DIRECTORIES", CMakeArray(info.implicit_link_dirs).to_string());
+    interp.set_variable("CMAKE_" + lang + "_IMPLICIT_LINK_LIBRARIES", CMakeArray(info.implicit_link_libs).to_string());
     if (lang == "CXX" && info.default_cxx_standard > 0) {
         interp.set_variable("CMAKE_CXX_STANDARD_DEFAULT", std::to_string(info.default_cxx_standard));
     } else if (lang == "C" && info.default_c_standard > 0) {
@@ -208,12 +205,9 @@ void populate_lang_vars(Interpreter& interp, const std::string& lang,
     apply_standard_options(interp, lang, compiler);
 
     // Cross-compile system info comes from the target compiler's macros.
-    if (!info.system_name.empty())
-        interp.set_variable("CMAKE_SYSTEM_NAME", info.system_name);
-    if (!info.system_processor.empty())
-        interp.set_variable("CMAKE_SYSTEM_PROCESSOR", info.system_processor);
-    if (!info.sizeof_void_p.empty())
-        interp.set_variable("CMAKE_SIZEOF_VOID_P", info.sizeof_void_p);
+    if (!info.system_name.empty()) interp.set_variable("CMAKE_SYSTEM_NAME", info.system_name);
+    if (!info.system_processor.empty()) interp.set_variable("CMAKE_SYSTEM_PROCESSOR", info.system_processor);
+    if (!info.sizeof_void_p.empty()) interp.set_variable("CMAKE_SIZEOF_VOID_P", info.sizeof_void_p);
 
     // CMAKE_CROSSCOMPILING is TRUE when the target system differs from host.
     // CMake sets this in CMakeDetermineSystem; mirroring it here means
@@ -221,15 +215,14 @@ void populate_lang_vars(Interpreter& interp, const std::string& lang,
     // `if(CMAKE_CROSSCOMPILING)` checks all behave as expected.
     const std::string host_name = interp.get_variable("CMAKE_HOST_SYSTEM_NAME");
     const std::string host_proc = interp.get_variable("CMAKE_HOST_SYSTEM_PROCESSOR");
-    const std::string sys_name  = interp.get_variable("CMAKE_SYSTEM_NAME");
-    const std::string sys_proc  = interp.get_variable("CMAKE_SYSTEM_PROCESSOR");
+    const std::string sys_name = interp.get_variable("CMAKE_SYSTEM_NAME");
+    const std::string sys_proc = interp.get_variable("CMAKE_SYSTEM_PROCESSOR");
     const bool cross = (!sys_name.empty() && !host_name.empty() && sys_name != host_name)
-                    || (!sys_proc.empty() && !host_proc.empty() && sys_proc != host_proc);
+                       || (!sys_proc.empty() && !host_proc.empty() && sys_proc != host_proc);
     interp.set_variable("CMAKE_CROSSCOMPILING", cross ? "TRUE" : "FALSE");
 }
 
-void fake_cmake_compiler_checks_and_init(Interpreter& interp, CacheStore& cache)
-{
+void fake_cmake_compiler_checks_and_init(Interpreter& interp, CacheStore& cache) {
     // Populate the process-wide backup_vars exactly once. call_once
     // synchronizes every reader with the populator: if multiple EP
     // orchestrator threads land here concurrently, only one runs the
@@ -251,8 +244,7 @@ void fake_cmake_compiler_checks_and_init(Interpreter& interp, CacheStore& cache)
             c_info = std::move(*c_cached);
         } else {
             // Cache miss on at least one compiler — detect in parallel
-            auto detect_and_cache = [&cache](const std::string& binary, Language lang,
-                                             const std::string& cache_key,
+            auto detect_and_cache = [&cache](const std::string& binary, Language lang, const std::string& cache_key,
                                              std::optional<PlatformInfo> cached) -> PlatformInfo {
                 if (cached) return std::move(*cached);
                 GnuCompiler compiler(binary, lang);
@@ -264,10 +256,8 @@ void fake_cmake_compiler_checks_and_init(Interpreter& interp, CacheStore& cache)
                 return info;
             };
 
-            auto cxx_future = std::async(std::launch::async, detect_and_cache,
-                "g++", Language::CXX, cxx_cache_key, std::move(cxx_cached));
-            auto c_future = std::async(std::launch::async, detect_and_cache,
-                "gcc", Language::C, c_cache_key, std::move(c_cached));
+            auto cxx_future = std::async(std::launch::async, detect_and_cache, "g++", Language::CXX, cxx_cache_key, std::move(cxx_cached));
+            auto c_future = std::async(std::launch::async, detect_and_cache, "gcc", Language::C, c_cache_key, std::move(c_cached));
             cxx_info = cxx_future.get();
             c_info = c_future.get();
         }
@@ -279,8 +269,7 @@ void fake_cmake_compiler_checks_and_init(Interpreter& interp, CacheStore& cache)
         backup_vars_set("CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES", CMakeArray(cxx_info.implicit_includes).to_string());
         backup_vars_set("CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES", CMakeArray(cxx_info.implicit_link_dirs).to_string());
         backup_vars_set("CMAKE_CXX_IMPLICIT_LINK_LIBRARIES", CMakeArray(cxx_info.implicit_link_libs).to_string());
-        if (cxx_info.default_cxx_standard > 0)
-            backup_vars_set("CMAKE_CXX_STANDARD_DEFAULT", std::to_string(cxx_info.default_cxx_standard));
+        if (cxx_info.default_cxx_standard > 0) backup_vars_set("CMAKE_CXX_STANDARD_DEFAULT", std::to_string(cxx_info.default_cxx_standard));
         // Host-default backup uses gcc-style -std= strings unconditionally:
         // this block fires only when host detection resolved gcc/g++ (the
         // default binary). User-pinned non-GCC compilers go through the
@@ -299,8 +288,7 @@ void fake_cmake_compiler_checks_and_init(Interpreter& interp, CacheStore& cache)
         backup_vars_set("CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES", CMakeArray(c_info.implicit_includes).to_string());
         backup_vars_set("CMAKE_C_IMPLICIT_LINK_DIRECTORIES", CMakeArray(c_info.implicit_link_dirs).to_string());
         backup_vars_set("CMAKE_C_IMPLICIT_LINK_LIBRARIES", CMakeArray(c_info.implicit_link_libs).to_string());
-        if (c_info.default_c_standard > 0)
-            backup_vars_set("CMAKE_C_STANDARD_DEFAULT", std::to_string(c_info.default_c_standard));
+        if (c_info.default_c_standard > 0) backup_vars_set("CMAKE_C_STANDARD_DEFAULT", std::to_string(c_info.default_c_standard));
         backup_vars_set("CMAKE_C90_STANDARD_COMPILE_OPTION", "-std=c90");
         backup_vars_set("CMAKE_C99_STANDARD_COMPILE_OPTION", "-std=c99");
         backup_vars_set("CMAKE_C11_STANDARD_COMPILE_OPTION", "-std=c11");
@@ -316,12 +304,9 @@ void fake_cmake_compiler_checks_and_init(Interpreter& interp, CacheStore& cache)
     });
 
     // Per-Interpreter: copy system-level vars out of the populated cache.
-    for (const char* name : {"CMAKE_SYSTEM_NAME", "CMAKE_SYSTEM_PROCESSOR",
-                              "CMAKE_SIZEOF_VOID_P", "CMAKE_HOST_SYSTEM_NAME",
-                              "CMAKE_HOST_SYSTEM_PROCESSOR"}) {
-        if (auto v = backup_vars_lookup(name)) {
-            interp.set_variable(name, *v);
-        }
+    for (const char* name :
+         {"CMAKE_SYSTEM_NAME", "CMAKE_SYSTEM_PROCESSOR", "CMAKE_SIZEOF_VOID_P", "CMAKE_HOST_SYSTEM_NAME", "CMAKE_HOST_SYSTEM_PROCESSOR"}) {
+        if (auto v = backup_vars_lookup(name)) { interp.set_variable(name, *v); }
     }
     interp.set_variable("CMAKE_CFG_INTDIR", ".");
 }
@@ -345,10 +330,7 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
         const std::string effective_binary = user_binary.empty() ? default_binary : user_binary;
 
         // Fast path: user didn't override anything → reuse host-detection backup.
-        const bool host_path = user_binary.empty()
-                            && sysroot.empty()
-                            && compiler_target.empty()
-                            && !backup_vars_empty();
+        const bool host_path = user_binary.empty() && sysroot.empty() && compiler_target.empty() && !backup_vars_empty();
 
         // Resolve compiler_id either from the host-detection backup or via
         // on-demand detection. We need it early so the right Compiler subclass
@@ -359,40 +341,31 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
         if (host_path) {
             auto apply_backup = [&](auto const& vars) {
                 for (const auto& var : vars) {
-                    if (auto v = backup_vars_lookup(var); v && !v->empty())
-                        set_variable(var, *v);
+                    if (auto v = backup_vars_lookup(var); v && !v->empty()) set_variable(var, *v);
                 }
             };
-            if (lang == "C") apply_backup(c_lang_vars);
-            else             apply_backup(cxx_lang_vars);
+            if (lang == "C")
+                apply_backup(c_lang_vars);
+            else
+                apply_backup(cxx_lang_vars);
             detected_id = get_variable("CMAKE_" + lang + "_COMPILER_ID");
         } else {
             // On-demand detection against the user's compiler + sysroot/target.
             // Cache-keyed so repeat invocations are cheap.
-            on_demand_info = detect_compiler_for(
-                *cache_store_, effective_binary, lang_enum, sysroot, compiler_target);
+            on_demand_info = detect_compiler_for(*cache_store_, effective_binary, lang_enum, sysroot, compiler_target);
             detected_id = on_demand_info->compiler_id;
         }
 
         // CMAKE_<LANG>_COMPILER_TARGET only makes sense for drivers that
         // honor --target=. (compiler_target is always empty on host_path.)
-        const std::string compile_target_effective =
-            compiler_honors_target_flag(detected_id) ? compiler_target : std::string{};
-        auto compiler = make_compiler(
-            detected_id, effective_binary, lang_enum, sysroot, compile_target_effective);
+        const std::string compile_target_effective = compiler_honors_target_flag(detected_id) ? compiler_target : std::string{};
+        auto compiler = make_compiler(detected_id, effective_binary, lang_enum, sysroot, compile_target_effective);
 
-        if (on_demand_info) {
-            populate_lang_vars(*this, lang, effective_binary, *on_demand_info, *compiler);
-        }
+        if (on_demand_info) { populate_lang_vars(*this, lang, effective_binary, *on_demand_info, *compiler); }
 
         const std::string id = get_variable("CMAKE_" + lang + "_COMPILER_ID");
-        if (id == "GNU" || id == "Clang") {
-            set_variable("CMAKE_" + lang + "_VERBOSE_FLAG", "-v");
-        }
-        if (id == "GNU") {
-            set_variable(lang == "C" ? "CMAKE_COMPILER_IS_GNUCC"
-                                     : "CMAKE_COMPILER_IS_GNUCXX", "1");
-        }
+        if (id == "GNU" || id == "Clang") { set_variable("CMAKE_" + lang + "_VERBOSE_FLAG", "-v"); }
+        if (id == "GNU") { set_variable(lang == "C" ? "CMAKE_COMPILER_IS_GNUCC" : "CMAKE_COMPILER_IS_GNUCXX", "1"); }
 
         // Populate the prereq vars that CMake's Compiler/<id>-<lang>.cmake
         // expects to find (CMAKE_<LANG>_STANDARD_COMPUTED_DEFAULT,
@@ -407,7 +380,7 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
             // doesn't pin CXX_STANDARD explicitly.
             std::string std_default = "98";
             auto cmp = [&](const char* threshold) {
-                int a[3] = {0,0,0}, b[3] = {0,0,0};
+                int a[3] = {0, 0, 0}, b[3] = {0, 0, 0};
                 std::sscanf(ver.c_str(), "%d.%d.%d", &a[0], &a[1], &a[2]);
                 std::sscanf(threshold, "%d.%d.%d", &b[0], &b[1], &b[2]);
                 for (int i = 0; i < 3; ++i) {
@@ -415,8 +388,10 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
                 }
                 return true;
             };
-            if (cmp("11.1")) std_default = "17";
-            else if (cmp("6.0")) std_default = "14";
+            if (cmp("11.1"))
+                std_default = "17";
+            else if (cmp("6.0"))
+                std_default = "14";
             set_variable("CMAKE_CXX_STANDARD_COMPUTED_DEFAULT", std_default);
             set_variable("CMAKE_CXX_EXTENSIONS_COMPUTED_DEFAULT", "ON");
         } else if ((id == "GNU" || id == "Clang") && lang == "C") {
@@ -455,9 +430,10 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
                 // If the module fails to load, surface it but don't abort —
                 // user can fall back to --fast-setup. Most projects will
                 // never reach this path.
-                print_message("WARNING",
-                    "enable_language(" + lang + "): failed to load " + module + ".cmake — "
-                    "consider --fast-setup. Error: " + res.error().message);
+                print_message("WARNING", "enable_language(" + lang + "): failed to load " + module
+                                             + ".cmake — "
+                                               "consider --fast-setup. Error: "
+                                             + res.error().message);
             }
         }
         set_variable("CMAKE_" + lang + "_COMPILER_LOADED", "1");
@@ -473,27 +449,25 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
         std::string user_asm = get_variable("CMAKE_ASM_COMPILER");
         std::string user_sysroot = get_variable("CMAKE_SYSROOT");
         std::string user_asm_target = get_variable("CMAKE_ASM_COMPILER_TARGET");
-        const bool asm_host_path = user_asm.empty()
-                                && user_sysroot.empty()
-                                && user_asm_target.empty();
+        const bool asm_host_path = user_asm.empty() && user_sysroot.empty() && user_asm_target.empty();
         auto cached_asm = backup_vars_lookup("CMAKE_ASM_COMPILER");
         if (asm_host_path && cached_asm && !cached_asm->empty()) {
             for (const auto& var : asm_lang_vars) {
-                if (auto v = backup_vars_lookup(var); v && !v->empty())
-                    set_variable(var, *v);
+                if (auto v = backup_vars_lookup(var); v && !v->empty()) set_variable(var, *v);
             }
         } else if (!user_asm.empty()) {
             // User pinned the ASM compiler; fill in companion vars from the
             // C side if available, then defaults. Don't touch CMAKE_ASM_COMPILER.
-            if (get_variable("CMAKE_ASM_COMPILER_ID").empty())
-                set_variable("CMAKE_ASM_COMPILER_ID", get_variable("CMAKE_C_COMPILER_ID"));
+            if (get_variable("CMAKE_ASM_COMPILER_ID").empty()) set_variable("CMAKE_ASM_COMPILER_ID", get_variable("CMAKE_C_COMPILER_ID"));
             if (get_variable("CMAKE_ASM_COMPILER_VERSION").empty())
                 set_variable("CMAKE_ASM_COMPILER_VERSION", get_variable("CMAKE_C_COMPILER_VERSION"));
             for (const auto* var : asm_lang_vars) {
                 std::string_view v(var);
                 if (get_variable(var).empty()) {
-                    if (v == "CMAKE_ASM_FLAGS_DEBUG") set_variable(var, "-g");
-                    else if (v.starts_with("CMAKE_ASM_FLAGS")) set_variable(var, "");
+                    if (v == "CMAKE_ASM_FLAGS_DEBUG")
+                        set_variable(var, "-g");
+                    else if (v.starts_with("CMAKE_ASM_FLAGS"))
+                        set_variable(var, "");
                 }
             }
         } else {
@@ -522,17 +496,13 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
             set_variable("CMAKE_ASM_FLAGS_MINSIZEREL", "");
 
             // Cache for next time
-            for (const auto& var : asm_lang_vars) {
-                backup_vars_set(var, get_variable(var));
-            }
+            for (const auto& var : asm_lang_vars) { backup_vars_set(var, get_variable(var)); }
         }
         set_variable("CMAKE_ASM_COMPILER_LOADED", "1");
         const std::string asm_id_now = get_variable("CMAKE_ASM_COMPILER_ID");
-        const std::string asm_target = compiler_honors_target_flag(asm_id_now)
-            ? get_variable("CMAKE_ASM_COMPILER_TARGET") : std::string{};
-        auto compiler = make_compiler(
-            asm_id_now, get_variable("CMAKE_ASM_COMPILER"), Language::ASM,
-            get_variable("CMAKE_SYSROOT"), asm_target);
+        const std::string asm_target = compiler_honors_target_flag(asm_id_now) ? get_variable("CMAKE_ASM_COMPILER_TARGET") : std::string{};
+        auto compiler =
+            make_compiler(asm_id_now, get_variable("CMAKE_ASM_COMPILER"), Language::ASM, get_variable("CMAKE_SYSROOT"), asm_target);
         compiler->set_version(get_variable("CMAKE_ASM_COMPILER_VERSION"));
         get_toolchain().set_compiler(Language::ASM, std::move(compiler));
     } else {
@@ -550,18 +520,16 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
         }
     };
     seed_from_init("CMAKE_" + lang + "_FLAGS");
-    for (const auto* cfg : {"DEBUG", "RELEASE", "RELWITHDEBINFO", "MINSIZEREL"}) {
-        seed_from_init("CMAKE_" + lang + "_FLAGS_" + cfg);
-    }
+    for (const auto* cfg : {"DEBUG", "RELEASE", "RELWITHDEBINFO", "MINSIZEREL"}) { seed_from_init("CMAKE_" + lang + "_FLAGS_" + cfg); }
     return {};
 }
 
 Interpreter* Interpreter::get_root() {
-    return this;  // No child interpreters anymore - we ARE the root
+    return this; // No child interpreters anymore - we ARE the root
 }
 
 const Interpreter* Interpreter::get_root() const {
-    return this;  // No child interpreters anymore - we ARE the root
+    return this; // No child interpreters anymore - we ARE the root
 }
 
 DirectoryContext& Interpreter::get_current_directory_context() {
@@ -582,14 +550,10 @@ DirectoryContext* Interpreter::get_directory_context(const std::string& dir) {
     std::string abs_dir = Path::make_absolute_and_normal(get_variable("CMAKE_CURRENT_SOURCE_DIR"), dir);
 
     auto it = directory_contexts_.find(abs_dir);
-    if (it != directory_contexts_.end()) {
-        return &it->second;
-    }
+    if (it != directory_contexts_.end()) { return &it->second; }
     // CMake also accepts the directory's binary dir as a key for DEFER.
     for (auto& [src, ctx] : directory_contexts_) {
-        if (ctx.binary_dir == abs_dir) {
-            return &ctx;
-        }
+        if (ctx.binary_dir == abs_dir) { return &ctx; }
     }
     return nullptr;
 }
@@ -608,9 +572,7 @@ void Interpreter::push_directory(const std::string& source_dir, const std::strin
         ctx.parent_dir = directory_stack_.back();
         // Inherit accumulated directory properties from parent (CMake semantics)
         auto parent_it = directory_contexts_.find(ctx.parent_dir);
-        if (parent_it != directory_contexts_.end()) {
-            ctx.accumulated = parent_it->second.accumulated;
-        }
+        if (parent_it != directory_contexts_.end()) { ctx.accumulated = parent_it->second.accumulated; }
     }
 
     // Add to contexts map
@@ -637,30 +599,23 @@ void Interpreter::execute_deferred_calls() {
     for (const auto& call : calls) {
         if (fatal_error_) break;
         auto res = execute_command_with_args(call.command, call.arguments);
-        if (!res) {
-            set_fatal_error(res.error());
-        }
+        if (!res) { set_fatal_error(res.error()); }
     }
 }
-
 
 void kiln::Interpreter::process_file_generates(const GenexEvaluationContext& genex_ctx) {
     for (auto& entry : pending_file_generates_) {
         // Set up per-entry genex context with the TARGET if specified
         auto entry_ctx = genex_ctx;
         if (!entry.target_name.empty()) {
-            if (auto it = targets_.find(entry.target_name); it != targets_.end()) {
-                entry_ctx.current_target = it->second.get();
-            }
+            if (auto it = targets_.find(entry.target_name); it != targets_.end()) { entry_ctx.current_target = it->second.get(); }
         }
         GenexEvaluator evaluator(entry_ctx);
 
         // Evaluate CONDITION — skip if falsy
         if (!entry.condition.empty()) {
             auto cond_result = evaluator.evaluate(entry.condition);
-            if (!cond_result || cond_result->empty() || *cond_result == "0") {
-                continue;
-            }
+            if (!cond_result || cond_result->empty() || *cond_result == "0") { continue; }
         }
 
         // Evaluate OUTPUT path
@@ -670,9 +625,7 @@ void kiln::Interpreter::process_file_generates(const GenexEvaluationContext& gen
             continue;
         }
         std::filesystem::path out_path = *output_result;
-        if (!out_path.is_absolute()) {
-            out_path = std::filesystem::path(entry.binary_dir) / out_path;
-        }
+        if (!out_path.is_absolute()) { out_path = std::filesystem::path(entry.binary_dir) / out_path; }
 
         // Evaluate CONTENT
         auto content_result = evaluator.evaluate(entry.content);
@@ -685,9 +638,7 @@ void kiln::Interpreter::process_file_generates(const GenexEvaluationContext& gen
         // Apply NEWLINE_STYLE
         if (!entry.newline_style.empty()) {
             std::string nl;
-            if (entry.newline_style == "DOS" || entry.newline_style == "WIN32" || entry.newline_style == "CRLF") {
-                nl = "\r\n";
-            }
+            if (entry.newline_style == "DOS" || entry.newline_style == "WIN32" || entry.newline_style == "CRLF") { nl = "\r\n"; }
             if (!nl.empty()) {
                 std::string converted;
                 converted.reserve(file_content.size());
@@ -721,8 +672,7 @@ void kiln::Interpreter::process_file_generates(const GenexEvaluationContext& gen
         if (std::filesystem::exists(out_path)) {
             std::ifstream existing(out_path, std::ios::binary);
             if (existing) {
-                std::string existing_content((std::istreambuf_iterator<char>(existing)),
-                                             std::istreambuf_iterator<char>());
+                std::string existing_content((std::istreambuf_iterator<char>(existing)), std::istreambuf_iterator<char>());
                 existing.close();
                 Hash256 existing_hash = blake2b(existing_content);
                 Hash256 new_hash = blake2b(file_content);
@@ -751,13 +701,9 @@ void kiln::Interpreter::process_file_generates(const GenexEvaluationContext& gen
                     // Extract path from arg: could be bare path or -DVAR=path
                     std::string_view candidate = arg;
                     auto eq = candidate.find('=');
-                    if (eq != std::string_view::npos) {
-                        candidate = candidate.substr(eq + 1);
-                    }
+                    if (eq != std::string_view::npos) { candidate = candidate.substr(eq + 1); }
                     auto norm = std::filesystem::path(candidate).lexically_normal().string();
-                    if (file_generate_outputs_.count(norm)) {
-                        rule->depends.push_back(norm);
-                    }
+                    if (file_generate_outputs_.count(norm)) { rule->depends.push_back(norm); }
                 }
             }
         }
@@ -766,7 +712,8 @@ void kiln::Interpreter::process_file_generates(const GenexEvaluationContext& gen
     pending_file_generates_.clear();
 }
 
-std::expected<kiln::Interpreter*, kiln::BuildError> kiln::Interpreter::run_build(int jobs, const std::vector<std::string>& requested_targets) {
+std::expected<kiln::Interpreter*, kiln::BuildError> kiln::Interpreter::run_build(int jobs,
+                                                                                 const std::vector<std::string>& requested_targets) {
     // Sanity check CMAKE_BUILD_TYPE
     std::array<std::string, 4> stanard_build_types_lower = {"debug", "release", "minsize", "relwithdebinfo"};
     auto build_type = get_variable("CMAKE_BUILD_TYPE");
@@ -782,25 +729,19 @@ std::expected<kiln::Interpreter*, kiln::BuildError> kiln::Interpreter::run_build
 
     ProfileScope graph_scope("generate build graph", "graph");
     auto graph_result = generate_build_graph(requested_targets);
-    if (!graph_result) {
-        return std::unexpected(graph_result.error());
-    }
+    if (!graph_result) { return std::unexpected(graph_result.error()); }
     auto& graph = *graph_result;
     graph_scope.stop();
 
     // Print deferred target dumps (AT_BUILD) - targets are now resolved
     for (const auto& dump_target_name : get_targets_to_dump_at_build()) {
-        if (targets_.count(dump_target_name)) {
-            print_message("", targets_[dump_target_name]->generate_dump_info());
-        }
+        if (targets_.count(dump_target_name)) { print_message("", targets_[dump_target_name]->generate_dump_info()); }
     }
 
     // Apply compat deps and validate
     graph.apply_cmake_compat_deps();
     auto validate_result = graph.validate();
-    if (!validate_result) {
-        return std::unexpected(BuildError{current_file_, validate_result.error()});
-    }
+    if (!validate_result) { return std::unexpected(BuildError{current_file_, validate_result.error()}); }
 
     std::string root_binary_dir = get_variable("CMAKE_BINARY_DIR");
 
@@ -808,9 +749,7 @@ std::expected<kiln::Interpreter*, kiln::BuildError> kiln::Interpreter::run_build
     std::string export_cmds = get_variable("CMAKE_EXPORT_COMPILE_COMMANDS");
     if (!is_falsy(export_cmds)) {
         auto result = graph.generate_compile_commands(root_binary_dir);
-        if (!result) {
-            return std::unexpected(BuildError{current_file_, result.error()});
-        }
+        if (!result) { return std::unexpected(BuildError{current_file_, result.error()}); }
     }
 
     {
@@ -824,16 +763,12 @@ std::expected<kiln::Interpreter*, kiln::BuildError> kiln::Interpreter::run_build
     print_message("STATUS", "Starting " + build_type + " build...");
     auto result = graph.execute(root_binary_dir, jobs);
 
-
-    if (!result) {
-        return std::unexpected(BuildError{current_file_, result.error()});
-    }
+    if (!result) { return std::unexpected(BuildError{current_file_, result.error()}); }
 
     return this;
 }
 
-std::expected<BuildGraph, BuildError>
-Interpreter::generate_build_graph(const std::vector<std::string>& requested_targets) {
+std::expected<BuildGraph, BuildError> Interpreter::generate_build_graph(const std::vector<std::string>& requested_targets) {
     // Same as generate_dirty_tasks(), but returns the full graph instead of just dirty tasks.
     // Used by EP attachment to atomically add ALL EP tasks (clean tasks skip via normal signature check).
 
@@ -845,30 +780,22 @@ Interpreter::generate_build_graph(const std::vector<std::string>& requested_targ
         for (const auto& [name, target] : targets_) {
             auto custom = std::dynamic_pointer_cast<CustomTarget>(target);
             if (custom) {
-                if (custom->is_build_by_default()) {
-                    initial_targets.push_back(name);
-                }
+                if (custom->is_build_by_default()) { initial_targets.push_back(name); }
             } else {
                 std::string exclude = target->get_property("EXCLUDE_FROM_ALL");
-                if (exclude.empty() || is_falsy(exclude)) {
-                    initial_targets.push_back(name);
-                }
+                if (exclude.empty() || is_falsy(exclude)) { initial_targets.push_back(name); }
             }
         }
     } else {
         for (const auto& t : requested_targets) {
             std::string resolved = resolve_target_alias(t);
-            if (!targets_.count(resolved)) {
-                return std::unexpected(BuildError{current_file_, "Unknown target: " + t});
-            }
+            if (!targets_.count(resolved)) { return std::unexpected(BuildError{current_file_, "Unknown target: " + t}); }
             initial_targets.push_back(resolved);
         }
     }
 
     // Resolve all initial targets
-    for (const auto& name : initial_targets) {
-        targets_[name]->resolve(targets_, *this);
-    }
+    for (const auto& name : initial_targets) { targets_[name]->resolve(targets_, *this); }
 
     // Collect targets to build
     std::function<void(const std::string&)> collect = [&](const std::string& name) {
@@ -877,25 +804,17 @@ Interpreter::generate_build_graph(const std::vector<std::string>& requested_targ
         targets_to_build.insert(name);
         auto target = targets_[name];
 
-        for (const auto& dep : target->get_resolved_target_deps()) {
-            collect(dep);
-        }
+        for (const auto& dep : target->get_resolved_target_deps()) { collect(dep); }
 
         auto custom = std::dynamic_pointer_cast<CustomTarget>(target);
         if (custom) {
-            for (const auto& dep : custom->get_custom_dependencies()) {
-                collect(dep);
-            }
+            for (const auto& dep : custom->get_custom_dependencies()) { collect(dep); }
         }
 
-        for (const auto& dep : target->get_manually_added_dependencies()) {
-            collect(dep);
-        }
+        for (const auto& dep : target->get_manually_added_dependencies()) { collect(dep); }
     };
 
-    for (const auto& name : initial_targets) {
-        collect(name);
-    }
+    for (const auto& name : initial_targets) { collect(name); }
 
     std::string root_binary_dir = get_variable("CMAKE_BINARY_DIR");
     std::filesystem::create_directories(root_binary_dir);
@@ -909,8 +828,8 @@ Interpreter::generate_build_graph(const std::vector<std::string>& requested_targ
 
     std::string linker_type = get_variable("CMAKE_LINKER_TYPE");
     if (!linker_type.empty()) {
-        if (ci_equals(linker_type, "BFD") || ci_equals(linker_type, "GOLD") ||
-            ci_equals(linker_type, "MOLD") || ci_equals(linker_type, "LLD")) {
+        if (ci_equals(linker_type, "BFD") || ci_equals(linker_type, "GOLD") || ci_equals(linker_type, "MOLD")
+            || ci_equals(linker_type, "LLD")) {
             std::string flag = "-fuse-ld=" + to_lower(linker_type);
             exe_linker_flags.push_back(flag);
             shared_linker_flags.push_back(flag);
@@ -933,9 +852,7 @@ Interpreter::generate_build_graph(const std::vector<std::string>& requested_targ
     {
         auto genex_ctx = GenexEvaluationContext::from_interpreter(*this, targets_);
         process_file_generates(genex_ctx);
-        if (fatal_error_) {
-            return std::unexpected(BuildError{fatal_error_->file, fatal_error_->message});
-        }
+        if (fatal_error_) { return std::unexpected(BuildError{fatal_error_->file, fatal_error_->message}); }
     }
 
     // Generate tasks via transaction(s).
@@ -948,23 +865,21 @@ Interpreter::generate_build_graph(const std::vector<std::string>& requested_targ
         // Initial pass: generate tasks for the configured target set.
         auto txn = graph.begin();
         for (const auto& name : targets_to_build) {
-            if (auto r = targets_[name]->generate_tasks(txn, get_root()->toolchain_, targets_, *this, exe_linker_flags, shared_linker_flags); !r) {
+            if (auto r =
+                    targets_[name]->generate_tasks(txn, get_root()->toolchain_, targets_, *this, exe_linker_flags, shared_linker_flags);
+                !r) {
                 return std::unexpected(BuildError{current_file_, r.error()});
             }
         }
         auto commit_result = txn.commit();
-        if (!commit_result) {
-            return std::unexpected(BuildError{current_file_, commit_result.error()});
-        }
+        if (!commit_result) { return std::unexpected(BuildError{current_file_, commit_result.error()}); }
 
         std::unordered_map<std::string, std::string> output_to_target;
         for (const auto& [name, target] : targets_) {
             auto path = target->get_output_path();
             if (!path.empty()) output_to_target[path] = name;
             if (auto* ct = dynamic_cast<CustomTarget*>(target.get())) {
-                for (const auto& bp : ct->get_byproducts()) {
-                    output_to_target[bp] = name;
-                }
+                for (const auto& bp : ct->get_byproducts()) { output_to_target[bp] = name; }
             }
         }
 
@@ -980,7 +895,9 @@ Interpreter::generate_build_graph(const std::vector<std::string>& requested_targ
                 auto it = output_to_target.find(missing);
                 if (it != output_to_target.end() && !targets_to_build.count(it->second)) {
                     targets_to_build.insert(it->second);
-                    if (auto r = targets_[it->second]->generate_tasks(resolve_txn, get_root()->toolchain_, targets_, *this, exe_linker_flags, shared_linker_flags); !r) {
+                    if (auto r = targets_[it->second]->generate_tasks(resolve_txn, get_root()->toolchain_, targets_, *this,
+                                                                      exe_linker_flags, shared_linker_flags);
+                        !r) {
                         return std::unexpected(BuildError{current_file_, r.error()});
                     }
                     changed = true;
@@ -990,7 +907,9 @@ Interpreter::generate_build_graph(const std::vector<std::string>& requested_targ
                 auto tgt_it = targets_.find(missing);
                 if (tgt_it != targets_.end() && !targets_to_build.count(missing)) {
                     targets_to_build.insert(missing);
-                    if (auto r = tgt_it->second->generate_tasks(resolve_txn, get_root()->toolchain_, targets_, *this, exe_linker_flags, shared_linker_flags); !r) {
+                    if (auto r = tgt_it->second->generate_tasks(resolve_txn, get_root()->toolchain_, targets_, *this, exe_linker_flags,
+                                                                shared_linker_flags);
+                        !r) {
                         return std::unexpected(BuildError{current_file_, r.error()});
                     }
                     changed = true;
@@ -1000,34 +919,26 @@ Interpreter::generate_build_graph(const std::vector<std::string>& requested_targ
                 // not pulled in via any target's source list / DEPENDS.
                 auto cc_it = cc_rules.find(missing);
                 if (cc_it != cc_rules.end() && !generated_cc_for_resolver.count(missing)) {
-                    if (auto r = generate_custom_command_task_for_rule(
-                        resolve_txn, *cc_it->second, targets_, cc_rules,
-                        generated_cc_for_resolver, get_target_aliases()); !r) {
+                    if (auto r = generate_custom_command_task_for_rule(resolve_txn, *cc_it->second, targets_, cc_rules,
+                                                                       generated_cc_for_resolver, get_target_aliases());
+                        !r) {
                         return std::unexpected(BuildError{current_file_, r.error()});
                     }
                     changed = true;
                 }
             }
             auto rcommit = resolve_txn.commit();
-            if (!rcommit) {
-                return std::unexpected(BuildError{current_file_, rcommit.error()});
-            }
+            if (!rcommit) { return std::unexpected(BuildError{current_file_, rcommit.error()}); }
         }
     }
 
-
-
-
     // Resolve circular deps
-    for (auto& [name, target] : targets_) {
-        target->resolve_deferred_circular_deps(targets_);
-    }
+    for (auto& [name, target] : targets_) { target->resolve_deferred_circular_deps(targets_); }
 
     // Wire link dependencies
     for (const auto& name : targets_to_build) {
         auto target = targets_[name];
-        if (target->get_type() == TargetType::STATIC_LIBRARY)
-            continue;
+        if (target->get_type() == TargetType::STATIC_LIBRARY) continue;
 
         std::string out_path = target->get_output_path();
         std::string task_id = out_path.empty() ? target->get_name() : out_path;
@@ -1035,9 +946,7 @@ Interpreter::generate_build_graph(const std::vector<std::string>& requested_targ
         if (graph.has_task(task_id)) {
             auto& task = graph.get_task(task_id);
             for (const auto& lib : target->get_resolved_property("LINK_LIBRARIES")) {
-                if (graph.has_task(lib)) {
-                    task.inputs.push_back(lib);
-                }
+                if (graph.has_task(lib)) { task.inputs.push_back(lib); }
             }
         }
     }
@@ -1046,22 +955,19 @@ Interpreter::generate_build_graph(const std::vector<std::string>& requested_targ
     auto genex_ctx = GenexEvaluationContext::from_interpreter(*this, targets_);
 
     auto finalize_result = graph.evaluate_genex(genex_ctx);
-    if (!finalize_result) {
-        return std::unexpected(BuildError{current_file_, finalize_result.error()});
-    }
+    if (!finalize_result) { return std::unexpected(BuildError{current_file_, finalize_result.error()}); }
     graph.resolve_inferred_file_deps();
-
 
     // Return full graph (not just dirty tasks)
     return std::move(graph);
 }
 
-Interpreter::Interpreter(std::string script_dir, std::ostream* out, std::ostream* err, std::optional<std::string> build_dir, bool skip_sys_init, bool skip_cache_load, bool skip_host_compiler_detection)
+Interpreter::Interpreter(std::string script_dir, std::ostream* out, std::ostream* err, std::optional<std::string> build_dir,
+                         bool skip_sys_init, bool skip_cache_load, bool skip_host_compiler_detection)
     : out_(out), err_(err) {
 
-    std::filesystem::path abs_script_dir = script_dir.empty() ?
-        std::filesystem::current_path() :
-        std::filesystem::absolute(script_dir).lexically_normal();
+    std::filesystem::path abs_script_dir =
+        script_dir.empty() ? std::filesystem::current_path() : std::filesystem::absolute(script_dir).lexically_normal();
     frame_stack_.push_back({intern_file(abs_script_dir.string()), nullptr});
 
     std::filesystem::path abs_binary_dir;
@@ -1098,9 +1004,7 @@ Interpreter::Interpreter(std::string script_dir, std::ostream* out, std::ostream
     }
 
     // Set default install prefix if not already set
-    if (get_variable("CMAKE_INSTALL_PREFIX").empty()) {
-        variables_.set("CMAKE_INSTALL_PREFIX", "/usr/local");
-    }
+    if (get_variable("CMAKE_INSTALL_PREFIX").empty()) { variables_.set("CMAKE_INSTALL_PREFIX", "/usr/local"); }
 
     if (build_dir.has_value() && abs_binary_dir == abs_script_dir) {
         set_fatal_error("Build directory cannot be the same as the source directory: " + abs_script_dir.string());
@@ -1195,8 +1099,8 @@ Interpreter::Interpreter(std::string script_dir, std::ostream* out, std::ostream
     cache_store_ = std::make_unique<CacheStore>(cache_path);
     if (!skip_cache_load) {
         ProfileScope cache_profile("loading persistent cache", "init");
-        auto cache_load_res = cache_store_->load();  // Graceful - starts with empty cache if file doesn't exist
-        (void)cache_load_res;
+        auto cache_load_res = cache_store_->load(); // Graceful - starts with empty cache if file doesn't exist
+        (void) cache_load_res;
     }
 
     // Initialize toolchain with compiler detection
@@ -1237,10 +1141,8 @@ Interpreter::Interpreter(std::string script_dir, std::ostream* out, std::ostream
             // CMAKE_SYSTEM_VERSION / CMAKE_SYSTEM mirror host until a toolchain
             // file overrides them (cross-compile). Match CMake: the bare
             // CMAKE_SYSTEM is "<name>-<version>".
-            if (get_variable("CMAKE_SYSTEM_VERSION").empty())
-                set_variable("CMAKE_SYSTEM_VERSION", uname_info.release);
-            if (get_variable("CMAKE_SYSTEM").empty())
-                set_variable("CMAKE_SYSTEM", host_system);
+            if (get_variable("CMAKE_SYSTEM_VERSION").empty()) set_variable("CMAKE_SYSTEM_VERSION", uname_info.release);
+            if (get_variable("CMAKE_SYSTEM").empty()) set_variable("CMAKE_SYSTEM", host_system);
         }
     }
 #endif
@@ -1251,11 +1153,8 @@ Interpreter::Interpreter(std::string script_dir, std::ostream* out, std::ostream
     // empty output (Arch/Fedora/non-multiarch) leaves the var unset.
     if (!skip_sys_init) {
         std::string arch = detail::run_command("gcc -print-multiarch 2>/dev/null");
-        while (!arch.empty() && (arch.back() == '\n' || arch.back() == '\r' || arch.back() == ' '))
-            arch.pop_back();
-        if (!arch.empty()) {
-            set_variable("CMAKE_LIBRARY_ARCHITECTURE", arch);
-        }
+        while (!arch.empty() && (arch.back() == '\n' || arch.back() == '\r' || arch.back() == ' ')) arch.pop_back();
+        if (!arch.empty()) { set_variable("CMAKE_LIBRARY_ARCHITECTURE", arch); }
     }
 
     // Initialize built-in global properties
@@ -1266,7 +1165,6 @@ Interpreter::Interpreter(std::string script_dir, std::ostream* out, std::ostream
     global_properties_["CMAKE_ROLE"] = "PROJECT";
     global_properties_["FIND_LIBRARY_USE_LIB64_PATHS"] = "TRUE";
     global_properties_["FIND_LIBRARY_USE_LIB32_PATHS"] = "FALSE";
-
 
     // Some CMake defaults
     variables_.set("CMAKE_INSTALL_BINDIR", "bin");
@@ -1280,15 +1178,10 @@ Interpreter::Interpreter(std::string script_dir, std::ostream* out, std::ostream
     // Append install prefix and staging prefix (unless CMAKE_FIND_NO_INSTALL_PREFIX)
     std::string install_prefix = get_variable("CMAKE_INSTALL_PREFIX");
     std::string staging_prefix = get_variable("CMAKE_STAGING_PREFIX");
-    if (get_variable("CMAKE_FIND_NO_INSTALL_PREFIX") != "1"
-        && get_variable("CMAKE_FIND_NO_INSTALL_PREFIX") != "ON"
+    if (get_variable("CMAKE_FIND_NO_INSTALL_PREFIX") != "1" && get_variable("CMAKE_FIND_NO_INSTALL_PREFIX") != "ON"
         && get_variable("CMAKE_FIND_NO_INSTALL_PREFIX") != "TRUE") {
-        if (!install_prefix.empty()) {
-            system_prefix_path += ";" + install_prefix;
-        }
-        if (!staging_prefix.empty()) {
-            system_prefix_path += ";" + staging_prefix;
-        }
+        if (!install_prefix.empty()) { system_prefix_path += ";" + install_prefix; }
+        if (!staging_prefix.empty()) { system_prefix_path += ";" + staging_prefix; }
     }
     variables_.set("CMAKE_SYSTEM_PREFIX_PATH", system_prefix_path);
 
@@ -1322,595 +1215,603 @@ Interpreter::Interpreter(std::string script_dir, std::ostream* out, std::ostream
     // Initialize root directory context
     push_directory(abs_script_dir.string(), abs_binary_dir.string());
 
-        // Register non-internal builtins
-        register_message_builtins(*this);
-        register_variable_builtins(*this);
-        register_list_builtins(*this);
-        register_target_builtins(*this);
-        register_project_builtins(*this);
-        register_file_builtins(*this);
-        register_find_commands_builtins(*this);
-        register_math_builtins(*this);
-        register_string_builtins(*this);
-        register_process_builtins(*this);
-        register_property_builtins(*this);
-        register_try_compile_builtins(*this);
-        register_path_builtins(*this);
-        register_install_builtins(*this);
-        register_source_properties_builtins(*this);
-        register_system_info_builtins(*this);
+    // Register non-internal builtins
+    register_message_builtins(*this);
+    register_variable_builtins(*this);
+    register_list_builtins(*this);
+    register_target_builtins(*this);
+    register_project_builtins(*this);
+    register_file_builtins(*this);
+    register_find_commands_builtins(*this);
+    register_math_builtins(*this);
+    register_string_builtins(*this);
+    register_process_builtins(*this);
+    register_property_builtins(*this);
+    register_try_compile_builtins(*this);
+    register_path_builtins(*this);
+    register_install_builtins(*this);
+    register_source_properties_builtins(*this);
+    register_system_info_builtins(*this);
 
-        // CMake compatibility: _cmake_record_install_prefix() re-snapshots
-        // the install/staging prefix position in CMAKE_SYSTEM_PREFIX_PATH.
-        // Called by platform modules after modifying CMAKE_SYSTEM_PREFIX_PATH.
-        add_builtin("_cmake_record_install_prefix", [](Interpreter& interp, const std::vector<std::string>&) {
-            std::string install_prefix = interp.get_variable("CMAKE_INSTALL_PREFIX");
-            std::string staging_prefix = interp.get_variable("CMAKE_STAGING_PREFIX");
-            std::string sys_prefix_path = interp.get_variable("CMAKE_SYSTEM_PREFIX_PATH");
+    // CMake compatibility: _cmake_record_install_prefix() re-snapshots
+    // the install/staging prefix position in CMAKE_SYSTEM_PREFIX_PATH.
+    // Called by platform modules after modifying CMAKE_SYSTEM_PREFIX_PATH.
+    add_builtin("_cmake_record_install_prefix", [](Interpreter& interp, const std::vector<std::string>&) {
+        std::string install_prefix = interp.get_variable("CMAKE_INSTALL_PREFIX");
+        std::string staging_prefix = interp.get_variable("CMAKE_STAGING_PREFIX");
+        std::string sys_prefix_path = interp.get_variable("CMAKE_SYSTEM_PREFIX_PATH");
 
-            interp.set_variable("_CMAKE_SYSTEM_PREFIX_PATH_INSTALL_PREFIX_VALUE", install_prefix);
-            interp.set_variable("_CMAKE_SYSTEM_PREFIX_PATH_STAGING_PREFIX_VALUE", staging_prefix);
+        interp.set_variable("_CMAKE_SYSTEM_PREFIX_PATH_INSTALL_PREFIX_VALUE", install_prefix);
+        interp.set_variable("_CMAKE_SYSTEM_PREFIX_PATH_STAGING_PREFIX_VALUE", staging_prefix);
 
-            int icount = 0, scount = 0;
-            CMakeArrayIterator path_view(sys_prefix_path);
-            for (auto entry : path_view) {
-                if (!install_prefix.empty() && entry == install_prefix) ++icount;
-                if (!staging_prefix.empty() && entry == staging_prefix) ++scount;
+        int icount = 0, scount = 0;
+        CMakeArrayIterator path_view(sys_prefix_path);
+        for (auto entry : path_view) {
+            if (!install_prefix.empty() && entry == install_prefix) ++icount;
+            if (!staging_prefix.empty() && entry == staging_prefix) ++scount;
+        }
+        interp.set_variable("_CMAKE_SYSTEM_PREFIX_PATH_INSTALL_PREFIX_COUNT", std::to_string(icount));
+        interp.set_variable("_CMAKE_SYSTEM_PREFIX_PATH_STAGING_PREFIX_COUNT", std::to_string(scount));
+    });
+
+    add_builtin("enable_testing", [](Interpreter& interp, const std::vector<std::string>& args) {
+        if (!args.empty()) { interp.print_message("WARN", "enable_testing() expects no arguments"); }
+        interp.set_variable("BUILD_TESTING", "ON");
+        interp.mark_project_enabled_testing();
+    });
+
+    add_builtin("add_test", [](Interpreter& interp, const std::vector<std::string>& args) {
+        if (args.empty()) {
+            interp.set_fatal_error("add_test requires arguments");
+            return;
+        }
+
+        std::string name;
+        std::vector<std::string> raw_cmd;
+        std::string working_dir;
+
+        // Detect legacy form: add_test(testname command [arg...])
+        // Legacy form is used when the first argument is NOT the "NAME" keyword
+        if (args[0] != "NAME") {
+            if (args.size() < 2) {
+                interp.set_fatal_error("add_test requires at least a test name and command");
+                return;
             }
-            interp.set_variable("_CMAKE_SYSTEM_PREFIX_PATH_INSTALL_PREFIX_COUNT", std::to_string(icount));
-            interp.set_variable("_CMAKE_SYSTEM_PREFIX_PATH_STAGING_PREFIX_COUNT", std::to_string(scount));
-        });
+            name = args[0];
+            raw_cmd.assign(args.begin() + 1, args.end());
+        } else {
+            // NAME form: add_test(NAME <name> COMMAND <cmd> [args...]
+            //             [CONFIGURATIONS <config>...]
+            //             [WORKING_DIRECTORY <dir>]
+            //             [COMMAND_EXPAND_LISTS])
+            CommandParser parser("add_test");
+            std::vector<std::string> configurations;
+            bool command_expand_lists = false;
 
-        add_builtin("enable_testing", [](Interpreter& interp, const std::vector<std::string>& args) {
-            if (!args.empty()) {
-                interp.print_message("WARN", "enable_testing() expects no arguments");
+            parser.value("NAME", name);
+            parser.list("COMMAND", raw_cmd);
+            parser.value("WORKING_DIRECTORY", working_dir);
+            parser.list("CONFIGURATIONS", configurations);
+            parser.flag("COMMAND_EXPAND_LISTS", command_expand_lists);
+
+            auto parse_res = parser.parse(args);
+            if (!parse_res) {
+                interp.set_fatal_error(parse_res.error());
+                return;
             }
-            interp.set_variable("BUILD_TESTING", "ON");
-            interp.mark_project_enabled_testing();
-        });
+            for (const auto& w : *parse_res) interp.print_message("WARNING", w);
 
-        add_builtin("add_test", [](Interpreter& interp, const std::vector<std::string>& args) {
-            if (args.empty()) {
-                interp.set_fatal_error("add_test requires arguments");
+            if (name.empty()) {
+                interp.set_fatal_error("add_test NAME requires a non-empty test name");
                 return;
             }
 
-            std::string name;
-            std::vector<std::string> raw_cmd;
-            std::string working_dir;
-
-            // Detect legacy form: add_test(testname command [arg...])
-            // Legacy form is used when the first argument is NOT the "NAME" keyword
-            if (args[0] != "NAME") {
-                if (args.size() < 2) {
-                    interp.set_fatal_error("add_test requires at least a test name and command");
-                    return;
-                }
-                name = args[0];
-                raw_cmd.assign(args.begin() + 1, args.end());
-            } else {
-                // NAME form: add_test(NAME <name> COMMAND <cmd> [args...]
-                //             [CONFIGURATIONS <config>...]
-                //             [WORKING_DIRECTORY <dir>]
-                //             [COMMAND_EXPAND_LISTS])
-                CommandParser parser("add_test");
-                std::vector<std::string> configurations;
-                bool command_expand_lists = false;
-
-                parser.value("NAME", name);
-                parser.list("COMMAND", raw_cmd);
-                parser.value("WORKING_DIRECTORY", working_dir);
-                parser.list("CONFIGURATIONS", configurations);
-                parser.flag("COMMAND_EXPAND_LISTS", command_expand_lists);
-
-                auto parse_res = parser.parse(args);
-                if (!parse_res) {
-                    interp.set_fatal_error(parse_res.error());
-                    return;
-                }
-                for (const auto& w : *parse_res) interp.print_message("WARNING", w);
-
-                if (name.empty()) {
-                    interp.set_fatal_error("add_test NAME requires a non-empty test name");
-                    return;
-                }
-
-                if (raw_cmd.empty()) {
-                    interp.set_fatal_error("add_test requires COMMAND");
-                    return;
-                }
-
-                // Filter by CONFIGURATIONS if specified
-                if (!configurations.empty()) {
-                    auto build_type = interp.get_variable("CMAKE_BUILD_TYPE");
-                    bool config_match = false;
-                    for (const auto& config : configurations) {
-                        // Case-insensitive comparison (CMake behavior)
-                        std::string config_lower = to_lower(config);
-                        std::string build_type_lower = to_lower(build_type);
-                        if (config_lower == build_type_lower) {
-                            config_match = true;
-                            break;
-                        }
-                    }
-                    if (!config_match) {
-                        return; // Skip test — not for this configuration
-                    }
-                }
-            }
-
-            TestDefinition test;
-            test.name = name;
-            test.command = raw_cmd[0];
-            for (size_t i = 1; i < raw_cmd.size(); ++i) {
-                test.args.push_back(raw_cmd[i]);
-            }
-            test.working_dir = working_dir.empty() ? interp.get_variable("CMAKE_CURRENT_BINARY_DIR") : working_dir;
-
-            interp.get_tests().push_back(std::move(test));
-        });
-
-        add_builtin("set_tests_properties", [](Interpreter& interp, const std::vector<std::string>& args) {
-            // Known test properties (stored silently; unrecognized ones still stored but warn)
-            static const std::unordered_set<std::string> KNOWN_PROPERTIES = {
-                "TIMEOUT", "SKIP_RETURN_CODE", "DEPENDS",
-                "WORKING_DIRECTORY", "SKIP_REGULAR_EXPRESSION",
-                "WILL_FAIL", "PASS_REGULAR_EXPRESSION", "FAIL_REGULAR_EXPRESSION",
-                "ENVIRONMENT", "ENVIRONMENT_MODIFICATION", "LABELS",
-                "FIXTURES_SETUP", "FIXTURES_CLEANUP", "FIXTURES_REQUIRED",
-                "DISABLED", "COST", "PROCESSORS", "RESOURCE_LOCK",
-                "RUN_SERIAL", "MEASUREMENT", "ATTACHED_FILES",
-                "ATTACHED_FILES_ON_FAIL", "REQUIRED_FILES",
-                // Metadata-only properties (no runtime behavior needed)
-                "DEF_SOURCE_LINE", "_BACKTRACE_TRIPLES",
-            };
-
-            // Parse: set_tests_properties(test1 [test2...] PROPERTIES prop1 val1 [prop2 val2...])
-            // CMake quietly accepts an empty test-name list (e.g. when the
-            // caller's ${TEST_NAME} expands to nothing) and treats the whole
-            // call as a no-op. Match that — projects in the wild rely on it.
-            auto props_it = std::find(args.begin(), args.end(), "PROPERTIES");
-            if (props_it == args.end()) {
-                interp.set_fatal_error("set_tests_properties requires PROPERTIES keyword");
+            if (raw_cmd.empty()) {
+                interp.set_fatal_error("add_test requires COMMAND");
                 return;
             }
 
-            // Extract test names (everything before PROPERTIES)
-            std::vector<std::string> test_names(args.begin(), props_it);
-            if (test_names.empty()) {
-                return;  // No-op, matching CMake.
-            }
-
-            // Extract properties (everything after PROPERTIES)
-            std::vector<std::string> prop_args(props_it + 1, args.end());
-            if (prop_args.size() % 2 != 0) {
-                interp.set_fatal_error("set_tests_properties PROPERTIES must have pairs of property names and values");
-                return;
-            }
-
-            // Parse properties into map
-            std::map<std::string, std::string> properties;
-            for (size_t i = 0; i < prop_args.size(); i += 2) {
-                std::string prop_name = prop_args[i];
-                std::string prop_value = prop_args[i + 1];
-
-                // Warn if property is completely unrecognized (but still set it)
-                if (KNOWN_PROPERTIES.find(prop_name) == KNOWN_PROPERTIES.end()) {
-                    interp.print_message("WARN", "Unknown test property '" + prop_name + "'");
-                }
-
-                properties[prop_name] = prop_value;
-            }
-
-            // Apply properties to all named tests
-            auto& tests = interp.get_tests();
-            for (const auto& test_name : test_names) {
-                bool found = false;
-                for (auto& test : tests) {
-                    if (test.name == test_name) {
-                        // Merge properties (allowing multiple set_tests_properties calls)
-                        for (const auto& [key, value] : properties) {
-                            test.properties[key] = value;
-                        }
-                        found = true;
+            // Filter by CONFIGURATIONS if specified
+            if (!configurations.empty()) {
+                auto build_type = interp.get_variable("CMAKE_BUILD_TYPE");
+                bool config_match = false;
+                for (const auto& config : configurations) {
+                    // Case-insensitive comparison (CMake behavior)
+                    std::string config_lower = to_lower(config);
+                    std::string build_type_lower = to_lower(build_type);
+                    if (config_lower == build_type_lower) {
+                        config_match = true;
                         break;
                     }
                 }
-
-                if (!found) {
-                    interp.print_message("WARN", "Test '" + test_name + "' not found, cannot set properties");
+                if (!config_match) {
+                    return; // Skip test — not for this configuration
                 }
             }
-        });
+        }
 
-        register_find_package_builtins(*this);
+        TestDefinition test;
+        test.name = name;
+        test.command = raw_cmd[0];
+        for (size_t i = 1; i < raw_cmd.size(); ++i) { test.args.push_back(raw_cmd[i]); }
+        test.working_dir = working_dir.empty() ? interp.get_variable("CMAKE_CURRENT_BINARY_DIR") : working_dir;
 
-        add_builtin("include_guard", [](Interpreter& interp, const std::vector<std::string>& args) {
-            std::string scope = "DIRECTORY";
-            if (!args.empty()) scope = args[0];
+        interp.get_tests().push_back(std::move(test));
+    });
 
-            std::string current_file = interp.get_current_file();
-            if (current_file.empty()) return;
+    add_builtin("set_tests_properties", [](Interpreter& interp, const std::vector<std::string>& args) {
+        // Known test properties (stored silently; unrecognized ones still stored but warn)
+        static const std::unordered_set<std::string> KNOWN_PROPERTIES = {
+            "TIMEOUT",
+            "SKIP_RETURN_CODE",
+            "DEPENDS",
+            "WORKING_DIRECTORY",
+            "SKIP_REGULAR_EXPRESSION",
+            "WILL_FAIL",
+            "PASS_REGULAR_EXPRESSION",
+            "FAIL_REGULAR_EXPRESSION",
+            "ENVIRONMENT",
+            "ENVIRONMENT_MODIFICATION",
+            "LABELS",
+            "FIXTURES_SETUP",
+            "FIXTURES_CLEANUP",
+            "FIXTURES_REQUIRED",
+            "DISABLED",
+            "COST",
+            "PROCESSORS",
+            "RESOURCE_LOCK",
+            "RUN_SERIAL",
+            "MEASUREMENT",
+            "ATTACHED_FILES",
+            "ATTACHED_FILES_ON_FAIL",
+            "REQUIRED_FILES",
+            // Metadata-only properties (no runtime behavior needed)
+            "DEF_SOURCE_LINE",
+            "_BACKTRACE_TRIPLES",
+        };
 
-            if (scope == "GLOBAL") {
-                // If already guarded, trigger early return (skip rest of file)
-                if (interp.global_guarded_files_.contains(current_file)) {
-                    interp.request_return();
-                    return;
-                }
-                interp.global_guarded_files_.insert(current_file);
-            } else {
-                if (interp.get_current_directory_context().guarded_files.contains(current_file)) {
-                    interp.request_return();
-                    return;
-                }
-                interp.get_current_directory_context().guarded_files.insert(current_file);
+        // Parse: set_tests_properties(test1 [test2...] PROPERTIES prop1 val1 [prop2 val2...])
+        // CMake quietly accepts an empty test-name list (e.g. when the
+        // caller's ${TEST_NAME} expands to nothing) and treats the whole
+        // call as a no-op. Match that — projects in the wild rely on it.
+        auto props_it = std::find(args.begin(), args.end(), "PROPERTIES");
+        if (props_it == args.end()) {
+            interp.set_fatal_error("set_tests_properties requires PROPERTIES keyword");
+            return;
+        }
+
+        // Extract test names (everything before PROPERTIES)
+        std::vector<std::string> test_names(args.begin(), props_it);
+        if (test_names.empty()) {
+            return; // No-op, matching CMake.
+        }
+
+        // Extract properties (everything after PROPERTIES)
+        std::vector<std::string> prop_args(props_it + 1, args.end());
+        if (prop_args.size() % 2 != 0) {
+            interp.set_fatal_error("set_tests_properties PROPERTIES must have pairs of property names and values");
+            return;
+        }
+
+        // Parse properties into map
+        std::map<std::string, std::string> properties;
+        for (size_t i = 0; i < prop_args.size(); i += 2) {
+            std::string prop_name = prop_args[i];
+            std::string prop_value = prop_args[i + 1];
+
+            // Warn if property is completely unrecognized (but still set it)
+            if (KNOWN_PROPERTIES.find(prop_name) == KNOWN_PROPERTIES.end()) {
+                interp.print_message("WARN", "Unknown test property '" + prop_name + "'");
             }
-        });
 
-        // Internal builtins (interact with interpreter state/stack)
+            properties[prop_name] = prop_value;
+        }
 
-        add_builtin("add_subdirectory", [](Interpreter& interp, const std::vector<std::string>& args) {
-            if (args.empty()) return;
-            std::string subdir = args[0];
-            std::string current_source_dir = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
-            std::string current_binary_dir = interp.get_variable("CMAKE_CURRENT_BINARY_DIR");
-            std::string source_path_str = Path::join(current_source_dir, subdir);
-            std::string abs_source_str = std::filesystem::absolute(std::filesystem::path(source_path_str)).string();
-            abs_source_str = Path(abs_source_str).lexically_normal().str();
-            std::string cmake_file_str = Path::join(abs_source_str, "CMakeLists.txt");
-
-            // Compute binary directory for the subdirectory
-            // Check for explicit binary_dir argument (args[1]), skipping EXCLUDE_FROM_ALL
-            std::string binary_path_str;
-            bool has_explicit_binary_dir = false;
-            for (size_t i = 1; i < args.size(); ++i) {
-                if (args[i] != "EXCLUDE_FROM_ALL") {
-                    binary_path_str = Path::join(current_binary_dir, args[i]);
-                    has_explicit_binary_dir = true;
+        // Apply properties to all named tests
+        auto& tests = interp.get_tests();
+        for (const auto& test_name : test_names) {
+            bool found = false;
+            for (auto& test : tests) {
+                if (test.name == test_name) {
+                    // Merge properties (allowing multiple set_tests_properties calls)
+                    for (const auto& [key, value] : properties) { test.properties[key] = value; }
+                    found = true;
                     break;
                 }
             }
-            if (!has_explicit_binary_dir) {
-                if (Path(subdir).is_absolute()) {
-                    // For absolute source paths without explicit binary dir,
-                    // use the last component as subdirectory name under current binary dir
-                    binary_path_str = Path::join(current_binary_dir, Path(subdir).filename());
-                } else {
-                    binary_path_str = Path::join(current_binary_dir, subdir);
-                }
-            }
 
-            // Create binary directory (CMake does this implicitly)
-            std::error_code ec;
-            std::filesystem::create_directories(binary_path_str, ec);
+            if (!found) { interp.print_message("WARN", "Test '" + test_name + "' not found, cannot set properties"); }
+        }
+    });
 
-            if (!interp.cached_file_exists(cmake_file_str)) {
-                interp.set_fatal_error("CMakeLists.txt not found in " + abs_source_str);
+    register_find_package_builtins(*this);
+
+    add_builtin("include_guard", [](Interpreter& interp, const std::vector<std::string>& args) {
+        std::string scope = "DIRECTORY";
+        if (!args.empty()) scope = args[0];
+
+        std::string current_file = interp.get_current_file();
+        if (current_file.empty()) return;
+
+        if (scope == "GLOBAL") {
+            // If already guarded, trigger early return (skip rest of file)
+            if (interp.global_guarded_files_.contains(current_file)) {
+                interp.request_return();
                 return;
             }
+            interp.global_guarded_files_.insert(current_file);
+        } else {
+            if (interp.get_current_directory_context().guarded_files.contains(current_file)) {
+                interp.request_return();
+                return;
+            }
+            interp.get_current_directory_context().guarded_files.insert(current_file);
+        }
+    });
 
-            std::ifstream file(cmake_file_str);
-            if(!file) { interp.set_fatal_error("Could not read " + cmake_file_str); return; }
-            std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    // Internal builtins (interact with interpreter state/stack)
 
-            // Save current file for restoration
-            std::string saved_file = interp.get_current_file();
+    add_builtin("add_subdirectory", [](Interpreter& interp, const std::vector<std::string>& args) {
+        if (args.empty()) return;
+        std::string subdir = args[0];
+        std::string current_source_dir = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
+        std::string current_binary_dir = interp.get_variable("CMAKE_CURRENT_BINARY_DIR");
+        std::string source_path_str = Path::join(current_source_dir, subdir);
+        std::string abs_source_str = std::filesystem::absolute(std::filesystem::path(source_path_str)).string();
+        abs_source_str = Path(abs_source_str).lexically_normal().str();
+        std::string cmake_file_str = Path::join(abs_source_str, "CMakeLists.txt");
 
-            // Push variable scope and directory context
-            interp.get_variables().push_scope();
-            interp.push_directory(abs_source_str, binary_path_str);
+        // Compute binary directory for the subdirectory
+        // Check for explicit binary_dir argument (args[1]), skipping EXCLUDE_FROM_ALL
+        std::string binary_path_str;
+        bool has_explicit_binary_dir = false;
+        for (size_t i = 1; i < args.size(); ++i) {
+            if (args[i] != "EXCLUDE_FROM_ALL") {
+                binary_path_str = Path::join(current_binary_dir, args[i]);
+                has_explicit_binary_dir = true;
+                break;
+            }
+        }
+        if (!has_explicit_binary_dir) {
+            if (Path(subdir).is_absolute()) {
+                // For absolute source paths without explicit binary dir,
+                // use the last component as subdirectory name under current binary dir
+                binary_path_str = Path::join(current_binary_dir, Path(subdir).filename());
+            } else {
+                binary_path_str = Path::join(current_binary_dir, subdir);
+            }
+        }
 
-            // Set CMAKE_CURRENT_* variables for the subdirectory
-            interp.set_variable("CMAKE_CURRENT_SOURCE_DIR", abs_source_str);
-            interp.set_variable("CMAKE_CURRENT_BINARY_DIR", binary_path_str);
-            interp.set_variable("CMAKE_CURRENT_LIST_FILE", cmake_file_str);
-            interp.set_variable("CMAKE_CURRENT_LIST_DIR", abs_source_str);
-            interp.set_current_file(cmake_file_str);
+        // Create binary directory (CMake does this implicitly)
+        std::error_code ec;
+        std::filesystem::create_directories(binary_path_str, ec);
 
-            // Parse and interpret the subdirectory CMakeLists.txt
-            std::string subdir_filename = std::string(Path(cmake_file_str).filename());
+        if (!interp.cached_file_exists(cmake_file_str)) {
+            interp.set_fatal_error("CMakeLists.txt not found in " + abs_source_str);
+            return;
+        }
 
-            ProfileScope parse_profile("parse " + subdir + "/" + subdir_filename, "parse");
-            Parser parser(content, cmake_file_str);
-            auto ast = parser.parse();
-            parse_profile.stop();
+        std::ifstream file(cmake_file_str);
+        if (!file) {
+            interp.set_fatal_error("Could not read " + cmake_file_str);
+            return;
+        }
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-            if (interp.get_debugger()) interp.get_debugger()->push_call_depth();
+        // Save current file for restoration
+        std::string saved_file = interp.get_current_file();
 
-            // Auto-scope policies around subdirectories (CMake behavior)
-            interp.push_policies();
+        // Push variable scope and directory context
+        interp.get_variables().push_scope();
+        interp.push_directory(abs_source_str, binary_path_str);
 
-            {
-                // return() in subdirectory shouldn't propagate to parent
-                ReturnGuard rg(interp);
+        // Set CMAKE_CURRENT_* variables for the subdirectory
+        interp.set_variable("CMAKE_CURRENT_SOURCE_DIR", abs_source_str);
+        interp.set_variable("CMAKE_CURRENT_BINARY_DIR", binary_path_str);
+        interp.set_variable("CMAKE_CURRENT_LIST_FILE", cmake_file_str);
+        interp.set_variable("CMAKE_CURRENT_LIST_DIR", abs_source_str);
+        interp.set_current_file(cmake_file_str);
 
-                if (ast) {
-                    ProfileScope interpret_profile("interpret " + subdir + "/" + subdir_filename, "interpret");
-                    auto res = interp.interpret(ast.value());
-                    interpret_profile.stop();
-                    if (!res) {
-                        interp.set_fatal_error(res.error());
-                    } else {
-                        interp.execute_deferred_calls();
-                        interp.finalize_directory_targets();  // Apply retroactive properties
+        // Parse and interpret the subdirectory CMakeLists.txt
+        std::string subdir_filename = std::string(Path(cmake_file_str).filename());
+
+        ProfileScope parse_profile("parse " + subdir + "/" + subdir_filename, "parse");
+        Parser parser(content, cmake_file_str);
+        auto ast = parser.parse();
+        parse_profile.stop();
+
+        if (interp.get_debugger()) interp.get_debugger()->push_call_depth();
+
+        // Auto-scope policies around subdirectories (CMake behavior)
+        interp.push_policies();
+
+        {
+            // return() in subdirectory shouldn't propagate to parent
+            ReturnGuard rg(interp);
+
+            if (ast) {
+                ProfileScope interpret_profile("interpret " + subdir + "/" + subdir_filename, "interpret");
+                auto res = interp.interpret(ast.value());
+                interpret_profile.stop();
+                if (!res) {
+                    interp.set_fatal_error(res.error());
+                } else {
+                    interp.execute_deferred_calls();
+                    interp.finalize_directory_targets(); // Apply retroactive properties
+                }
+            } else {
+                interp.set_fatal_error(InterpreterError{
+                    cmake_file_str, ast.error().row, ast.error().col, ast.error().offset, ast.error().length, ast.error().reason, {}});
+            }
+        }
+
+        interp.pop_policies();
+
+        if (interp.get_debugger()) interp.get_debugger()->pop_call_depth();
+
+        // Pop directory context and variable scope
+        interp.pop_directory();
+        interp.get_variables().pop_scope();
+
+        // Restore current file
+        interp.set_current_file(saved_file);
+    });
+
+    // Deprecated command - just calls add_subdirectory for each directory
+    add_builtin("subdirs", [](Interpreter& interp, const std::vector<std::string>& args) {
+        CommandParser parser("subdirs");
+        std::vector<std::string> dirs;
+        std::vector<std::string> exclude_dirs;
+        bool preorder = false;
+
+        parser.positionals(dirs, "directories");
+        parser.list("EXCLUDE_FROM_ALL", exclude_dirs);
+        parser.flag("PREORDER", preorder);
+
+        PARSE_OR_RETURN(parser, interp, args);
+
+        // Process normal directories
+        for (const auto& dir : dirs) {
+            auto res = interp.execute_command_with_args("add_subdirectory", {dir});
+            if (!res) return;
+        }
+
+        // Process EXCLUDE_FROM_ALL directories
+        for (const auto& dir : exclude_dirs) {
+            auto res = interp.execute_command_with_args("add_subdirectory", {dir, dir, "EXCLUDE_FROM_ALL"});
+            if (!res) return;
+        }
+    });
+
+    add_builtin("include", [](Interpreter& interp, const std::vector<std::string>& args) {
+        if (args.empty()) {
+            interp.set_fatal_error("include() requires an argument");
+            return;
+        }
+        bool optional = false;
+        for (size_t i = 1; i < args.size(); ++i)
+            if (args[i] == "OPTIONAL") optional = true;
+
+        auto res = interp.include_file(args[0], optional);
+        if (!res) interp.set_fatal_error(res.error());
+    });
+
+    add_builtin("break", [](Interpreter& interp, const std::vector<std::string>&) {
+        if (interp.get_loop_depth() == 0) {
+            interp.set_fatal_error("break() can only be called inside a loop");
+            return;
+        }
+        interp.set_loop_control(Interpreter::LoopControl::BREAK);
+    });
+
+    add_builtin("continue", [](Interpreter& interp, const std::vector<std::string>&) {
+        if (interp.get_loop_depth() == 0) {
+            interp.set_fatal_error("continue() can only be called inside a loop");
+            return;
+        }
+        interp.set_loop_control(Interpreter::LoopControl::CONTINUE);
+    });
+
+    add_builtin("return", [](Interpreter& interp, const std::vector<std::string>& args) {
+        // CMake 3.25+ supports return(PROPAGATE var1 var2 ...)
+        // which propagates variables to the parent scope before returning
+        if (!args.empty() && args[0] == "PROPAGATE") {
+            for (size_t i = 1; i < args.size(); ++i) {
+                const std::string& var_name = args[i];
+                auto value = interp.get_optional_variable(var_name);
+                auto result = value.has_value() ? interp.get_variables().set_parent_scope(var_name, *value)
+                                                : interp.get_variables().unset_parent_scope(var_name);
+                if (!result) {
+                    interp.set_fatal_error("return(PROPAGATE " + var_name + "): " + result.error());
+                    return;
+                }
+            }
+        }
+        interp.request_return();
+    });
+
+    add_builtin("cmake_language", [](Interpreter& interp, const std::vector<std::string>& args) {
+        if (args.empty()) {
+            interp.set_fatal_error("cmake_language requires arguments");
+            return;
+        }
+
+        if (args[0] == "EVAL") {
+            if (args.size() < 3 || args[1] != "CODE") {
+                interp.set_fatal_error("cmake_language(EVAL) requires CODE keyword and code arguments");
+                return;
+            }
+            std::string code;
+            for (size_t i = 2; i < args.size(); ++i) {
+                if (i > 2) code += ' ';
+                code += args[i];
+            }
+
+            Parser p(code);
+            auto ast = p.parse();
+            if (!ast) {
+                std::vector<CallLocation> backtrace;
+                Interpreter* root = interp.get_root();
+                if (!root->trace_stack_.empty()) {
+                    // For parse errors during EVAL, the current command (cmake_language)
+                    // should be part of the backtrace. Convert TraceEntry → CallLocation.
+                    backtrace.reserve(root->trace_stack_.size());
+                    for (const auto& te : root->trace_stack_) {
+                        backtrace.push_back(
+                            {te.file ? *te.file : std::string(), te.row, te.col, te.offset, te.length, std::string(te.command)});
                     }
-                } else {
-                    interp.set_fatal_error(InterpreterError{cmake_file_str, ast.error().row, ast.error().col, ast.error().offset, ast.error().length, ast.error().reason, {}});
                 }
+                InterpreterError err{"<EVAL>",           ast.error().row,
+                                     ast.error().col,    ast.error().offset,
+                                     ast.error().length, "cmake_language(EVAL) parse error: " + ast.error().reason,
+                                     backtrace,          code};
+                interp.set_fatal_error(err);
+                return;
             }
 
-            interp.pop_policies();
+            std::string old_file = interp.get_current_file();
+            interp.set_current_file("<EVAL>");
+            auto res = interp.interpret(ast.value());
+            interp.set_current_file(old_file);
 
-            if (interp.get_debugger()) interp.get_debugger()->pop_call_depth();
-
-            // Pop directory context and variable scope
-            interp.pop_directory();
-            interp.get_variables().pop_scope();
-
-            // Restore current file
-            interp.set_current_file(saved_file);
-        });
-
-        // Deprecated command - just calls add_subdirectory for each directory
-        add_builtin("subdirs", [](Interpreter& interp, const std::vector<std::string>& args) {
-            CommandParser parser("subdirs");
-            std::vector<std::string> dirs;
-            std::vector<std::string> exclude_dirs;
-            bool preorder = false;
-
-            parser.positionals(dirs, "directories");
-            parser.list("EXCLUDE_FROM_ALL", exclude_dirs);
-            parser.flag("PREORDER", preorder);
-
-            PARSE_OR_RETURN(parser, interp, args);
-
-            // Process normal directories
-            for (const auto& dir : dirs) {
-                auto res = interp.execute_command_with_args("add_subdirectory", {dir});
-                if (!res) return;
+            if (!res) {
+                InterpreterError err = res.error();
+                if (err.file == "<EVAL>" && !err.source_content) { err.source_content = code; }
+                interp.set_fatal_error(err);
             }
 
-            // Process EXCLUDE_FROM_ALL directories
-            for (const auto& dir : exclude_dirs) {
-                auto res = interp.execute_command_with_args("add_subdirectory", {dir, dir, "EXCLUDE_FROM_ALL"});
-                if (!res) return;
+        } else if (args[0] == "CALL") {
+            if (args.size() < 2) {
+                interp.set_fatal_error("cmake_language(CALL) requires a command name");
+                return;
             }
-        });
+            std::string cmd = args[1];
+            std::vector<std::string> cmd_args;
+            if (args.size() > 2) { cmd_args.assign(args.begin() + 2, args.end()); }
 
-        add_builtin("include", [](Interpreter& interp, const std::vector<std::string>& args) {
-            if (args.empty()) { interp.set_fatal_error("include() requires an argument"); return; }
-            bool optional = false;
-            for (size_t i = 1; i < args.size(); ++i) if (args[i] == "OPTIONAL") optional = true;
-
-            auto res = interp.include_file(args[0], optional);
+            auto res = interp.execute_command_with_args(cmd, cmd_args);
             if (!res) interp.set_fatal_error(res.error());
-        });
-
-
-        add_builtin("break", [](Interpreter& interp, const std::vector<std::string>&) {
-            if (interp.get_loop_depth() == 0) {
-                interp.set_fatal_error("break() can only be called inside a loop");
+        } else if (args[0] == "DEFER") {
+            // cmake_language(DEFER [DIRECTORY <dir>] [ID <id>] [ID_VAR <var>] CALL <cmd> [<args>...])
+            // cmake_language(DEFER [DIRECTORY <dir>] CANCEL_CALL <id>...)
+            // cmake_language(DEFER [DIRECTORY <dir>] GET_CALL_IDS <var>)
+            // cmake_language(DEFER [DIRECTORY <dir>] GET_CALL <id> <var>)
+            if (args.size() < 2) {
+                interp.set_fatal_error("cmake_language(DEFER) requires additional arguments");
                 return;
             }
-            interp.set_loop_control(Interpreter::LoopControl::BREAK);
-        });
 
-        add_builtin("continue", [](Interpreter& interp, const std::vector<std::string>&) {
-            if (interp.get_loop_depth() == 0) {
-                interp.set_fatal_error("continue() can only be called inside a loop");
-                return;
-            }
-            interp.set_loop_control(Interpreter::LoopControl::CONTINUE);
-        });
+            size_t i = 1;
+            DirectoryContext* target_ctx = nullptr;
+            std::string user_id;
+            std::string id_var;
 
-        add_builtin("return", [](Interpreter& interp, const std::vector<std::string>& args) {
-            // CMake 3.25+ supports return(PROPAGATE var1 var2 ...)
-            // which propagates variables to the parent scope before returning
-            if (!args.empty() && args[0] == "PROPAGATE") {
-                for (size_t i = 1; i < args.size(); ++i) {
-                    const std::string& var_name = args[i];
-                    auto value = interp.get_optional_variable(var_name);
-                    auto result = value.has_value()
-                        ? interp.get_variables().set_parent_scope(var_name, *value)
-                        : interp.get_variables().unset_parent_scope(var_name);
-                    if (!result) {
-                        interp.set_fatal_error("return(PROPAGATE " + var_name + "): " + result.error());
+            // Parse optional DIRECTORY, ID, ID_VAR before the subcommand
+            while (i < args.size()) {
+                if (args[i] == "DIRECTORY") {
+                    if (i + 1 >= args.size()) {
+                        interp.set_fatal_error("cmake_language(DEFER DIRECTORY) missing directory argument");
                         return;
                     }
+                    auto* ctx = interp.get_root()->get_directory_context(args[i + 1]);
+                    if (!ctx) {
+                        interp.set_fatal_error("cmake_language(DEFER): directory not known: " + args[i + 1]);
+                        return;
+                    }
+                    target_ctx = ctx;
+                    i += 2;
+                } else if (args[i] == "ID") {
+                    if (i + 1 >= args.size()) {
+                        interp.set_fatal_error("cmake_language(DEFER ID) missing id argument");
+                        return;
+                    }
+                    user_id = args[i + 1];
+                    i += 2;
+                } else if (args[i] == "ID_VAR") {
+                    if (i + 1 >= args.size()) {
+                        interp.set_fatal_error("cmake_language(DEFER ID_VAR) missing variable argument");
+                        return;
+                    }
+                    id_var = args[i + 1];
+                    i += 2;
+                } else {
+                    break; // Must be a subcommand
                 }
             }
-            interp.request_return();
-        });
 
-        add_builtin("cmake_language", [](Interpreter& interp, const std::vector<std::string>& args) {
-            if (args.empty()) {
-                interp.set_fatal_error("cmake_language requires arguments");
+            if (!target_ctx) { target_ctx = &interp.get_root()->get_current_directory_context(); }
+
+            if (i >= args.size()) {
+                interp.set_fatal_error("cmake_language(DEFER) missing subcommand (CALL, CANCEL_CALL, GET_CALL_IDS, GET_CALL)");
                 return;
             }
 
-            if (args[0] == "EVAL") {
-                 if (args.size() < 3 || args[1] != "CODE") {
-                     interp.set_fatal_error("cmake_language(EVAL) requires CODE keyword and code arguments");
-                     return;
-                 }
-                 std::string code;
-                 for (size_t i = 2; i < args.size(); ++i) {
-                     if (i > 2) code += ' ';
-                     code += args[i];
-                 }
-
-                 Parser p(code);
-                 auto ast = p.parse();
-                 if (!ast) {
-                     std::vector<CallLocation> backtrace;
-                     Interpreter* root = interp.get_root();
-                     if (!root->trace_stack_.empty()) {
-                         // For parse errors during EVAL, the current command (cmake_language)
-                         // should be part of the backtrace. Convert TraceEntry → CallLocation.
-                         backtrace.reserve(root->trace_stack_.size());
-                         for (const auto& te : root->trace_stack_) {
-                             backtrace.push_back({te.file ? *te.file : std::string(), te.row, te.col, te.offset, te.length, std::string(te.command)});
-                         }
-                     }
-                     InterpreterError err{"<EVAL>", ast.error().row, ast.error().col, ast.error().offset, ast.error().length, "cmake_language(EVAL) parse error: " + ast.error().reason, backtrace, code};
-                     interp.set_fatal_error(err);
-                     return;
-                 }
-
-                 std::string old_file = interp.get_current_file();
-                 interp.set_current_file("<EVAL>");
-                 auto res = interp.interpret(ast.value());
-                 interp.set_current_file(old_file);
-
-                 if (!res) {
-                     InterpreterError err = res.error();
-                     if (err.file == "<EVAL>" && !err.source_content) {
-                         err.source_content = code;
-                     }
-                     interp.set_fatal_error(err);
-                 }
-
-            } else if (args[0] == "CALL") {
-                 if (args.size() < 2) {
-                     interp.set_fatal_error("cmake_language(CALL) requires a command name");
-                     return;
-                 }
-                 std::string cmd = args[1];
-                 std::vector<std::string> cmd_args;
-                 if (args.size() > 2) {
-                     cmd_args.assign(args.begin() + 2, args.end());
-                 }
-
-                 auto res = interp.execute_command_with_args(cmd, cmd_args);
-                 if (!res) interp.set_fatal_error(res.error());
-            } else if (args[0] == "DEFER") {
-                 // cmake_language(DEFER [DIRECTORY <dir>] [ID <id>] [ID_VAR <var>] CALL <cmd> [<args>...])
-                 // cmake_language(DEFER [DIRECTORY <dir>] CANCEL_CALL <id>...)
-                 // cmake_language(DEFER [DIRECTORY <dir>] GET_CALL_IDS <var>)
-                 // cmake_language(DEFER [DIRECTORY <dir>] GET_CALL <id> <var>)
-                 if (args.size() < 2) {
-                     interp.set_fatal_error("cmake_language(DEFER) requires additional arguments");
-                     return;
-                 }
-
-                 size_t i = 1;
-                 DirectoryContext* target_ctx = nullptr;
-                 std::string user_id;
-                 std::string id_var;
-
-                 // Parse optional DIRECTORY, ID, ID_VAR before the subcommand
-                 while (i < args.size()) {
-                     if (args[i] == "DIRECTORY") {
-                         if (i + 1 >= args.size()) {
-                             interp.set_fatal_error("cmake_language(DEFER DIRECTORY) missing directory argument");
-                             return;
-                         }
-                         auto* ctx = interp.get_root()->get_directory_context(args[i + 1]);
-                         if (!ctx) {
-                             interp.set_fatal_error("cmake_language(DEFER): directory not known: " + args[i + 1]);
-                             return;
-                         }
-                         target_ctx = ctx;
-                         i += 2;
-                     } else if (args[i] == "ID") {
-                         if (i + 1 >= args.size()) {
-                             interp.set_fatal_error("cmake_language(DEFER ID) missing id argument");
-                             return;
-                         }
-                         user_id = args[i + 1];
-                         i += 2;
-                     } else if (args[i] == "ID_VAR") {
-                         if (i + 1 >= args.size()) {
-                             interp.set_fatal_error("cmake_language(DEFER ID_VAR) missing variable argument");
-                             return;
-                         }
-                         id_var = args[i + 1];
-                         i += 2;
-                     } else {
-                         break;  // Must be a subcommand
-                     }
-                 }
-
-                 if (!target_ctx) {
-                     target_ctx = &interp.get_root()->get_current_directory_context();
-                 }
-
-                 if (i >= args.size()) {
-                     interp.set_fatal_error("cmake_language(DEFER) missing subcommand (CALL, CANCEL_CALL, GET_CALL_IDS, GET_CALL)");
-                     return;
-                 }
-
-                 const std::string& subcmd = args[i];
-                 if (subcmd == "CALL") {
-                     if (i + 1 >= args.size()) {
-                         interp.set_fatal_error("cmake_language(DEFER CALL) requires a command name");
-                         return;
-                     }
-                     std::string call_id;
-                     if (!user_id.empty()) {
-                         call_id = user_id;
-                     } else {
-                         call_id = "_" + std::to_string(target_ctx->next_deferred_id++);
-                     }
-                     if (!id_var.empty()) {
-                         interp.set_variable(id_var, call_id);
-                     }
-                     DeferredCall dc;
-                     dc.id = call_id;
-                     dc.command = args[i + 1];
-                     dc.arguments.assign(args.begin() + i + 2, args.end());
-                     target_ctx->deferred_calls.push_back(std::move(dc));
-                 } else if (subcmd == "CANCEL_CALL") {
-                     std::set<std::string> ids_to_cancel(args.begin() + i + 1, args.end());
-                     auto& calls = target_ctx->deferred_calls;
-                     std::erase_if(calls, [&](const DeferredCall& dc) {
-                         return ids_to_cancel.count(dc.id) > 0;
-                     });
-                 } else if (subcmd == "GET_CALL_IDS") {
-                     if (i + 1 >= args.size()) {
-                         interp.set_fatal_error("cmake_language(DEFER GET_CALL_IDS) requires a variable name");
-                         return;
-                     }
-                     std::string result;
-                     for (size_t j = 0; j < target_ctx->deferred_calls.size(); ++j) {
-                         if (j > 0) result += ';';
-                         result += target_ctx->deferred_calls[j].id;
-                     }
-                     interp.set_variable(args[i + 1], result);
-                 } else if (subcmd == "GET_CALL") {
-                     if (i + 2 >= args.size()) {
-                         interp.set_fatal_error("cmake_language(DEFER GET_CALL) requires an id and a variable name");
-                         return;
-                     }
-                     const std::string& search_id = args[i + 1];
-                     const std::string& var_name = args[i + 2];
-                     std::string result;
-                     for (const auto& dc : target_ctx->deferred_calls) {
-                         if (dc.id == search_id) {
-                             result = dc.command;
-                             for (const auto& a : dc.arguments) {
-                                 result += ';';
-                                 result += a;
-                             }
-                             break;
-                         }
-                     }
-                     interp.set_variable(var_name, result);
-                 } else {
-                     interp.set_fatal_error("cmake_language(DEFER): unknown subcommand: " + subcmd);
-                 }
-            } else if (args[0] == "GET_MESSAGE_LOG_LEVEL") {
-                 if (args.size() < 2) {
-                     interp.set_fatal_error("cmake_language(GET_MESSAGE_LOG_LEVEL) requires a variable name");
-                     return;
-                 }
-                 std::string level = interp.get_variable("CMAKE_MESSAGE_LOG_LEVEL");
-                 interp.set_variable(args[1], level.empty() ? "STATUS" : level);
+            const std::string& subcmd = args[i];
+            if (subcmd == "CALL") {
+                if (i + 1 >= args.size()) {
+                    interp.set_fatal_error("cmake_language(DEFER CALL) requires a command name");
+                    return;
+                }
+                std::string call_id;
+                if (!user_id.empty()) {
+                    call_id = user_id;
+                } else {
+                    call_id = "_" + std::to_string(target_ctx->next_deferred_id++);
+                }
+                if (!id_var.empty()) { interp.set_variable(id_var, call_id); }
+                DeferredCall dc;
+                dc.id = call_id;
+                dc.command = args[i + 1];
+                dc.arguments.assign(args.begin() + i + 2, args.end());
+                target_ctx->deferred_calls.push_back(std::move(dc));
+            } else if (subcmd == "CANCEL_CALL") {
+                std::set<std::string> ids_to_cancel(args.begin() + i + 1, args.end());
+                auto& calls = target_ctx->deferred_calls;
+                std::erase_if(calls, [&](const DeferredCall& dc) { return ids_to_cancel.count(dc.id) > 0; });
+            } else if (subcmd == "GET_CALL_IDS") {
+                if (i + 1 >= args.size()) {
+                    interp.set_fatal_error("cmake_language(DEFER GET_CALL_IDS) requires a variable name");
+                    return;
+                }
+                std::string result;
+                for (size_t j = 0; j < target_ctx->deferred_calls.size(); ++j) {
+                    if (j > 0) result += ';';
+                    result += target_ctx->deferred_calls[j].id;
+                }
+                interp.set_variable(args[i + 1], result);
+            } else if (subcmd == "GET_CALL") {
+                if (i + 2 >= args.size()) {
+                    interp.set_fatal_error("cmake_language(DEFER GET_CALL) requires an id and a variable name");
+                    return;
+                }
+                const std::string& search_id = args[i + 1];
+                const std::string& var_name = args[i + 2];
+                std::string result;
+                for (const auto& dc : target_ctx->deferred_calls) {
+                    if (dc.id == search_id) {
+                        result = dc.command;
+                        for (const auto& a : dc.arguments) {
+                            result += ';';
+                            result += a;
+                        }
+                        break;
+                    }
+                }
+                interp.set_variable(var_name, result);
             } else {
-                interp.set_fatal_error("Unknown cmake_language mode: " + args[0]);
+                interp.set_fatal_error("cmake_language(DEFER): unknown subcommand: " + subcmd);
             }
-        });
+        } else if (args[0] == "GET_MESSAGE_LOG_LEVEL") {
+            if (args.size() < 2) {
+                interp.set_fatal_error("cmake_language(GET_MESSAGE_LOG_LEVEL) requires a variable name");
+                return;
+            }
+            std::string level = interp.get_variable("CMAKE_MESSAGE_LOG_LEVEL");
+            interp.set_variable(args[1], level.empty() ? "STATUS" : level);
+        } else {
+            interp.set_fatal_error("Unknown cmake_language mode: " + args[0]);
+        }
+    });
 }
 
 std::expected<void, InterpreterError> Interpreter::interpret(const std::vector<AstNode>& ast) {
@@ -1918,20 +1819,29 @@ std::expected<void, InterpreterError> Interpreter::interpret(const std::vector<A
         if (g_interrupted.load(std::memory_order_relaxed)) {
             return std::unexpected(InterpreterError{"", 0, 0, 0, 0, "Interrupted", {}, std::nullopt});
         }
-        auto res = std::visit([this](const auto& n) -> std::expected<void, InterpreterError> {
-            using T = std::decay_t<decltype(n)>;
-            if constexpr (std::is_same_v<T, CommandInvocation>) return execute_command(n);
-            else if constexpr (std::is_same_v<T, IfBlock>) return execute_if_block(n);
-            else if constexpr (std::is_same_v<T, FunctionBlock>) return execute_function_block(n);
-            else if constexpr (std::is_same_v<T, MacroBlock>) return execute_macro_block(n);
-            else if constexpr (std::is_same_v<T, ForeachBlock>) return execute_foreach_block(n);
-            else if constexpr (std::is_same_v<T, WhileBlock>) return execute_while_block(n);
-            else if constexpr (std::is_same_v<T, BlockBlock>) return execute_block_block(n);
-        }, node);
+        auto res = std::visit(
+            [this](const auto& n) -> std::expected<void, InterpreterError> {
+                using T = std::decay_t<decltype(n)>;
+                if constexpr (std::is_same_v<T, CommandInvocation>)
+                    return execute_command(n);
+                else if constexpr (std::is_same_v<T, IfBlock>)
+                    return execute_if_block(n);
+                else if constexpr (std::is_same_v<T, FunctionBlock>)
+                    return execute_function_block(n);
+                else if constexpr (std::is_same_v<T, MacroBlock>)
+                    return execute_macro_block(n);
+                else if constexpr (std::is_same_v<T, ForeachBlock>)
+                    return execute_foreach_block(n);
+                else if constexpr (std::is_same_v<T, WhileBlock>)
+                    return execute_while_block(n);
+                else if constexpr (std::is_same_v<T, BlockBlock>)
+                    return execute_block_block(n);
+            },
+            node);
 
         if (!res) return res;
         if (loop_control_ != LoopControl::NONE) return {};
-        if (return_requested_) return {};  // Early return from script/function
+        if (return_requested_) return {}; // Early return from script/function
     }
     return {};
 }
@@ -2013,8 +1923,7 @@ std::expected<void, InterpreterError> Interpreter::include_file(const std::strin
                 "/usr/local/share/cmake/Modules",
                 "/usr/lib/cmake/Modules",
             };
-            if (auto& extra = cmake_extra_modules_root(); !extra.empty())
-                sys_module_dirs.push_back(extra + "/Modules");
+            if (auto& extra = cmake_extra_modules_root(); !extra.empty()) sys_module_dirs.push_back(extra + "/Modules");
             if (auto& triplet = gnu_arch_triplet(); !triplet.empty()) {
                 sys_module_dirs.push_back("/usr/lib/" + triplet + "/cmake/Modules");
             }
@@ -2027,7 +1936,8 @@ std::expected<void, InterpreterError> Interpreter::include_file(const std::strin
 
     if (!found_path) {
         if (optional) return {};
-        return std::unexpected(InterpreterError{current_file_, current_cmd_row_, current_cmd_col_, 0, 0, "include() could not find: " + file_path, {}});
+        return std::unexpected(
+            InterpreterError{current_file_, current_cmd_row_, current_cmd_col_, 0, 0, "include() could not find: " + file_path, {}});
     }
 
     const std::string& resolved_path = *found_path;
@@ -2035,7 +1945,8 @@ std::expected<void, InterpreterError> Interpreter::include_file(const std::strin
     // Check if it's a directory (reject directories, but accept symlinks to files)
     if (cached_is_directory(resolved_path)) {
         if (optional) return {};
-        return std::unexpected(InterpreterError{current_file_, current_cmd_row_, current_cmd_col_, 0, 0, "include() path is a directory: " + resolved_path, {}});
+        return std::unexpected(InterpreterError{
+            current_file_, current_cmd_row_, current_cmd_col_, 0, 0, "include() path is a directory: " + resolved_path, {}});
     }
 
     std::string abs_path = std::filesystem::absolute(resolved_path).string();
@@ -2053,9 +1964,7 @@ std::expected<void, InterpreterError> Interpreter::include_file(const std::strin
         ast_to_use = cached_ast;
     } else {
         std::ifstream file(abs_path);
-        if (!file) {
-            return std::unexpected(InterpreterError{abs_path, 0, 0, 0, 0, "include() could not read: " + abs_path, {}});
-        }
+        if (!file) { return std::unexpected(InterpreterError{abs_path, 0, 0, 0, 0, "include() could not read: " + abs_path, {}}); }
 
         std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
@@ -2065,7 +1974,13 @@ std::expected<void, InterpreterError> Interpreter::include_file(const std::strin
         parse_profile.stop();
 
         if (!parsed_ast) {
-            return std::unexpected(InterpreterError{abs_path, parsed_ast.error().row, parsed_ast.error().col, parsed_ast.error().offset, parsed_ast.error().length, parsed_ast.error().reason, {}});
+            return std::unexpected(InterpreterError{abs_path,
+                                                    parsed_ast.error().row,
+                                                    parsed_ast.error().col,
+                                                    parsed_ast.error().offset,
+                                                    parsed_ast.error().length,
+                                                    parsed_ast.error().reason,
+                                                    {}});
         }
 
         ast_to_use = &parsed_ast.value();
@@ -2126,9 +2041,7 @@ const Interpreter::DirectoryCacheEntry* Interpreter::get_directory_cache_entry(s
     // This covers the common case of paths from GLOB_RECURSE and other FS operations.
     if (!dir.empty() && dir[0] == '/') {
         auto it = root->dir_scan_cache_.find(dir);
-        if (it != root->dir_scan_cache_.end()) {
-            return &it->second;
-        }
+        if (it != root->dir_scan_cache_.end()) { return &it->second; }
     }
 
     // Slow path: normalize to absolute path
@@ -2137,22 +2050,20 @@ const Interpreter::DirectoryCacheEntry* Interpreter::get_directory_cache_entry(s
 
     // Session cache lookup with normalized key
     auto it = root->dir_scan_cache_.find(dir_key);
-    if (it != root->dir_scan_cache_.end()) {
-        return &it->second;
-    }
+    if (it != root->dir_scan_cache_.end()) { return &it->second; }
 
     // Cache miss — single stat via last_write_time (replaces exists + is_directory + last_write_time)
     std::error_code ec2;
     auto current_mtime = std::filesystem::last_write_time(dir_key, ec2);
-    if (ec2) return nullptr;  // doesn't exist, not accessible, or not a directory
+    if (ec2) return nullptr; // doesn't exist, not accessible, or not a directory
 
     // Clock skew detection
     auto now = std::filesystem::file_time_type::clock::now();
     if (current_mtime > now) {
         static std::unordered_set<std::string> warned_dirs;
         if (!warned_dirs.contains(dir_key)) {
-            *err_ << colors::YELLOW << "Warning: Directory has modification time in the future: "
-                  << dir_key << ". Possible clock skew detected." << colors::RESET << std::endl;
+            *err_ << colors::YELLOW << "Warning: Directory has modification time in the future: " << dir_key
+                  << ". Possible clock skew detected." << colors::RESET << std::endl;
             warned_dirs.insert(dir_key);
         }
     }
@@ -2168,9 +2079,7 @@ const Interpreter::DirectoryCacheEntry* Interpreter::get_directory_cache_entry(s
             // Populate session cache from persistent cache
             DirectoryCacheEntry cache_entry;
             cache_entry.mtime = current_mtime;
-            for (const auto& f : persistent->files) {
-                cache_entry.entries.insert(f);
-            }
+            for (const auto& f : persistent->files) { cache_entry.entries.insert(f); }
             for (const auto& d : persistent->subdirs) {
                 cache_entry.entries.insert(d);
                 cache_entry.subdirs.insert(d);
@@ -2193,9 +2102,7 @@ const Interpreter::DirectoryCacheEntry* Interpreter::get_directory_cache_entry(s
             auto name = entry.path().filename().string();
             entries.insert(name);
             std::error_code ec2;
-            if (entry.is_directory(ec2) && !ec2) {
-                subdirs.insert(name);
-            }
+            if (entry.is_directory(ec2) && !ec2) { subdirs.insert(name); }
         }
     } catch (...) {
         // Permission denied or other errors - don't cache
@@ -2272,9 +2179,7 @@ bool Interpreter::cached_is_directory(std::string_view path) {
     if (!filename.empty()) {
         // get_directory_listing handles session cache → persistent cache → directory scan
         auto* subdirs = get_directory_subdirs(parent);
-        if (subdirs) {
-            return subdirs->contains(filename);
-        }
+        if (subdirs) { return subdirs->contains(filename); }
     }
 
     // Parent doesn't exist or can't be read — fall back to direct stat
@@ -2284,9 +2189,7 @@ bool Interpreter::cached_is_directory(std::string_view path) {
 
 void Interpreter::set_fatal_error(const std::string& message) {
     // If debugger is attached, drop into it before dying
-    if (debugger_) {
-        debugger_->on_fatal_error(message);
-    }
+    if (debugger_) { debugger_->on_fatal_error(message); }
 
     Interpreter* root = get_root();
     std::vector<CallLocation> backtrace;
@@ -2299,7 +2202,8 @@ void Interpreter::set_fatal_error(const std::string& message) {
         }
 
         const auto& current = root->trace_stack_.back();
-        set_fatal_error(InterpreterError{current.file ? *current.file : std::string(), current.row, current.col, current.offset, current.length, message, backtrace});
+        set_fatal_error(InterpreterError{current.file ? *current.file : std::string(), current.row, current.col, current.offset,
+                                         current.length, message, backtrace});
     } else {
         set_fatal_error(InterpreterError{current_file_, current_cmd_row_, current_cmd_col_, 0, 0, message, {}});
     }
@@ -2332,8 +2236,7 @@ void Interpreter::add_builtin(const std::string& name, BuiltinFunction func) {
 void Interpreter::expand_arguments_into(const std::vector<Argument>& args, std::vector<std::string>& result) {
     for (const auto& arg : args) {
         // Fast path: single literal part, unquoted — skip evaluate_argument entirely
-        if (arg.parts.size() == 1 && !arg.quoted &&
-            std::holds_alternative<std::string>(arg.parts[0])) {
+        if (arg.parts.size() == 1 && !arg.quoted && std::holds_alternative<std::string>(arg.parts[0])) {
             const auto& s = std::get<std::string>(arg.parts[0]);
             if (s.empty()) continue;
             if (s.find(';') == std::string::npos) {
@@ -2351,12 +2254,9 @@ void Interpreter::expand_arguments_into(const std::vector<Argument>& args, std::
         }
 
         // Fast path: single ${VAR} reference, unquoted — iterate variable storage directly (zero copy)
-        if (arg.parts.size() == 1 && !arg.quoted &&
-            std::holds_alternative<VariableReference>(arg.parts[0])) {
+        if (arg.parts.size() == 1 && !arg.quoted && std::holds_alternative<VariableReference>(arg.parts[0])) {
             const auto& ref = std::get<VariableReference>(arg.parts[0]);
-            if (ref.namespace_prefix.empty() &&
-                ref.name_parts.size() == 1 &&
-                std::holds_alternative<std::string>(ref.name_parts[0])) {
+            if (ref.namespace_prefix.empty() && ref.name_parts.size() == 1 && std::holds_alternative<std::string>(ref.name_parts[0])) {
                 auto view = get_variable_view(std::get<std::string>(ref.name_parts[0]));
                 if (view && !view->empty()) {
                     if (view->find(';') == std::string_view::npos) {
@@ -2396,9 +2296,7 @@ void Interpreter::expand_arguments_into(const std::vector<Argument>& args, std::
             // Split by semicolon for unquoted arguments (list expansion)
             for (auto item : CMakeArrayIterator(val)) {
                 // CMake removes empty elements when expanding variable references
-                if (has_var_ref && item.empty()) {
-                    continue;
-                }
+                if (has_var_ref && item.empty()) { continue; }
                 if (item.find('\\') != std::string_view::npos) {
                     result.push_back(unescape_list_element(item));
                 } else {
@@ -2425,8 +2323,13 @@ std::expected<void, InterpreterError> Interpreter::execute_command(const Command
 
     if (root->trace_stack_.size() > max_trace_depth_) {
         pop_trace_stack();
-        return std::unexpected(InterpreterError{current_file_, cmd.row, cmd.col, cmd.offset, cmd.length,
-            "call stack depth limit exceeded (" + std::to_string(max_trace_depth_) + ")", {}});
+        return std::unexpected(InterpreterError{current_file_,
+                                                cmd.row,
+                                                cmd.col,
+                                                cmd.offset,
+                                                cmd.length,
+                                                "call stack depth limit exceeded (" + std::to_string(max_trace_depth_) + ")",
+                                                {}});
     }
 
     // Fast paths: shapes recognized at parse time. Each skips arg-vector
@@ -2435,16 +2338,16 @@ std::expected<void, InterpreterError> Interpreter::execute_command(const Command
     // (matches the dispatch order in execute_command_with_args).
     if (!debugger_) {
         if (cmd.pre_parsed_math) {
-            if (root->user_functions_.find(std::string_view("math")) == root->user_functions_.end() &&
-                root->user_macros_.find(std::string_view("math")) == root->user_macros_.end()) {
+            if (root->user_functions_.find(std::string_view("math")) == root->user_functions_.end()
+                && root->user_macros_.find(std::string_view("math")) == root->user_macros_.end()) {
                 if (try_execute_pre_parsed_math(*this, *cmd.pre_parsed_math, cmd.arguments)) {
                     pop_trace_stack();
                     return {};
                 }
             }
         } else if (cmd.pre_parsed_substring) {
-            if (root->user_functions_.find(std::string_view("string")) == root->user_functions_.end() &&
-                root->user_macros_.find(std::string_view("string")) == root->user_macros_.end()) {
+            if (root->user_functions_.find(std::string_view("string")) == root->user_functions_.end()
+                && root->user_macros_.find(std::string_view("string")) == root->user_macros_.end()) {
                 if (try_execute_pre_parsed_substring(*this, *cmd.pre_parsed_substring)) {
                     pop_trace_stack();
                     return {};
@@ -2458,18 +2361,15 @@ std::expected<void, InterpreterError> Interpreter::execute_command(const Command
     expand_arguments_into(cmd.arguments, expanded_args_buf_);
 
     // Debugger/trace hook - must happen after argument expansion
-    if (debugger_) {
-        debugger_->on_command(current_file_, cmd.row, cmd.col,
-                              cmd.identifier, expanded_args_buf_, cmd.arguments);
-    }
+    if (debugger_) { debugger_->on_command(current_file_, cmd.row, cmd.col, cmd.identifier, expanded_args_buf_, cmd.arguments); }
 
     auto res = execute_command_with_args(cmd.identifier, expanded_args_buf_);
 
     if (!res) {
         if (auto err = get_fatal_error()) {
-             // The error is already set, just clean up stack and return it
-             pop_trace_stack();
-             return std::unexpected(*err);
+            // The error is already set, just clean up stack and return it
+            pop_trace_stack();
+            return std::unexpected(*err);
         }
     }
 
@@ -2477,13 +2377,17 @@ std::expected<void, InterpreterError> Interpreter::execute_command(const Command
     return res;
 }
 
-std::expected<void, InterpreterError> Interpreter::execute_command_with_args(const std::string& identifier, const std::vector<std::string>& args) {
+std::expected<void, InterpreterError> Interpreter::execute_command_with_args(const std::string& identifier,
+                                                                             const std::vector<std::string>& args) {
     Interpreter* root = get_root();
 
     // Fast path: check if already lowercase (common case) to avoid allocation
     bool is_lower = true;
     for (char c : identifier) {
-        if (c >= 'A' && c <= 'Z') { is_lower = false; break; }
+        if (c >= 'A' && c <= 'Z') {
+            is_lower = false;
+            break;
+        }
     }
     const std::string& lower_identifier = is_lower ? identifier : (lower_buf_ = to_lower(identifier), lower_buf_);
 
@@ -2492,20 +2396,14 @@ std::expected<void, InterpreterError> Interpreter::execute_command_with_args(con
     // to the macro; the original builtin is reachable as `_find_package`.
     // vcpkg.cmake relies on this to inject its toolchain logic.
     auto fit = root->user_functions_.find(lower_identifier);
-    if (fit != root->user_functions_.end()) {
-        return invoke_user_function(*fit->second, args);
-    }
+    if (fit != root->user_functions_.end()) { return invoke_user_function(*fit->second, args); }
     auto mit = root->user_macros_.find(lower_identifier);
-    if (mit != root->user_macros_.end()) {
-        return invoke_user_macro(*mit->second, args);
-    }
+    if (mit != root->user_macros_.end()) { return invoke_user_macro(*mit->second, args); }
 
     auto bit = root->builtins_.find(lower_identifier);
     if (bit != root->builtins_.end()) {
         bit->second(*this, args);
-        if (auto err = get_fatal_error()) {
-            return std::unexpected(*err);
-        }
+        if (auto err = get_fatal_error()) { return std::unexpected(*err); }
         return {};
     }
 
@@ -2516,9 +2414,7 @@ std::expected<void, InterpreterError> Interpreter::execute_command_with_args(con
         auto bit_under = root->builtins_.find(lower_identifier.substr(1));
         if (bit_under != root->builtins_.end()) {
             bit_under->second(*this, args);
-            if (auto err = get_fatal_error()) {
-                return std::unexpected(*err);
-            }
+            if (auto err = get_fatal_error()) { return std::unexpected(*err); }
             return {};
         }
     }
@@ -2531,7 +2427,8 @@ std::expected<void, InterpreterError> Interpreter::execute_if_block(const IfBloc
     Interpreter* root = get_root();
     root->trace_stack_.push_back({current_file_interned_, if_block.row, if_block.col, if_block.offset, if_block.length, "if"});
 
-    auto cond_result = evaluate_condition(if_block.condition, if_block.pre_parsed, if_block.row, if_block.col, if_block.offset, if_block.length);
+    auto cond_result =
+        evaluate_condition(if_block.condition, if_block.pre_parsed, if_block.row, if_block.col, if_block.offset, if_block.length);
     if (!cond_result) {
         set_fatal_error(cond_result.error());
         pop_trace_stack();
@@ -2569,9 +2466,7 @@ std::expected<void, InterpreterError> Interpreter::execute_if_block(const IfBloc
 std::expected<void, InterpreterError> Interpreter::execute_function_block(const FunctionBlock& block) {
     // Resolve dynamic name (e.g., function("${VAR}" ...)) at registration time.
     std::string resolved_name = block.name;
-    if (resolved_name.empty()) {
-        resolved_name = evaluate_argument(block.name_argument);
-    }
+    if (resolved_name.empty()) { resolved_name = evaluate_argument(block.name_argument); }
     std::string lower_name = to_lower(resolved_name);
     // Store at root - CMake functions/macros are globally visible
     Interpreter* root = get_root();
@@ -2605,9 +2500,7 @@ std::expected<void, InterpreterError> Interpreter::execute_function_block(const 
 std::expected<void, InterpreterError> Interpreter::execute_macro_block(const MacroBlock& block) {
     // Resolve dynamic name (e.g., macro("${VAR}" ...)) at registration time.
     std::string resolved_name = block.name;
-    if (resolved_name.empty()) {
-        resolved_name = evaluate_argument(block.name_argument);
-    }
+    if (resolved_name.empty()) { resolved_name = evaluate_argument(block.name_argument); }
     std::string lower_name = to_lower(resolved_name);
     // Store at root - CMake functions/macros are globally visible
     Interpreter* root = get_root();
@@ -2646,9 +2539,7 @@ std::expected<void, InterpreterError> Interpreter::execute_foreach_block(const F
         std::vector<std::string> var_names_to_save;
         if (zip.loop_vars.size() == 1) {
             // Single variable mode: create var_0, var_1, etc.
-            for (size_t i = 0; i < zip.lists.size(); ++i) {
-                var_names_to_save.push_back(zip.loop_vars[0] + "_" + std::to_string(i));
-            }
+            for (size_t i = 0; i < zip.lists.size(); ++i) { var_names_to_save.push_back(zip.loop_vars[0] + "_" + std::to_string(i)); }
         } else {
             // Multiple variables mode: use variables directly
             var_names_to_save = zip.loop_vars;
@@ -2678,9 +2569,7 @@ std::expected<void, InterpreterError> Interpreter::execute_foreach_block(const F
             // Pre-create Entry handles for all loop variables
             std::vector<ShadowMap::Entry> loop_entries;
             loop_entries.reserve(var_names_to_save.size());
-            for (const auto& var_name : var_names_to_save) {
-                loop_entries.push_back(variables_.entry(var_name));
-            }
+            for (const auto& var_name : var_names_to_save) { loop_entries.push_back(variables_.entry(var_name)); }
 
             for (size_t i = 0; i < max_length; ++i) {
                 for (size_t list_idx = 0; list_idx < evaluated_lists.size(); ++list_idx) {
@@ -2697,9 +2586,7 @@ std::expected<void, InterpreterError> Interpreter::execute_foreach_block(const F
                             continue;
                         }
                     }
-                    if (entry_idx < loop_entries.size()) {
-                        loop_entries[entry_idx].set(value);
-                    }
+                    if (entry_idx < loop_entries.size()) { loop_entries[entry_idx].set(value); }
                 }
 
                 auto res = interpret(block.body);
@@ -2711,21 +2598,28 @@ std::expected<void, InterpreterError> Interpreter::execute_foreach_block(const F
                     }
                     loop_depth_--;
                     for (size_t j = 0; j < loop_entries.size(); ++j) {
-                        if (saved_vars[j].second) loop_entries[j].set(saved_values[j]);
-                        else loop_entries[j].set("");
+                        if (saved_vars[j].second)
+                            loop_entries[j].set(saved_values[j]);
+                        else
+                            loop_entries[j].set("");
                     }
                     pop_trace_stack();
                     return res;
                 }
 
-                if (loop_control_ == LoopControl::BREAK) { clear_loop_control(); break; }
+                if (loop_control_ == LoopControl::BREAK) {
+                    clear_loop_control();
+                    break;
+                }
                 if (loop_control_ == LoopControl::CONTINUE) clear_loop_control();
                 if (return_requested_) break;
             }
 
             for (size_t j = 0; j < loop_entries.size(); ++j) {
-                if (saved_vars[j].second) loop_entries[j].set(saved_values[j]);
-                else loop_entries[j].set("");
+                if (saved_vars[j].second)
+                    loop_entries[j].set(saved_values[j]);
+                else
+                    loop_entries[j].set("");
             }
         } else {
             // Slow path: use set_variable() which fires watches
@@ -2766,7 +2660,10 @@ std::expected<void, InterpreterError> Interpreter::execute_foreach_block(const F
                     return res;
                 }
 
-                if (loop_control_ == LoopControl::BREAK) { clear_loop_control(); break; }
+                if (loop_control_ == LoopControl::BREAK) {
+                    clear_loop_control();
+                    break;
+                }
                 if (loop_control_ == LoopControl::CONTINUE) clear_loop_control();
                 if (return_requested_) break;
             }
@@ -2796,9 +2693,7 @@ std::expected<void, InterpreterError> Interpreter::execute_foreach_block(const F
     // Save the loop variable's previous value (for nested loops)
     bool loop_var_was_set = is_variable_set(loop_var_name);
     std::string loop_var_old_value;
-    if (loop_var_was_set) {
-        loop_var_old_value = get_variable(loop_var_name);
-    }
+    if (loop_var_was_set) { loop_var_old_value = get_variable(loop_var_name); }
 
     loop_depth_++;
 
@@ -2863,17 +2758,24 @@ std::expected<void, InterpreterError> Interpreter::execute_foreach_block(const F
                     std::abort();
                 }
                 loop_depth_--;
-                if (loop_var_was_set) loop_entry.set(loop_var_old_value);
-                else loop_entry.set("");
+                if (loop_var_was_set)
+                    loop_entry.set(loop_var_old_value);
+                else
+                    loop_entry.set("");
                 pop_trace_stack();
                 return res;
             }
-            if (loop_control_ == LoopControl::BREAK) { clear_loop_control(); break; }
+            if (loop_control_ == LoopControl::BREAK) {
+                clear_loop_control();
+                break;
+            }
             if (loop_control_ == LoopControl::CONTINUE) clear_loop_control();
             if (return_requested_) break;
         }
-        if (loop_var_was_set) loop_entry.set(loop_var_old_value);
-        else loop_entry.set("");
+        if (loop_var_was_set)
+            loop_entry.set(loop_var_old_value);
+        else
+            loop_entry.set("");
 
         if (loop_depth_ <= 0) {
             std::cerr << "FATAL: loop_depth_ is " << loop_depth_ << " when trying to decrement in foreach\n";
@@ -2953,17 +2855,24 @@ std::expected<void, InterpreterError> Interpreter::execute_foreach_block(const F
                     std::abort();
                 }
                 loop_depth_--;
-                if (loop_var_was_set) loop_entry.set(loop_var_old_value);
-                else loop_entry.set("");
+                if (loop_var_was_set)
+                    loop_entry.set(loop_var_old_value);
+                else
+                    loop_entry.set("");
                 pop_trace_stack();
                 return res;
             }
-            if (loop_control_ == LoopControl::BREAK) { clear_loop_control(); break; }
+            if (loop_control_ == LoopControl::BREAK) {
+                clear_loop_control();
+                break;
+            }
             if (loop_control_ == LoopControl::CONTINUE) clear_loop_control();
             if (return_requested_) break;
         }
-        if (loop_var_was_set) loop_entry.set(loop_var_old_value);
-        else loop_entry.set("");
+        if (loop_var_was_set)
+            loop_entry.set(loop_var_old_value);
+        else
+            loop_entry.set("");
     } else {
         // Slow path: use set_variable() which fires watches
         for (auto item : CMakeArrayIterator(items_raw)) {
@@ -2989,7 +2898,10 @@ std::expected<void, InterpreterError> Interpreter::execute_foreach_block(const F
                 pop_trace_stack();
                 return res;
             }
-            if (loop_control_ == LoopControl::BREAK) { clear_loop_control(); break; }
+            if (loop_control_ == LoopControl::BREAK) {
+                clear_loop_control();
+                break;
+            }
             if (loop_control_ == LoopControl::CONTINUE) clear_loop_control();
             if (return_requested_) break;
         }
@@ -3026,9 +2938,7 @@ std::expected<void, InterpreterError> Interpreter::execute_while_block(const Whi
         }
 
         // Break if condition is false
-        if (!cond_result.value()) {
-            break;
-        }
+        if (!cond_result.value()) { break; }
 
         // Execute body
         auto res = interpret(block.body);
@@ -3038,9 +2948,12 @@ std::expected<void, InterpreterError> Interpreter::execute_while_block(const Whi
             return res;
         }
 
-        if (loop_control_ == LoopControl::BREAK) { clear_loop_control(); break; }
+        if (loop_control_ == LoopControl::BREAK) {
+            clear_loop_control();
+            break;
+        }
         if (loop_control_ == LoopControl::CONTINUE) clear_loop_control();
-        if (return_requested_) break;  // return() exits the loop and propagates to caller
+        if (return_requested_) break; // return() exits the loop and propagates to caller
     }
 
     loop_depth_--;
@@ -3065,18 +2978,14 @@ std::expected<void, InterpreterError> Interpreter::execute_block_block(const Blo
             // Save propagated variable values before popping
             std::unordered_map<std::string, std::string> propagated_values;
             for (const auto& var_name : block.propagate_vars) {
-                if (auto* val = variables_.try_get(var_name)) {
-                    propagated_values[var_name] = *val;
-                }
+                if (auto* val = variables_.try_get(var_name)) { propagated_values[var_name] = *val; }
             }
 
             // Pop the block scope
             variables_.pop_scope();
 
             // Set propagated variables in parent scope
-            for (const auto& [var_name, value] : propagated_values) {
-                variables_.set(var_name, value);
-            }
+            for (const auto& [var_name, value] : propagated_values) { variables_.set(var_name, value); }
         } else {
             // Pop the block scope without propagation
             variables_.pop_scope();
@@ -3138,10 +3047,9 @@ std::expected<void, InterpreterError> Interpreter::invoke_user_function(const Fu
 
     // ARGVn and named parameters — use pre-computed keys for common cases
     static const std::string argv_keys[] = {
-        "ARGV0", "ARGV1", "ARGV2", "ARGV3", "ARGV4", "ARGV5", "ARGV6", "ARGV7",
-        "ARGV8", "ARGV9", "ARGV10", "ARGV11", "ARGV12", "ARGV13", "ARGV14", "ARGV15",
-        "ARGV16", "ARGV17", "ARGV18", "ARGV19", "ARGV20", "ARGV21", "ARGV22", "ARGV23",
-        "ARGV24", "ARGV25", "ARGV26", "ARGV27", "ARGV28", "ARGV29", "ARGV30", "ARGV31",
+        "ARGV0",  "ARGV1",  "ARGV2",  "ARGV3",  "ARGV4",  "ARGV5",  "ARGV6",  "ARGV7",  "ARGV8",  "ARGV9",  "ARGV10",
+        "ARGV11", "ARGV12", "ARGV13", "ARGV14", "ARGV15", "ARGV16", "ARGV17", "ARGV18", "ARGV19", "ARGV20", "ARGV21",
+        "ARGV22", "ARGV23", "ARGV24", "ARGV25", "ARGV26", "ARGV27", "ARGV28", "ARGV29", "ARGV30", "ARGV31",
     };
     static constexpr size_t num_precomputed = sizeof(argv_keys) / sizeof(argv_keys[0]);
     for (size_t i = 0; i < args.size(); ++i) {
@@ -3151,9 +3059,7 @@ std::expected<void, InterpreterError> Interpreter::invoke_user_function(const Fu
             variables_.set("ARGV" + std::to_string(i), args[i]);
         }
     }
-    for (size_t i = 0; i < func.parameters.size() && i < args.size(); ++i) {
-        variables_.set(func.parameters[i], args[i]);
-    }
+    for (size_t i = 0; i < func.parameters.size() && i < args.size(); ++i) { variables_.set(func.parameters[i], args[i]); }
 
     int saved_depth = loop_depth_;
     LoopControl saved_control = loop_control_;
@@ -3194,9 +3100,7 @@ std::expected<void, InterpreterError> Interpreter::invoke_user_function(const Fu
     // Clean up any deferred function deletions we've passed
     Interpreter* root = get_root();
     if (!root->deferred_function_deletions_.empty()) {
-        std::erase_if(root->deferred_function_deletions_, [&](const auto& entry) {
-            return root->frame_stack_.size() <= entry.first;
-        });
+        std::erase_if(root->deferred_function_deletions_, [&](const auto& entry) { return root->frame_stack_.size() <= entry.first; });
     }
 
     if (!res) set_fatal_error(res.error());
@@ -3205,17 +3109,14 @@ std::expected<void, InterpreterError> Interpreter::invoke_user_function(const Fu
     loop_control_ = saved_control;
     current_file_ = saved_file;
     current_file_interned_ = saved_file_interned;
-    if (had_macro_subs) {
-        macro_substitutions_ = std::move(saved_macro_substitutions);
-    }
+    if (had_macro_subs) { macro_substitutions_ = std::move(saved_macro_substitutions); }
     return res;
 }
 
 bool Interpreter::call_user_function(const std::string& name, const std::vector<std::string>& args) {
     // Normalize to lowercase for lookup
     std::string lower_name = name;
-    std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(),
-                  [](unsigned char c){ return std::tolower(c); });
+    std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), [](unsigned char c) { return std::tolower(c); });
 
     // Look up function in root interpreter
     auto* root = get_root();
@@ -3232,7 +3133,10 @@ bool Interpreter::call_user_function(const std::string& name, const std::vector<
 
 std::expected<void, InterpreterError> Interpreter::invoke_user_macro(const MacroBlock& macro, const std::vector<std::string>& args) {
     // Save only the entries we're about to overwrite (not the entire map)
-    struct SavedEntry { std::string key; std::optional<std::string> old_value; };
+    struct SavedEntry {
+        std::string key;
+        std::optional<std::string> old_value;
+    };
     std::vector<SavedEntry> saved;
     saved.reserve(args.size() + macro.parameters.size() + 3);
 
@@ -3271,12 +3175,8 @@ std::expected<void, InterpreterError> Interpreter::invoke_user_macro(const Macro
     }
     save_and_set("ARGN", std::move(argn_str));
 
-    for (size_t i = 0; i < args.size(); ++i) {
-        save_and_set("ARGV" + std::to_string(i), args[i]);
-    }
-    for (size_t i = 0; i < macro.parameters.size() && i < args.size(); ++i) {
-        save_and_set_ref(macro.parameters[i], args[i]);
-    }
+    for (size_t i = 0; i < args.size(); ++i) { save_and_set("ARGV" + std::to_string(i), args[i]); }
+    for (size_t i = 0; i < macro.parameters.size() && i < args.size(); ++i) { save_and_set_ref(macro.parameters[i], args[i]); }
 
     std::string saved_file = current_file_;
     const std::string* saved_file_interned = current_file_interned_;
@@ -3300,9 +3200,7 @@ std::expected<void, InterpreterError> Interpreter::invoke_user_macro(const Macro
             return entry.name == lower_name && entry.depth > static_cast<size_t>(depth);
         });
     }
-    if (depth == 0) {
-        root->macro_execution_depth_.erase(lower_name);
-    }
+    if (depth == 0) { root->macro_execution_depth_.erase(lower_name); }
 
     current_file_ = saved_file;
     current_file_interned_ = saved_file_interned;
@@ -3334,52 +3232,60 @@ static bool ci_equal(const char* a, const char* b, size_t len) {
 
 bool Interpreter::is_truthy(const std::string& val) {
     switch (val.size()) {
-        case 1: return val[0] == '1' || val[0] == 'Y' || val[0] == 'y';
-        case 2: return ci_equal(val.data(), "ON", 2);
-        case 3: return ci_equal(val.data(), "YES", 3);
-        case 4: return ci_equal(val.data(), "TRUE", 4);
-        default: return false;
+    case 1:
+        return val[0] == '1' || val[0] == 'Y' || val[0] == 'y';
+    case 2:
+        return ci_equal(val.data(), "ON", 2);
+    case 3:
+        return ci_equal(val.data(), "YES", 3);
+    case 4:
+        return ci_equal(val.data(), "TRUE", 4);
+    default:
+        return false;
     }
 }
 
 bool Interpreter::is_falsy(std::string_view val) {
     if (val.empty()) return true;
     switch (val.size()) {
-        case 1: return val[0] == '0' || val[0] == 'N' || val[0] == 'n';
-        case 2: return ci_equal(val.data(), "NO", 2);
-        case 3: return ci_equal(val.data(), "OFF", 3);
-        case 5: return ci_equal(val.data(), "FALSE", 5);
-        case 6: return ci_equal(val.data(), "IGNORE", 6);
-        case 8: return ci_equal(val.data(), "NOTFOUND", 8);
+    case 1:
+        return val[0] == '0' || val[0] == 'N' || val[0] == 'n';
+    case 2:
+        return ci_equal(val.data(), "NO", 2);
+    case 3:
+        return ci_equal(val.data(), "OFF", 3);
+    case 5:
+        return ci_equal(val.data(), "FALSE", 5);
+    case 6:
+        return ci_equal(val.data(), "IGNORE", 6);
+    case 8:
+        return ci_equal(val.data(), "NOTFOUND", 8);
     }
     // *-NOTFOUND (case-insensitive suffix)
-    if (val.size() > 9 && ci_equal(val.data() + val.size() - 9, "-NOTFOUND", 9)) {
-        return true;
-    }
+    if (val.size() > 9 && ci_equal(val.data() + val.size() - 9, "-NOTFOUND", 9)) { return true; }
     return false;
 }
 
-std::expected<bool, InterpreterError> Interpreter::evaluate_condition(const std::vector<Argument>& condition, size_t row, size_t col, size_t offset, size_t length) {
+std::expected<bool, InterpreterError> Interpreter::evaluate_condition(const std::vector<Argument>& condition, size_t row, size_t col,
+                                                                      size_t offset, size_t length) {
     return kiln::evaluate_condition(*this, condition, row, col, offset, length);
 }
 
-std::expected<bool, InterpreterError> Interpreter::evaluate_condition(const std::vector<Argument>& condition, const PreParsedCondition& pp, size_t row, size_t col, size_t offset, size_t length) {
+std::expected<bool, InterpreterError> Interpreter::evaluate_condition(const std::vector<Argument>& condition, const PreParsedCondition& pp,
+                                                                      size_t row, size_t col, size_t offset, size_t length) {
     return kiln::evaluate_condition(*this, condition, pp, row, col, offset, length);
 }
 
 bool Interpreter::has_user_function(const std::string& name) const {
     std::string lower_name = to_lower(name);
-    return get_root()->user_functions_.contains(lower_name) ||
-           get_root()->user_macros_.contains(lower_name) ||
-           builtins_.contains(lower_name);
+    return get_root()->user_functions_.contains(lower_name) || get_root()->user_macros_.contains(lower_name)
+           || builtins_.contains(lower_name);
 }
 
 std::string Interpreter::evaluate_variable_reference(const VariableReference& ref) {
     // Fast path: single string name_part with no namespace (most common: ${SIMPLE_VAR})
     // Avoids copying the variable name - uses string_view directly from AST
-    if (ref.name_parts.size() == 1 &&
-        std::holds_alternative<std::string>(ref.name_parts[0]) &&
-        ref.namespace_prefix.empty()) {
+    if (ref.name_parts.size() == 1 && std::holds_alternative<std::string>(ref.name_parts[0]) && ref.namespace_prefix.empty()) {
         // Use string_view to avoid copying the variable name for lookup
         std::string_view name = std::get<std::string>(ref.name_parts[0]);
         return get_variable(name);
@@ -3403,11 +3309,9 @@ std::string Interpreter::evaluate_variable_reference(const VariableReference& re
         // string "ARGC" hits the *variable* ARGC, not the macro's ARGC param.
         // The simple-path branch above still consults macro substitutions for
         // direct references like ${ARGC}.
-        if (auto* val = variables_.try_get(name))
-            return *val;
+        if (auto* val = variables_.try_get(name)) return *val;
         const auto* root = const_cast<Interpreter*>(this)->get_root();
-        if (auto cache_it = root->cache_variables_.find(name); cache_it != root->cache_variables_.end())
-            return cache_it->second;
+        if (auto cache_it = root->cache_variables_.find(name); cache_it != root->cache_variables_.end()) return cache_it->second;
         return "";
     } else if (ref.namespace_prefix == "ENV") {
         const char* env_var = getenv(name.c_str());
@@ -3425,8 +3329,7 @@ std::string Interpreter::evaluate_argument(const Argument& arg) {
     // and simple variable refs like ${var} — the vast majority of arguments)
     if (arg.parts.size() == 1) {
         auto& p = arg.parts[0];
-        if (std::holds_alternative<std::string>(p))
-            return std::get<std::string>(p);
+        if (std::holds_alternative<std::string>(p)) return std::get<std::string>(p);
         return evaluate_variable_reference(std::get<VariableReference>(p));
     }
 
@@ -3459,35 +3362,27 @@ void Interpreter::fire_variable_watch(const std::string& name, const std::string
     if (it == variable_watches_.end()) return;
 
     // Print to stderr
-    *err_ << "-- variable_watch: " << name << " was " << access_type
-           << ", value=\"" << value << "\", in file " << current_file_ << "\n";
+    *err_ << "-- variable_watch: " << name << " was " << access_type << ", value=\"" << value << "\", in file " << current_file_ << "\n";
 
     // If callback function specified, call it
     if (it->second.callback_function) {
-        call_user_function(*it->second.callback_function,
-                           {name, access_type, value, current_file_, "UNKNOWN"});
+        call_user_function(*it->second.callback_function, {name, access_type, value, current_file_, "UNKNOWN"});
     }
 
     // Notify debugger if present
-    if (debugger_) {
-        debugger_->on_variable_access(name, access_type, value, current_file_);
-    }
+    if (debugger_) { debugger_->on_variable_access(name, access_type, value, current_file_); }
 }
 
 void Interpreter::set_variable(const std::string& name, const std::string& val) {
     variables_.set(name, val);
-    if (!variable_watches_.empty()) {
-        fire_variable_watch(name, "MODIFIED_ACCESS", val);
-    }
+    if (!variable_watches_.empty()) { fire_variable_watch(name, "MODIFIED_ACCESS", val); }
 }
 
 std::expected<void, std::string> Interpreter::set_variable_parent_scope(const std::string& name, const std::string& val) {
     // Use ShadowMap's parent scope for both function and subdirectory contexts
     // add_subdirectory now uses push_scope/pop_scope, so ShadowMap handles all scoping
     auto result = variables_.set_parent_scope(name, val);
-    if (result) {
-        return {};
-    }
+    if (result) { return {}; }
     return std::unexpected(result.error());
 }
 
@@ -3495,9 +3390,7 @@ std::expected<void, std::string> Interpreter::unset_variable_parent_scope(const 
     // Use ShadowMap's parent scope for both function and subdirectory contexts
     // add_subdirectory now uses push_scope/pop_scope, so ShadowMap handles all scoping
     auto result = variables_.unset_parent_scope(name);
-    if (result) {
-        return {};
-    }
+    if (result) { return {}; }
     return std::unexpected(result.error());
 }
 
@@ -3506,25 +3399,19 @@ void Interpreter::set_cache_variable(const std::string& var_name, const std::str
 }
 
 bool Interpreter::unset_variable(const std::string& name) {
-    if (!variable_watches_.empty()) {
-        fire_variable_watch(name, "REMOVED_ACCESS", "");
-    }
+    if (!variable_watches_.empty()) { fire_variable_watch(name, "REMOVED_ACCESS", ""); }
     variables_.unset(name);
-    return true;  // ShadowMap::unset is always safe (no-op if variable doesn't exist)
+    return true; // ShadowMap::unset is always safe (no-op if variable doesn't exist)
 }
 
 bool Interpreter::is_variable_set(std::string_view name) const {
     // Check macro substitutions first (skip when empty — common case for non-macro code)
     if (!macro_substitutions_.empty()) {
-        if (auto it = macro_substitutions_.find(std::string(name)); it != macro_substitutions_.end()) {
-            return true;
-        }
+        if (auto it = macro_substitutions_.find(std::string(name)); it != macro_substitutions_.end()) { return true; }
     }
 
     // Check local variables (single-lookup via ShadowMap with transparent lookup)
-    if (variables_.try_get(name)) {
-        return true;
-    }
+    if (variables_.try_get(name)) { return true; }
 
     // Check cache variables (always on root — cache is global)
     const auto* root = const_cast<Interpreter*>(this)->get_root();
@@ -3552,10 +3439,8 @@ std::optional<std::string> Interpreter::get_optional_variable(std::string_view n
     // Position 14: CMAKE_CURRENT_FUNCTION
     //              01234567890123456789...
     //                            ^-- position 14 is 'F'
-    if (name.size() >= 22 && name[14] == 'F' &&
-        (name == "CMAKE_CURRENT_FUNCTION" ||
-         name == "CMAKE_CURRENT_FUNCTION_LIST_FILE" ||
-         name == "CMAKE_CURRENT_FUNCTION_LIST_DIR")) {
+    if (name.size() >= 22 && name[14] == 'F'
+        && (name == "CMAKE_CURRENT_FUNCTION" || name == "CMAKE_CURRENT_FUNCTION_LIST_FILE" || name == "CMAKE_CURRENT_FUNCTION_LIST_DIR")) {
 
         const auto* fb = frame_stack_.back().function_block;
         if (fb != nullptr) {
@@ -3563,19 +3448,15 @@ std::optional<std::string> Interpreter::get_optional_variable(std::string_view n
             if (name == "CMAKE_CURRENT_FUNCTION_LIST_FILE") return fb->definition_file;
             if (name == "CMAKE_CURRENT_FUNCTION_LIST_DIR") return fb->definition_dir;
         }
-        return std::nullopt;  // Not in a function
+        return std::nullopt; // Not in a function
     }
 
     // Check local variables (single-lookup via ShadowMap with transparent lookup)
-    if (auto* val = variables_.try_get(name)) {
-        return std::string(*val);
-    }
+    if (auto* val = variables_.try_get(name)) { return std::string(*val); }
 
     // Check cache variables (always on root — cache is global)
     const auto* root = const_cast<Interpreter*>(this)->get_root();
-    if (auto cache_it = root->cache_variables_.find(name); cache_it != root->cache_variables_.end()) {
-        return cache_it->second;
-    }
+    if (auto cache_it = root->cache_variables_.find(name); cache_it != root->cache_variables_.end()) { return cache_it->second; }
 
     return std::nullopt;
 }
@@ -3583,15 +3464,12 @@ std::optional<std::string> Interpreter::get_optional_variable(std::string_view n
 std::optional<std::string_view> Interpreter::get_variable_view(std::string_view name) const {
     // Check macro substitutions first (macro parameters take precedence)
     if (!macro_substitutions_.empty()) {
-        if (auto it = macro_substitutions_.find(std::string(name)); it != macro_substitutions_.end())
-            return std::string_view(it->second);
+        if (auto it = macro_substitutions_.find(std::string(name)); it != macro_substitutions_.end()) return std::string_view(it->second);
     }
 
     // Function-scoped special variables
-    if (name.size() >= 22 && name[14] == 'F' &&
-        (name == "CMAKE_CURRENT_FUNCTION" ||
-         name == "CMAKE_CURRENT_FUNCTION_LIST_FILE" ||
-         name == "CMAKE_CURRENT_FUNCTION_LIST_DIR")) {
+    if (name.size() >= 22 && name[14] == 'F'
+        && (name == "CMAKE_CURRENT_FUNCTION" || name == "CMAKE_CURRENT_FUNCTION_LIST_FILE" || name == "CMAKE_CURRENT_FUNCTION_LIST_DIR")) {
         const auto* fb = frame_stack_.back().function_block;
         if (fb != nullptr) {
             if (name == "CMAKE_CURRENT_FUNCTION") return std::string_view(fb->name);
@@ -3602,14 +3480,12 @@ std::optional<std::string_view> Interpreter::get_variable_view(std::string_view 
     }
 
     // Check local variables (ShadowMap stores std::string, pointer is stable)
-    if (auto* val = variables_.try_get(name))
-        return std::string_view(*val);
+    if (auto* val = variables_.try_get(name)) return std::string_view(*val);
 
     // Check cache variables (always on root — cache is global)
     {
         const auto* root = const_cast<Interpreter*>(this)->get_root();
-        if (auto it = root->cache_variables_.find(name); it != root->cache_variables_.end())
-            return std::string_view(it->second);
+        if (auto it = root->cache_variables_.find(name); it != root->cache_variables_.end()) return std::string_view(it->second);
     }
 
     return std::nullopt;
@@ -3621,9 +3497,7 @@ void Interpreter::print_message(const std::string& mode, const std::string& msg,
     kiln::print_message(os, mode, msg, indent, force_colors_);
 
     // Debugger hook for --break-on-message
-    if (debugger_) {
-        debugger_->on_message(msg);
-    }
+    if (debugger_) { debugger_->on_message(msg); }
 }
 
 void Interpreter::print_warning_with_context(const std::string& msg) {
@@ -3636,13 +3510,9 @@ void Interpreter::print_warning_with_context(const std::string& msg) {
         }
         const auto& current = root->trace_stack_.back();
         std::optional<std::string> source_content;
-        if (!root->source_view_.empty()) {
-            source_content = std::string(root->source_view_);
-        }
-        print_diagnostic(*err_, DiagnosticSeverity::Warning, msg,
-                         current.file ? *current.file : std::string(),
-                         current.row, current.col, current.offset, current.length,
-                         backtrace, source_content);
+        if (!root->source_view_.empty()) { source_content = std::string(root->source_view_); }
+        print_diagnostic(*err_, DiagnosticSeverity::Warning, msg, current.file ? *current.file : std::string(), current.row, current.col,
+                         current.offset, current.length, backtrace, source_content);
     } else {
         print_message("WARNING", msg, true);
     }
@@ -3706,8 +3576,8 @@ void Interpreter::check_invariants() const {
     }
 
     if (loop_control_ != LoopControl::NONE && loop_depth_ <= 0) {
-        std::cerr << "INTERNAL ERROR (kiln bug): loop_control_ is set (" << static_cast<int>(loop_control_)
-                  << ") but loop_depth_ is " << loop_depth_ << "\n";
+        std::cerr << "INTERNAL ERROR (kiln bug): loop_control_ is set (" << static_cast<int>(loop_control_) << ") but loop_depth_ is "
+                  << loop_depth_ << "\n";
         std::abort();
     }
 
@@ -3740,9 +3610,7 @@ void Interpreter::finalize_directory_targets() {
     // CMAKE_INCLUDE_CURRENT_DIR: when ON, prepend source and binary dirs to include path
     bool include_current_dir = false;
     std::string icd_val = get_variable("CMAKE_INCLUDE_CURRENT_DIR");
-    if (!icd_val.empty() && !is_falsy(icd_val)) {
-        include_current_dir = true;
-    }
+    if (!icd_val.empty() && !is_falsy(icd_val)) { include_current_dir = true; }
 
     for (const auto& target : ctx.owned_targets) {
         // Imported targets are not affected by directory-level commands like
@@ -3752,8 +3620,7 @@ void Interpreter::finalize_directory_targets() {
         if (target->is_imported()) continue;
 
         // Apply CMAKE_INCLUDE_CURRENT_DIR (binary dir first, then source dir — CMake order)
-        if (include_current_dir &&
-            target->get_type() != TargetType::INTERFACE_LIBRARY) {
+        if (include_current_dir && target->get_type() != TargetType::INTERFACE_LIBRARY) {
             std::string src_dir = get_variable("CMAKE_CURRENT_SOURCE_DIR");
             std::string bin_dir = get_variable("CMAKE_CURRENT_BINARY_DIR");
             target->prepend_property("INCLUDE_DIRECTORIES", {src_dir}, PropertyVisibility::PRIVATE);
@@ -3774,9 +3641,7 @@ std::optional<int64_t> Interpreter::get_dir_mtime_cached(const std::string& path
 
     // Check session cache (project paths cached too — dirs don't change during a single run)
     auto it = root->dir_mtime_cache_.find(path);
-    if (it != root->dir_mtime_cache_.end()) {
-        return it->second;
-    }
+    if (it != root->dir_mtime_cache_.end()) { return it->second; }
 
     // Not cached - stat and cache it
     std::error_code ec;
@@ -3803,9 +3668,7 @@ std::string Interpreter::cached_weakly_canonical(std::string_view p) {
     } else {
         try {
             resolved_parent = std::filesystem::weakly_canonical(parent).string();
-        } catch (...) {
-            resolved_parent = Path(parent).lexically_normal().str();
-        }
+        } catch (...) { resolved_parent = Path(parent).lexically_normal().str(); }
         canonical_dir_cache_[parent] = resolved_parent;
     }
 
@@ -3815,9 +3678,7 @@ std::string Interpreter::cached_weakly_canonical(std::string_view p) {
     if (std::filesystem::is_symlink(full_str, ec)) {
         try {
             return std::filesystem::weakly_canonical(full_str).string();
-        } catch (...) {
-            return Path(full_str).lexically_normal().str();
-        }
+        } catch (...) { return Path(full_str).lexically_normal().str(); }
     }
     return Path(full_str).lexically_normal().str();
 }
@@ -3829,13 +3690,11 @@ bool Interpreter::is_project_path(const std::string& path) const {
     if (root->cached_abs_source_dir_.empty()) {
         root->cached_abs_source_dir_ = std::filesystem::absolute(get_variable("CMAKE_SOURCE_DIR")).string();
         // Ensure trailing slash for prefix matching
-        if (!root->cached_abs_source_dir_.empty() && root->cached_abs_source_dir_.back() != '/')
-            root->cached_abs_source_dir_ += '/';
+        if (!root->cached_abs_source_dir_.empty() && root->cached_abs_source_dir_.back() != '/') root->cached_abs_source_dir_ += '/';
     }
     if (root->cached_abs_binary_dir_.empty()) {
         root->cached_abs_binary_dir_ = std::filesystem::absolute(get_variable("CMAKE_BINARY_DIR")).string();
-        if (!root->cached_abs_binary_dir_.empty() && root->cached_abs_binary_dir_.back() != '/')
-            root->cached_abs_binary_dir_ += '/';
+        if (!root->cached_abs_binary_dir_.empty() && root->cached_abs_binary_dir_.back() != '/') root->cached_abs_binary_dir_ += '/';
     }
 
     // Only compute absolute() for the input path
@@ -3848,7 +3707,7 @@ bool Interpreter::is_project_path(const std::string& path) const {
     // Also check exact match (path IS the source/binary dir itself)
     // Compare without trailing slash
     std::string_view src_view(root->cached_abs_source_dir_);
-    src_view.remove_suffix(1);  // remove trailing '/'
+    src_view.remove_suffix(1); // remove trailing '/'
     if (abs_path == src_view) return true;
 
     std::string_view bin_view(root->cached_abs_binary_dir_);
@@ -3858,4 +3717,4 @@ bool Interpreter::is_project_path(const std::string& path) const {
     return false;
 }
 
-}
+} // namespace kiln

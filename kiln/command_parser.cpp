@@ -2,11 +2,9 @@
 
 namespace kiln {
 
-CommandParser::CommandParser(std::string_view cmd_name)
-    : cmd_name_(cmd_name) {}
+CommandParser::CommandParser(std::string_view cmd_name) : cmd_name_(cmd_name) {}
 
-CommandParser::CommandParser(std::string_view cmd_name, std::string_view subcommand)
-    : cmd_name_(cmd_name), subcommand_(subcommand) {}
+CommandParser::CommandParser(std::string_view cmd_name, std::string_view subcommand) : cmd_name_(cmd_name), subcommand_(subcommand) {}
 
 void CommandParser::positional(std::string& var, std::string_view label, bool required) {
     single_positionals_.push_back({&var, label, required, false});
@@ -73,10 +71,8 @@ std::expected<std::vector<std::string>, std::string> CommandParser::parse(std::s
                     missing += ">...";
                 }
                 if (!missing.empty()) {
-                    warnings.push_back("While parsing " + error_prefix +
-                        ", encountered known keyword '" + arg +
-                        "' where positional " + missing +
-                        " was expected. This likely means a required argument was omitted.");
+                    warnings.push_back("While parsing " + error_prefix + ", encountered known keyword '" + arg + "' where positional "
+                                       + missing + " was expected. This likely means a required argument was omitted.");
                 }
             }
 
@@ -135,9 +131,7 @@ std::expected<std::vector<std::string>, std::string> CommandParser::parse(std::s
 
     // Helper to prepend warnings to an error message for context
     auto make_error = [&](std::string msg) -> std::unexpected<std::string> {
-        for (const auto& w : warnings) {
-            msg += "\nnote: " + w;
-        }
+        for (const auto& w : warnings) { msg += "\nnote: " + w; }
         return std::unexpected(std::move(msg));
     };
 

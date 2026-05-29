@@ -15,14 +15,14 @@ struct InstallRule;
 // Pre-computed target install info (computed while interpreter is alive,
 // used by install task after interpreter is destroyed)
 struct PendingTargetInstall {
-    std::string artifact_path;  // Built artifact (e.g., /build/libmylib.a)
-    std::string dest_path;      // Full destination path (e.g., /install/lib/libmylib.a)
+    std::string artifact_path; // Built artifact (e.g., /build/libmylib.a)
+    std::string dest_path;     // Full destination path (e.g., /install/lib/libmylib.a)
 };
 
 // Metadata for an ExternalProject step command (may contain multiple commands)
 struct EPStepCommand {
-    std::vector<std::vector<std::string>> commands;  // One or more commands
-    bool is_empty = false;                           // Empty string means skip this step
+    std::vector<std::vector<std::string>> commands; // One or more commands
+    bool is_empty = false;                          // Empty string means skip this step
 };
 
 // ExternalProjectTarget: Represents an ExternalProject_Add target.
@@ -45,11 +45,9 @@ public:
     ~ExternalProjectTarget() override;
 
     // Generate tasks creates TWO tasks: orchestrator and sentinel
-    std::expected<void, std::string> generate_tasks(GraphTransaction& txn, const Toolchain& toolchain,
-                        const TargetMap& all_targets,
-                        const Interpreter& interp,
-                        const std::vector<std::string>& exe_linker_flags = {},
-                        const std::vector<std::string>& shared_linker_flags = {}) override;
+    std::expected<void, std::string> generate_tasks(GraphTransaction& txn, const Toolchain& toolchain, const TargetMap& all_targets,
+                                                    const Interpreter& interp, const std::vector<std::string>& exe_linker_flags = {},
+                                                    const std::vector<std::string>& shared_linker_flags = {}) override;
 
     // EP configuration (set by ExternalProject_Add at configure time)
     void set_ep_source_dir(std::string dir) { ep_source_dir_ = std::move(dir); }
@@ -119,9 +117,7 @@ public:
     Interpreter* get_ep_interpreter() const { return ep_interp_.get(); }
 
     // Pre-computed target installs (computed while interpreter is alive)
-    void add_pending_target_install(PendingTargetInstall install) {
-        pending_target_installs_.push_back(std::move(install));
-    }
+    void add_pending_target_install(PendingTargetInstall install) { pending_target_installs_.push_back(std::move(install)); }
     const std::vector<PendingTargetInstall>& get_pending_target_installs() const { return pending_target_installs_; }
 
 private:

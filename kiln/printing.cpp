@@ -19,23 +19,28 @@ namespace {
 std::pair<std::string_view, std::string_view> message_prefix_and_color(std::string_view mode);
 }
 
-std::string format_message(std::string_view mode, std::string_view msg,
-                           std::string_view indent, bool use_color) {
+std::string format_message(std::string_view mode, std::string_view msg, std::string_view indent, bool use_color) {
     auto [prefix, msg_color] = message_prefix_and_color(mode);
     std::string out;
     if (use_color && !msg_color.empty()) {
         out.reserve(prefix.size() + msg.size() + indent.size() + msg_color.size() + 8);
-        out.append(msg_color); out.append(prefix); out.push_back(' ');
-        out.append(indent); out.append(msg); out.append(colors::RESET);
+        out.append(msg_color);
+        out.append(prefix);
+        out.push_back(' ');
+        out.append(indent);
+        out.append(msg);
+        out.append(colors::RESET);
     } else {
         out.reserve(prefix.size() + msg.size() + indent.size() + 1);
-        out.append(prefix); out.push_back(' '); out.append(indent); out.append(msg);
+        out.append(prefix);
+        out.push_back(' ');
+        out.append(indent);
+        out.append(msg);
     }
     return out;
 }
 
-void print_message(std::ostream& os, std::string_view mode, std::string_view msg,
-                   std::string_view indent, bool force_color) {
+void print_message(std::ostream& os, std::string_view mode, std::string_view msg, std::string_view indent, bool force_color) {
     bool color = force_color || is_color_enabled(os);
     os << format_message(mode, msg, indent, color) << '\n';
 }
@@ -97,8 +102,7 @@ std::pair<std::string_view, std::string_view> message_prefix_and_color(std::stri
 std::string format_action(std::string_view verb, std::string_view detail, bool use_color) {
     std::ostringstream oss;
     if (use_color) {
-        oss << colors::BOLD_GREEN << std::setw(action_verb_width) << verb
-            << colors::RESET << ' ' << detail;
+        oss << colors::BOLD_GREEN << std::setw(action_verb_width) << verb << colors::RESET << ' ' << detail;
     } else {
         oss << verb << ' ' << detail;
     }
@@ -121,14 +125,13 @@ void print_action(const OutputCtx& out, std::string_view verb, std::string_view 
     out.sink(format_action(verb, detail, out.use_color));
 }
 
-void print_message(const OutputCtx& out, std::string_view mode, std::string_view msg,
-                   std::string_view indent) {
+void print_message(const OutputCtx& out, std::string_view mode, std::string_view msg, std::string_view indent) {
     out.sink(format_message(mode, msg, indent, out.use_color));
 }
 
 std::pair<std::string, std::vector<size_t>> expand_tabs(std::string_view line, size_t tab_width) {
     std::string result;
-    std::vector<size_t> col_map;  // col_map[i] = visual position of source column i
+    std::vector<size_t> col_map; // col_map[i] = visual position of source column i
 
     for (char c : line) {
         col_map.push_back(result.length());
@@ -139,38 +142,33 @@ std::pair<std::string, std::vector<size_t>> expand_tabs(std::string_view line, s
             result += c;
         }
     }
-    col_map.push_back(result.length());  // For positions at/past end of line
+    col_map.push_back(result.length()); // For positions at/past end of line
     return {result, col_map};
 }
 
-void print_diagnostic(std::ostream& os,
-                      DiagnosticSeverity severity,
-                      const std::string& message,
-                      const std::string& file_path,
-                      size_t row, size_t col, size_t offset, size_t length,
-                      const std::vector<CallLocation>& backtrace,
-                      const std::optional<std::string>& source_content,
-                      const std::string& note) {
+void print_diagnostic(std::ostream& os, DiagnosticSeverity severity, const std::string& message, const std::string& file_path, size_t row,
+                      size_t col, size_t offset, size_t length, const std::vector<CallLocation>& backtrace,
+                      const std::optional<std::string>& source_content, const std::string& note) {
     bool color = is_color_enabled(os);
 
     // Severity label
     std::string_view sev_color, sev_label, caret_color;
     switch (severity) {
-        case DiagnosticSeverity::Error:
-            sev_color = colors::BOLD_RED;
-            sev_label = "error:";
-            caret_color = colors::BOLD_RED;
-            break;
-        case DiagnosticSeverity::Warning:
-            sev_color = colors::BOLD_YELLOW;
-            sev_label = "warning:";
-            caret_color = colors::BOLD_YELLOW;
-            break;
-        case DiagnosticSeverity::Note:
-            sev_color = colors::BOLD_CYAN;
-            sev_label = "note:";
-            caret_color = colors::BOLD_CYAN;
-            break;
+    case DiagnosticSeverity::Error:
+        sev_color = colors::BOLD_RED;
+        sev_label = "error:";
+        caret_color = colors::BOLD_RED;
+        break;
+    case DiagnosticSeverity::Warning:
+        sev_color = colors::BOLD_YELLOW;
+        sev_label = "warning:";
+        caret_color = colors::BOLD_YELLOW;
+        break;
+    case DiagnosticSeverity::Note:
+        sev_color = colors::BOLD_CYAN;
+        sev_label = "note:";
+        caret_color = colors::BOLD_CYAN;
+        break;
     }
 
     // Header line: "error: message"
@@ -198,8 +196,7 @@ void print_diagnostic(std::ostream& os,
     } else {
         std::ifstream error_file(file_path);
         if (error_file) {
-            file_content.assign((std::istreambuf_iterator<char>(error_file)),
-                                std::istreambuf_iterator<char>());
+            file_content.assign((std::istreambuf_iterator<char>(error_file)), std::istreambuf_iterator<char>());
             has_content = true;
         }
     }
@@ -211,13 +208,9 @@ void print_diagnostic(std::ostream& os,
         // Use offset if available to find the line boundaries directly
         if (offset > 0 && offset < file_content.size()) {
             line_start = offset;
-            while (line_start > 0 && file_content[line_start - 1] != '\n') {
-                line_start--;
-            }
+            while (line_start > 0 && file_content[line_start - 1] != '\n') { line_start--; }
             line_end = offset;
-            while (line_end < file_content.size() && file_content[line_end] != '\n') {
-                line_end++;
-            }
+            while (line_end < file_content.size() && file_content[line_end] != '\n') { line_end++; }
         } else {
             // Fallback: count lines from the beginning
             size_t current_line = 1;
@@ -249,12 +242,10 @@ void print_diagnostic(std::ostream& os,
         size_t caret_len = std::max(visual_end - visual_start, size_t{1});
 
         if (color) {
-            os << "   " << padding << " " << colors::BOLD_BLUE << "|" << colors::RESET << " "
-               << std::string(visual_start, ' ')
+            os << "   " << padding << " " << colors::BOLD_BLUE << "|" << colors::RESET << " " << std::string(visual_start, ' ')
                << caret_color << std::string(caret_len, '^') << colors::RESET << std::endl;
         } else {
-            os << "   " << padding << " | " << std::string(visual_start, ' ')
-               << std::string(caret_len, '^') << std::endl;
+            os << "   " << padding << " | " << std::string(visual_start, ' ') << std::string(caret_len, '^') << std::endl;
         }
     }
 

@@ -32,8 +32,8 @@ struct VariableReference;
 using ArgumentPart = std::variant<std::string, VariableReference>;
 
 struct VariableReference {
-    std::string namespace_prefix;  // "", "ENV", "CACHE" (ENV and CACHE for future use)
-    std::vector<ArgumentPart> name_parts;  // Recursively contains strings and VariableReferences
+    std::string namespace_prefix;         // "", "ENV", "CACHE" (ENV and CACHE for future use)
+    std::vector<ArgumentPart> name_parts; // Recursively contains strings and VariableReferences
 };
 
 struct Argument {
@@ -43,26 +43,45 @@ struct Argument {
 
 enum class ConditionOp : uint8_t {
     Fallback = 0,
-    BoolCheck,      // if(X)
-    Defined,        // if(DEFINED X)
-    Target,         // if(TARGET X)
-    Exists,         // if(EXISTS X)
-    IsDirectory, IsAbsolute, IsSymlink, Command,
+    BoolCheck, // if(X)
+    Defined,   // if(DEFINED X)
+    Target,    // if(TARGET X)
+    Exists,    // if(EXISTS X)
+    IsDirectory,
+    IsAbsolute,
+    IsSymlink,
+    Command,
     // Binary — numeric
-    BinaryEqual, BinaryNotEqual, BinaryLess, BinaryGreater, BinaryLessEqual, BinaryGreaterEqual,
+    BinaryEqual,
+    BinaryNotEqual,
+    BinaryLess,
+    BinaryGreater,
+    BinaryLessEqual,
+    BinaryGreaterEqual,
     // Binary — string
-    BinaryStrEqual, BinaryStrLess, BinaryStrGreater, BinaryStrLessEqual, BinaryStrGreaterEqual,
+    BinaryStrEqual,
+    BinaryStrLess,
+    BinaryStrGreater,
+    BinaryStrLessEqual,
+    BinaryStrGreaterEqual,
     // Binary — version
-    BinaryVersionEqual, BinaryVersionLess, BinaryVersionGreater, BinaryVersionLessEqual, BinaryVersionGreaterEqual,
+    BinaryVersionEqual,
+    BinaryVersionLess,
+    BinaryVersionGreater,
+    BinaryVersionLessEqual,
+    BinaryVersionGreaterEqual,
     // Binary — other
-    BinaryMatches, BinaryInList, BinaryIsNewerThan,
+    BinaryMatches,
+    BinaryInList,
+    BinaryIsNewerThan,
     // Compound — homogeneous AND/OR chains of simple sub-conditions
-    CompoundAnd, CompoundOr,
+    CompoundAnd,
+    CompoundOr,
 };
 
 struct PreParsedCondition {
     ConditionOp op = ConditionOp::Fallback;
-    uint8_t flags = 0;      // bit 0: negated, bit 1: has_dynamic_args
+    uint8_t flags = 0; // bit 0: negated, bit 1: has_dynamic_args
     uint8_t left_idx = 0;
     uint8_t right_idx = 0;
     bool negated() const { return flags & 1; }
@@ -71,8 +90,8 @@ struct PreParsedCondition {
     // Compound AND/OR support: inline array of simple sub-conditions.
     struct SubCondition {
         ConditionOp op;
-        uint8_t flags;       // bit 0: negated, bit 1: has_dynamic_args
-        uint8_t left_idx;    // index into the ORIGINAL condition argument vector
+        uint8_t flags;    // bit 0: negated, bit 1: has_dynamic_args
+        uint8_t left_idx; // index into the ORIGINAL condition argument vector
         uint8_t right_idx;
         bool negated() const { return flags & 1; }
         bool has_dynamic_args() const { return flags & 2; }
@@ -115,46 +134,46 @@ struct IfBlock {
 };
 
 struct FunctionBlock {
-    std::string name;                  // Empty when name is dynamic; resolved at registration
-    Argument name_argument;            // Unevaluated name (used when `name` is empty)
+    std::string name;       // Empty when name is dynamic; resolved at registration
+    Argument name_argument; // Unevaluated name (used when `name` is empty)
     std::vector<std::string> parameters;
     std::vector<AstNode> body;
-    std::string definition_file = "";  // File where function was defined
-    std::string definition_dir = "";   // Directory where function was defined
+    std::string definition_file = ""; // File where function was defined
+    std::string definition_dir = "";  // Directory where function was defined
 };
 
 struct MacroBlock {
-    std::string name;                  // Empty when name is dynamic; resolved at registration
-    Argument name_argument;            // Unevaluated name (used when `name` is empty)
+    std::string name;       // Empty when name is dynamic; resolved at registration
+    Argument name_argument; // Unevaluated name (used when `name` is empty)
     std::vector<std::string> parameters;
     std::vector<AstNode> body;
-    std::string definition_file = "";  // File where macro was defined (for consistency)
-    std::string definition_dir = "";   // Directory where macro was defined (for consistency)
+    std::string definition_file = ""; // File where macro was defined (for consistency)
+    std::string definition_dir = "";  // Directory where macro was defined (for consistency)
 };
 
 // Foreach loop parameter types
 struct ForeachSimple {
-    std::vector<Argument> items;  // Items to iterate over
+    std::vector<Argument> items; // Items to iterate over
 };
 
 struct ForeachRange {
-    std::optional<Argument> start;  // If not provided, defaults to 0
-    Argument stop;                   // Required
-    std::optional<Argument> step;    // If not provided, defaults to 1
+    std::optional<Argument> start; // If not provided, defaults to 0
+    Argument stop;                 // Required
+    std::optional<Argument> step;  // If not provided, defaults to 1
 };
 
 struct ForeachIn {
-    std::vector<Argument> lists;  // Variable names to expand as lists
-    std::vector<Argument> items;  // Literal items
+    std::vector<Argument> lists; // Variable names to expand as lists
+    std::vector<Argument> items; // Literal items
 };
 
 struct ForeachZipLists {
-    std::vector<std::string> loop_vars;  // Multiple loop variable names
-    std::vector<Argument> lists;         // List variable names to zip together
+    std::vector<std::string> loop_vars; // Multiple loop variable names
+    std::vector<Argument> lists;        // List variable names to zip together
 };
 
 struct ForeachBlock {
-    Argument loop_var;  // The loop variable name (used for simple, range, and in modes)
+    Argument loop_var; // The loop variable name (used for simple, range, and in modes)
     std::variant<ForeachSimple, ForeachRange, ForeachIn, ForeachZipLists> params;
     std::vector<AstNode> body;
     size_t row = 0;
@@ -174,8 +193,8 @@ struct WhileBlock {
 };
 
 struct BlockBlock {
-    bool scope_for_variables = true;  // CMake default: block() creates a variable scope
-    std::vector<std::string> propagate_vars;  // Variables to propagate back to parent scope
+    bool scope_for_variables = true;         // CMake default: block() creates a variable scope
+    std::vector<std::string> propagate_vars; // Variables to propagate back to parent scope
     std::vector<AstNode> body;
     size_t row = 0;
     size_t col = 0;
@@ -194,10 +213,10 @@ struct PreParsedMath {
         uint16_t var_part_idx; // index into expression Argument's parts
         int64_t literal;
     };
-    std::vector<Operand> operands;       // operands.size() == ops.size() + 1
-    std::vector<char> ops;               // each one of + - * / %
-    std::string out_var;                 // destination variable name (parse-time literal)
-    bool hex_output = false;             // OUTPUT_FORMAT HEXADECIMAL
+    std::vector<Operand> operands; // operands.size() == ops.size() + 1
+    std::vector<char> ops;         // each one of + - * / %
+    std::string out_var;           // destination variable name (parse-time literal)
+    bool hex_output = false;       // OUTPUT_FORMAT HEXADECIMAL
 };
 
 // Pre-classified string(SUBSTRING <input> <begin> <length> <out_var>) shape.
@@ -209,7 +228,7 @@ struct PreParsedMath {
 struct PreParsedSubstring {
     // input: either a literal string or a single bare ${VAR}
     bool input_is_var = false;
-    std::string input;          // value (when !is_var) or var name (when is_var)
+    std::string input; // value (when !is_var) or var name (when is_var)
     // begin: literal int or single bare ${VAR}
     bool begin_is_var = false;
     int64_t begin_literal = 0;
@@ -229,8 +248,8 @@ struct CommandInvocation {
     size_t col = 0;
     size_t offset = 0;
     size_t length = 0;
-    std::optional<PreParsedMath> pre_parsed_math;            // math() fast path
-    std::optional<PreParsedSubstring> pre_parsed_substring;  // string(SUBSTRING) fast path
+    std::optional<PreParsedMath> pre_parsed_math;           // math() fast path
+    std::optional<PreParsedSubstring> pre_parsed_substring; // string(SUBSTRING) fast path
 };
 
 // Parse-time classification. Returns nullopt unless the shape fits the
@@ -248,7 +267,7 @@ public:
 
 private:
     std::string_view content_;
-    std::string filename_;  // Current file being parsed
+    std::string filename_; // Current file being parsed
     size_t pos_ = 0;
     size_t row_ = 1;
     size_t col_ = 1;
@@ -262,8 +281,8 @@ private:
     std::expected<BlockBlock, ParseError> parse_block_block(const CommandInvocation& block_command);
     void consume_whitespace();
     std::expected<CommandInvocation, ParseError> parse_command_invocation();
-    std::expected<CommandInvocation, ParseError> parse_command_body(
-        std::string identifier, size_t cmd_row, size_t cmd_col, size_t cmd_offset);
+    std::expected<CommandInvocation, ParseError> parse_command_body(std::string identifier, size_t cmd_row, size_t cmd_col,
+                                                                    size_t cmd_offset);
     std::expected<Argument, ParseError> parse_argument();
     std::expected<std::vector<ArgumentPart>, ParseError> parse_unquoted_argument_value();
     std::expected<std::vector<ArgumentPart>, ParseError> parse_quoted_argument_value();

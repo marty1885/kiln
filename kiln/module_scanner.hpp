@@ -31,8 +31,7 @@ std::string get_bmi_path(const std::string& binary_dir, const std::string& modul
 // source path. Header-unit BMIs live under <binary_dir>/bmis/header_units/
 // keyed by a path-mangled form of the source so they don't collide with
 // named-module BMIs.
-std::string get_header_unit_bmi_path(const std::string& binary_dir,
-                                     const std::string& source_path);
+std::string get_header_unit_bmi_path(const std::string& binary_dir, const std::string& source_path);
 
 // Get the DDI file path for a given source file
 std::string get_ddi_path(const std::string& binary_dir, const std::string& source_path);
@@ -43,22 +42,22 @@ std::string get_ddi_path(const std::string& binary_dir, const std::string& sourc
 // /scanDependencies. One file per scanned TU; rules[] usually has one entry.
 
 struct P1689Provide {
-    std::string logical_name;                           // Module name, e.g. "Math" or "Math:Part"
-    std::optional<std::string> source_path;             // Source path of the providing TU
-    std::optional<std::string> compiled_module_path;    // Hint for BMI output path
-    bool is_interface = true;                           // True for interface units, false for impl
+    std::string logical_name;                        // Module name, e.g. "Math" or "Math:Part"
+    std::optional<std::string> source_path;          // Source path of the providing TU
+    std::optional<std::string> compiled_module_path; // Hint for BMI output path
+    bool is_interface = true;                        // True for interface units, false for impl
 };
 
 struct P1689Require {
-    std::string logical_name;                           // Module name or header-unit name
-    std::string lookup_method = "by-name";              // "by-name" | "include-angle" | "include-quote"
-    std::optional<std::string> source_path;             // Header path (for include-* methods)
+    std::string logical_name;               // Module name or header-unit name
+    std::string lookup_method = "by-name";  // "by-name" | "include-angle" | "include-quote"
+    std::optional<std::string> source_path; // Header path (for include-* methods)
 };
 
 struct P1689Rule {
-    std::string primary_output;                         // The compile output (.o) this scan describes
+    std::string primary_output; // The compile output (.o) this scan describes
     std::vector<P1689Provide> provides;
-    std::vector<P1689Require> requires_;                // Trailing _ avoids C++ keyword
+    std::vector<P1689Require> requires_; // Trailing _ avoids C++ keyword
 };
 
 struct P1689File {
@@ -79,11 +78,11 @@ std::expected<P1689File, std::string> parse_p1689_string(const std::string& json
 // transitive PUBLIC/INTERFACE link deps to resolve cross-target imports.
 
 struct ModuleManifestEntry {
-    std::string logical_name;     // e.g. "Foo" or "Foo:Part"
-    std::string bmi_path;         // Absolute path to the BMI (.gcm)
-    std::string primary_output;   // The producing compile task's id (its .o path)
-    std::string source_path;      // The provider's source TU; used in error messages
-    std::string visibility;       // "PUBLIC" | "INTERFACE" — PRIVATE entries are not written
+    std::string logical_name;   // e.g. "Foo" or "Foo:Part"
+    std::string bmi_path;       // Absolute path to the BMI (.gcm)
+    std::string primary_output; // The producing compile task's id (its .o path)
+    std::string source_path;    // The provider's source TU; used in error messages
+    std::string visibility;     // "PUBLIC" | "INTERFACE" — PRIVATE entries are not written
 };
 
 struct ModuleManifest {
@@ -103,8 +102,8 @@ std::expected<ModuleManifest, std::string> parse_module_manifest_string(const st
 // directory containing modules.json.
 
 struct LibstdcxxModuleEntry {
-    std::string logical_name;      // "std" or "std.compat"
-    std::string source_path;       // Relative to modules.json's directory
+    std::string logical_name; // "std" or "std.compat"
+    std::string source_path;  // Relative to modules.json's directory
     bool is_std_library = false;
 };
 

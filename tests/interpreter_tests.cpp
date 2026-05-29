@@ -13,13 +13,9 @@ std::string run_script(std::string src) {
     auto interpreter = std::make_unique<kiln::Interpreter>("", &output);
 
     interpreter->add_builtin("message", [&](kiln::Interpreter& interp, const std::vector<std::string>& args) {
-        if (args.empty()) {
-            throw std::runtime_error("message called with incorrect number of arguments");
-        }
+        if (args.empty()) { throw std::runtime_error("message called with incorrect number of arguments"); }
         // A simple implementation for testing purposes
-        for (const auto& arg : args) {
-            output << arg;
-        }
+        for (const auto& arg : args) { output << arg; }
         output << std::endl;
     });
 
@@ -32,18 +28,13 @@ std::string run_script(std::string src) {
     }
 
     auto result = interpreter->interpret(ast_or_error.value());
-    if (!result) {
-        throw std::runtime_error(result.error().message);
-    }
+    if (!result) { throw std::runtime_error(result.error().message); }
 
     interpreter->execute_deferred_calls();
-    if (auto err = interpreter->get_fatal_error()) {
-        throw std::runtime_error(err->message);
-    }
+    if (auto err = interpreter->get_fatal_error()) { throw std::runtime_error(err->message); }
 
     return output.str();
 }
-
 
 TEST_CASE("Interpreter variable substitution", "[interpreter]") {
     auto output = run_script(R"(
@@ -1969,7 +1960,7 @@ TEST_CASE("if condition: IN_LIST operator", "[interpreter][if]") {
             message("fail")
         endif()
     )");
-    REQUIRE(output == "pass\n");  // Empty elements are now preserved in lists
+    REQUIRE(output == "pass\n"); // Empty elements are now preserved in lists
 
     // Case sensitivity check
     output = run_script(R"(
@@ -2268,7 +2259,8 @@ TEST_CASE("if condition: invalid conditions", "[interpreter][if][negative]") {
         else()
             message("else-branch")
         endif()
-    )"), std::runtime_error);
+    )"),
+                      std::runtime_error);
 
     // if(A EQUAL) should error - missing right operand
     REQUIRE_THROWS_AS(run_script(R"(
@@ -2276,7 +2268,8 @@ TEST_CASE("if condition: invalid conditions", "[interpreter][if][negative]") {
         if(A EQUAL)
             message("pass")
         endif()
-    )"), std::runtime_error);
+    )"),
+                      std::runtime_error);
 
     // if(AND B) - AND at start treated as variable name, B is unconsumed
     // CMake errors on unconsumed tokens
@@ -2287,7 +2280,8 @@ TEST_CASE("if condition: invalid conditions", "[interpreter][if][negative]") {
         else()
             message("else-branch")
         endif()
-    )"), std::runtime_error);
+    )"),
+                      std::runtime_error);
 
     // if(NOT) - CMake compatibility: NOT without operand treated as primary value
     // evaluates to false (NOT is not a boolean constant, dereferenced as empty variable)
@@ -2698,42 +2692,34 @@ TEST_CASE("PARENT_SCOPE", "[interpreter][parent_scope]") {
 
 TEST_CASE("namespace error cases", "[interpreter][namespace][errors]") {
     // Test invalid set(CACHE{...}) syntax
-    CHECK_THROWS_WITH(
-        run_script(R"(
+    CHECK_THROWS_WITH(run_script(R"(
             set(CACHE{MY_VAR} "value")
         )"),
-        Catch::Matchers::ContainsSubstring("set(CACHE{...} ...) is invalid")
-    );
+                      Catch::Matchers::ContainsSubstring("set(CACHE{...} ...) is invalid"));
 
     // Test invalid unset(CACHE{...}) syntax
-    CHECK_THROWS_WITH(
-        run_script(R"(
+    CHECK_THROWS_WITH(run_script(R"(
             unset(CACHE{MY_VAR})
         )"),
-        Catch::Matchers::ContainsSubstring("unset(CACHE{...}) is invalid")
-    );
+                      Catch::Matchers::ContainsSubstring("unset(CACHE{...}) is invalid"));
 
     // Test cannot mix CACHE and PARENT_SCOPE in set
-    CHECK_THROWS_WITH(
-        run_script(R"(
+    CHECK_THROWS_WITH(run_script(R"(
             function(test_func)
                 set(VAR "value" CACHE STRING "doc" PARENT_SCOPE)
             endfunction()
             test_func()
         )"),
-        Catch::Matchers::ContainsSubstring("cannot use both CACHE and PARENT_SCOPE")
-    );
+                      Catch::Matchers::ContainsSubstring("cannot use both CACHE and PARENT_SCOPE"));
 
     // Test cannot mix in unset
-    CHECK_THROWS_WITH(
-        run_script(R"(
+    CHECK_THROWS_WITH(run_script(R"(
             function(test_func)
                 unset(VAR CACHE PARENT_SCOPE)
             endfunction()
             test_func()
         )"),
-        Catch::Matchers::ContainsSubstring("cannot use both CACHE and PARENT_SCOPE")
-    );
+                      Catch::Matchers::ContainsSubstring("cannot use both CACHE and PARENT_SCOPE"));
 
     // Test PARENT_SCOPE outside function - CMake issues a warning, not an error
     // Script continues execution, just logs a warning
@@ -3264,9 +3250,7 @@ TEST_CASE("string() RANDOM operation", "[interpreter][string]") {
     )");
     REQUIRE(output.length() == 9); // 8 chars + newline
     // Check it only contains 0 and 1
-    for (size_t i = 0; i < output.length() - 1; ++i) {
-        REQUIRE((output[i] == '0' || output[i] == '1'));
-    }
+    for (size_t i = 0; i < output.length() - 1; ++i) { REQUIRE((output[i] == '0' || output[i] == '1')); }
 }
 
 TEST_CASE("string() TIMESTAMP operation", "[interpreter][string]") {
@@ -3545,7 +3529,8 @@ TEST_CASE("find_program handles NOTFOUND", "[interpreter][find]") {
 TEST_CASE("find_program REQUIRED flag", "[interpreter][find]") {
     REQUIRE_THROWS_AS(run_script(R"(
         find_program(NONEXISTENT this_does_not_exist_12345 REQUIRED)
-    )"), std::runtime_error);
+    )"),
+                      std::runtime_error);
 }
 
 TEST_CASE("find_library finds system libraries", "[interpreter][find]") {
@@ -3666,7 +3651,8 @@ TEST_CASE("find commands with PATH_SUFFIXES", "[interpreter][find]") {
     test_file.close();
 
     std::string script = R"(
-        find_file(TEST_FILE test.txt PATHS ")" + temp_dir.string() + R"(" PATH_SUFFIXES subdir)
+        find_file(TEST_FILE test.txt PATHS ")"
+                         + temp_dir.string() + R"(" PATH_SUFFIXES subdir)
         if(TEST_FILE)
             message("Found test file: ${TEST_FILE}")
         else()
@@ -3691,17 +3677,18 @@ TEST_CASE("find_program with NO_CACHE flag", "[interpreter][find]") {
     std::ofstream prog_file(test_prog);
     prog_file << "#!/bin/bash\necho test\n";
     prog_file.close();
-    std::filesystem::permissions(test_prog,
-        std::filesystem::perms::owner_exec | std::filesystem::perms::owner_read,
-        std::filesystem::perm_options::add);
+    std::filesystem::permissions(test_prog, std::filesystem::perms::owner_exec | std::filesystem::perms::owner_read,
+                                 std::filesystem::perm_options::add);
 
     std::string script = R"(
-        find_program(TEST_PROG test_prog PATHS ")" + temp_dir.string() + R"(" NO_CACHE)
+        find_program(TEST_PROG test_prog PATHS ")"
+                         + temp_dir.string() + R"(" NO_CACHE)
         message("First find: ${TEST_PROG}")
 
         # Without NO_CACHE, the result would be cached
         # With NO_CACHE, it's stored only in the variable
-        find_program(TEST_PROG test_prog PATHS ")" + temp_dir.string() + R"(" NO_CACHE)
+        find_program(TEST_PROG test_prog PATHS ")"
+                         + temp_dir.string() + R"(" NO_CACHE)
         message("Second find: ${TEST_PROG}")
     )";
 
@@ -3758,7 +3745,8 @@ TEST_CASE("find_path with PATH_SUFFIXES", "[interpreter][find]") {
     test_file.close();
 
     std::string script = R"(
-        find_path(HEADER_DIR header.h PATHS ")" + temp_dir.string() + R"(" PATH_SUFFIXES include/mylib include)
+        find_path(HEADER_DIR header.h PATHS ")"
+                         + temp_dir.string() + R"(" PATH_SUFFIXES include/mylib include)
         if(HEADER_DIR)
             message("Found header directory: ${HEADER_DIR}")
         else()
@@ -3874,12 +3862,14 @@ TEST_CASE("cmake_language", "[interpreter][cmake_language]") {
     // Test error: unknown mode
     CHECK_THROWS_WITH(run_script(R"(
         cmake_language(UNKNOWN_MODE)
-    )"), Catch::Matchers::ContainsSubstring("Unknown cmake_language mode"));
+    )"),
+                      Catch::Matchers::ContainsSubstring("Unknown cmake_language mode"));
 
     // Test error: EVAL missing args
     CHECK_THROWS_WITH(run_script(R"(
         cmake_language(EVAL)
-    )"), Catch::Matchers::ContainsSubstring("requires CODE"));
+    )"),
+                      Catch::Matchers::ContainsSubstring("requires CODE"));
 }
 
 TEST_CASE("cmake_language DEFER", "[interpreter][cmake_language]") {
@@ -4106,12 +4096,14 @@ TEST_CASE("cmake_parse_arguments error handling", "[interpreter]") {
     // Test too few arguments
     CHECK_THROWS_WITH(run_script(R"(
         cmake_parse_arguments()
-    )"), Catch::Matchers::ContainsSubstring("requires at least 1 argument"));
+    )"),
+                      Catch::Matchers::ContainsSubstring("requires at least 1 argument"));
 
     // Test standard form too few arguments
     CHECK_THROWS_WITH(run_script(R"(
         cmake_parse_arguments(MY "OPT" "VAL")
-    )"), Catch::Matchers::ContainsSubstring("requires at least 4 arguments"));
+    )"),
+                      Catch::Matchers::ContainsSubstring("requires at least 4 arguments"));
 
     // Test PARSE_ARGV too few arguments
     CHECK_THROWS_WITH(run_script(R"(
@@ -4119,7 +4111,8 @@ TEST_CASE("cmake_parse_arguments error handling", "[interpreter]") {
             cmake_parse_arguments(PARSE_ARGV 0 MY "OPT")
         endfunction()
         test()
-    )"), Catch::Matchers::ContainsSubstring("requires 6 arguments"));
+    )"),
+                      Catch::Matchers::ContainsSubstring("requires 6 arguments"));
 
     // Test PARSE_ARGV with invalid index
     CHECK_THROWS_WITH(run_script(R"(
@@ -4127,7 +4120,8 @@ TEST_CASE("cmake_parse_arguments error handling", "[interpreter]") {
             cmake_parse_arguments(PARSE_ARGV bad MY "OPT" "" "")
         endfunction()
         test()
-    )"), Catch::Matchers::ContainsSubstring("must be a number"));
+    )"),
+                      Catch::Matchers::ContainsSubstring("must be a number"));
 
     // Test PARSE_ARGV with negative index
     CHECK_THROWS_WITH(run_script(R"(
@@ -4135,7 +4129,8 @@ TEST_CASE("cmake_parse_arguments error handling", "[interpreter]") {
             cmake_parse_arguments(PARSE_ARGV -1 MY "OPT" "" "")
         endfunction()
         test()
-    )"), Catch::Matchers::ContainsSubstring("cannot be negative"));
+    )"),
+                      Catch::Matchers::ContainsSubstring("cannot be negative"));
 }
 
 TEST_CASE("Parser handles parentheses in quoted strings", "[parser]") {
@@ -4246,7 +4241,7 @@ TEST_CASE("Empty list elements filtered in unquoted foreach", "[interpreter][bug
             message("${item}")
         endforeach()
     )");
-    REQUIRE(output == "a\nc\n");  // 2 iterations, empty element filtered
+    REQUIRE(output == "a\nc\n"); // 2 iterations, empty element filtered
 }
 
 TEST_CASE("Empty list elements preserved in IN LISTS foreach", "[interpreter][bugfix]") {
@@ -4257,7 +4252,7 @@ TEST_CASE("Empty list elements preserved in IN LISTS foreach", "[interpreter][bu
             message("${item}")
         endforeach()
     )");
-    REQUIRE(output == "a\n\nc\n");  // 3 iterations, empty element preserved
+    REQUIRE(output == "a\n\nc\n"); // 3 iterations, empty element preserved
 }
 
 TEST_CASE("Empty prefix in list expansion like CHECK_INCLUDE_FILES", "[interpreter][bugfix]") {
@@ -4270,7 +4265,7 @@ TEST_CASE("Empty prefix in list expansion like CHECK_INCLUDE_FILES", "[interpret
             message("${FILE}")
         endforeach()
     )");
-    REQUIRE(output == "sys/types.h\n");  // Empty element filtered, only header remains
+    REQUIRE(output == "sys/types.h\n"); // Empty element filtered, only header remains
 }
 
 TEST_CASE("Foreach variable is cleared after loop", "[interpreter][bugfix]") {
@@ -4324,7 +4319,7 @@ TEST_CASE("Macro argument text substitution", "[interpreter][bugfix]") {
         endmacro()
         test(old)
     )");
-    REQUIRE(output == "old\n");  // arg is text-substituted to "old", not the variable
+    REQUIRE(output == "old\n"); // arg is text-substituted to "old", not the variable
 
     output = run_script(R"(
         macro(test x)
@@ -4667,7 +4662,8 @@ TEST_CASE("if condition: EXISTS with unquoted paths", "[interpreter][if][bugfix]
 
     // Test EXISTS with unquoted path
     auto output = run_script(R"(
-        if(EXISTS )" + test_file.string() + R"()
+        if(EXISTS )" + test_file.string()
+                             + R"()
             message("EXISTS unquoted: found")
         else()
             message("EXISTS unquoted: not found")
@@ -4677,7 +4673,8 @@ TEST_CASE("if condition: EXISTS with unquoted paths", "[interpreter][if][bugfix]
 
     // Test EXISTS with quoted path
     output = run_script(R"(
-        if(EXISTS ")" + test_file.string() + R"(")
+        if(EXISTS ")" + test_file.string()
+                        + R"(")
             message("EXISTS quoted: found")
         else()
             message("EXISTS quoted: not found")
@@ -4687,7 +4684,8 @@ TEST_CASE("if condition: EXISTS with unquoted paths", "[interpreter][if][bugfix]
 
     // Test EXISTS with variable expansion
     output = run_script(R"(
-        set(TEST_PATH ")" + test_file.string() + R"(")
+        set(TEST_PATH ")"
+                        + test_file.string() + R"(")
         if(EXISTS ${TEST_PATH})
             message("EXISTS variable: found")
         else()
@@ -4698,7 +4696,8 @@ TEST_CASE("if condition: EXISTS with unquoted paths", "[interpreter][if][bugfix]
 
     // Test IS_DIRECTORY with unquoted path
     output = run_script(R"(
-        if(IS_DIRECTORY )" + temp_dir.string() + R"()
+        if(IS_DIRECTORY )"
+                        + temp_dir.string() + R"()
             message("IS_DIRECTORY unquoted: yes")
         else()
             message("IS_DIRECTORY unquoted: no")
@@ -4708,7 +4707,8 @@ TEST_CASE("if condition: EXISTS with unquoted paths", "[interpreter][if][bugfix]
 
     // Test IS_ABSOLUTE with unquoted path
     output = run_script(R"(
-        if(IS_ABSOLUTE )" + test_file.string() + R"()
+        if(IS_ABSOLUTE )"
+                        + test_file.string() + R"()
             message("IS_ABSOLUTE unquoted: yes")
         else()
             message("IS_ABSOLUTE unquoted: no")
@@ -5633,7 +5633,7 @@ TEST_CASE("cmake_path command", "[interpreter][cmake_path]") {
             cmake_path(GET mypath ROOT_NAME result)
             message("${result}")
         )");
-        REQUIRE(output == "\n");  // Unix paths don't have root names
+        REQUIRE(output == "\n"); // Unix paths don't have root names
     }
 
     SECTION("GET ROOT_DIRECTORY") {
@@ -5994,7 +5994,7 @@ TEST_CASE("cmake_path command", "[interpreter][cmake_path]") {
             cmake_path(GET mypath EXTENSION result)
             message("${result}")
         )");
-        REQUIRE(output == "\n");  // Dotfiles don't have extensions
+        REQUIRE(output == "\n"); // Dotfiles don't have extensions
     }
 
     SECTION("GET STEM on dotfile") {
@@ -6003,7 +6003,7 @@ TEST_CASE("cmake_path command", "[interpreter][cmake_path]") {
             cmake_path(GET mypath STEM result)
             message("${result}")
         )");
-        REQUIRE(output == "\n");  // Stem of dotfile is empty
+        REQUIRE(output == "\n"); // Stem of dotfile is empty
     }
 
     SECTION("NORMAL_PATH with multiple slashes and dots") {
@@ -6495,7 +6495,8 @@ TEST_CASE("Cache variables don't create local scope variables", "[interpreter][s
 
     // CACHE_VAR should remain "root_cache" because set(... CACHE STRING ...) without
     // FORCE doesn't overwrite existing cache entries. LOCAL_VAR remains in root scope.
-    REQUIRE(output == "Before function - CACHE_VAR=root_cache LOCAL_VAR=root_local\nAfter function - CACHE_VAR=root_cache LOCAL_VAR=root_local\n");
+    REQUIRE(output
+            == "Before function - CACHE_VAR=root_cache LOCAL_VAR=root_local\nAfter function - CACHE_VAR=root_cache LOCAL_VAR=root_local\n");
 }
 
 TEST_CASE("Cache variables vs local variables precedence", "[interpreter][scoping][cache]") {
@@ -6519,7 +6520,9 @@ TEST_CASE("Cache variables vs local variables precedence", "[interpreter][scopin
     )");
 
     // Local variables should shadow cache variables at each scope level
-    REQUIRE(output == "Cache only: cache_value\nWith local: local_value\nFunction sees: local_value\nFunction local: function_local\nAfter function: local_value\n");
+    REQUIRE(output
+            == "Cache only: cache_value\nWith local: local_value\nFunction sees: local_value\nFunction local: function_local\nAfter "
+               "function: local_value\n");
 }
 
 TEST_CASE("Macro parameters don't leak into nested function calls", "[interpreter][scoping][bugfix]") {
@@ -6546,7 +6549,8 @@ TEST_CASE("Macro parameters don't leak into nested function calls", "[interprete
         caller("M1" "M2" "M3")
     )");
 
-    REQUIRE(output == "macro m1=M1 m2=M2 m3=M3\nlevel1 ARGC=1 ARGV=L1_X\nlevel1 x=L1_X\nlevel2 ARGC=2 ARGV=L2_A;L2_B\nlevel2 a=L2_A b=L2_B\n");
+    REQUIRE(output
+            == "macro m1=M1 m2=M2 m3=M3\nlevel1 ARGC=1 ARGV=L1_X\nlevel1 x=L1_X\nlevel2 ARGC=2 ARGV=L2_A;L2_B\nlevel2 a=L2_A b=L2_B\n");
 }
 
 TEST_CASE("file(STRINGS) REGEX uses substring matching", "[interpreter][file][regex][bugfix]") {
@@ -6564,19 +6568,23 @@ TEST_CASE("file(STRINGS) REGEX uses substring matching", "[interpreter][file][re
         out << "Multiple ERROR and WARNING in one line\n";
     }
 
-    std::string script =
-        "file(STRINGS \"" + temp_file.string() + "\" lines REGEX \"ERROR\")\n"
-        "message(\"ERROR lines: ${lines}\")\n"
-        "\n"
-        "file(STRINGS \"" + temp_file.string() + "\" warn_lines REGEX \"WARNING\")\n"
-        "message(\"WARNING lines: ${warn_lines}\")\n";
+    std::string script = "file(STRINGS \"" + temp_file.string()
+                         + "\" lines REGEX \"ERROR\")\n"
+                           "message(\"ERROR lines: ${lines}\")\n"
+                           "\n"
+                           "file(STRINGS \""
+                         + temp_file.string()
+                         + "\" warn_lines REGEX \"WARNING\")\n"
+                           "message(\"WARNING lines: ${warn_lines}\")\n";
 
     auto output = run_script(script);
 
     std::filesystem::remove(temp_file);
 
     // Should find lines containing the regex pattern as a substring
-    REQUIRE(output == "ERROR lines: This line contains ERROR message;Multiple ERROR and WARNING in one line\nWARNING lines: Another line with WARNING text;Multiple ERROR and WARNING in one line\n");
+    REQUIRE(output
+            == "ERROR lines: This line contains ERROR message;Multiple ERROR and WARNING in one line\nWARNING lines: Another line with "
+               "WARNING text;Multiple ERROR and WARNING in one line\n");
 }
 
 TEST_CASE("file(STRINGS) REGEX sets CMAKE_MATCH_* variables", "[interpreter][file][regex][bugfix]") {
@@ -6591,13 +6599,13 @@ TEST_CASE("file(STRINGS) REGEX sets CMAKE_MATCH_* variables", "[interpreter][fil
         out << "Version: 7.8.9\n";
     }
 
-    std::string script =
-        "file(STRINGS \"" + temp_file.string() + "\" lines REGEX \"Version: ([0-9]+)\\\\.([0-9]+)\\\\.([0-9]+)\")\n"
-        "message(\"CMAKE_MATCH_COUNT=${CMAKE_MATCH_COUNT}\")\n"
-        "message(\"CMAKE_MATCH_0=${CMAKE_MATCH_0}\")\n"
-        "message(\"CMAKE_MATCH_1=${CMAKE_MATCH_1}\")\n"
-        "message(\"CMAKE_MATCH_2=${CMAKE_MATCH_2}\")\n"
-        "message(\"CMAKE_MATCH_3=${CMAKE_MATCH_3}\")\n";
+    std::string script = "file(STRINGS \"" + temp_file.string()
+                         + "\" lines REGEX \"Version: ([0-9]+)\\\\.([0-9]+)\\\\.([0-9]+)\")\n"
+                           "message(\"CMAKE_MATCH_COUNT=${CMAKE_MATCH_COUNT}\")\n"
+                           "message(\"CMAKE_MATCH_0=${CMAKE_MATCH_0}\")\n"
+                           "message(\"CMAKE_MATCH_1=${CMAKE_MATCH_1}\")\n"
+                           "message(\"CMAKE_MATCH_2=${CMAKE_MATCH_2}\")\n"
+                           "message(\"CMAKE_MATCH_3=${CMAKE_MATCH_3}\")\n";
 
     auto output = run_script(script);
 
@@ -6726,7 +6734,10 @@ TEST_CASE("Macro replaces function with same name", "[interpreter][function][mac
 TEST_CASE("add_definitions strips -D prefix", "[interpreter][directory_properties]") {
     std::string temp_dir = "build_test_add_definitions";
     std::filesystem::create_directories(temp_dir);
-    { std::ofstream f("test.cpp"); f << "int main() { return 0; }\n"; }
+    {
+        std::ofstream f("test.cpp");
+        f << "int main() { return 0; }\n";
+    }
 
     kiln::Interpreter interp(".", &std::cout, &std::cerr, temp_dir);
 
@@ -6758,7 +6769,10 @@ TEST_CASE("add_definitions strips -D prefix", "[interpreter][directory_propertie
 TEST_CASE("add_compile_definitions does not strip prefix", "[interpreter][directory_properties]") {
     std::string temp_dir = "build_test_add_compile_definitions";
     std::filesystem::create_directories(temp_dir);
-    { std::ofstream f("test.cpp"); f << "int main() { return 0; }\n"; }
+    {
+        std::ofstream f("test.cpp");
+        f << "int main() { return 0; }\n";
+    }
 
     kiln::Interpreter interp(".", &std::cout, &std::cerr, temp_dir);
 
@@ -6787,7 +6801,10 @@ TEST_CASE("add_compile_definitions does not strip prefix", "[interpreter][direct
 TEST_CASE("add_compile_options applies to targets", "[interpreter][directory_properties]") {
     std::string temp_dir = "build_test_add_compile_options";
     std::filesystem::create_directories(temp_dir);
-    { std::ofstream f("test.cpp"); f << "int main() { return 0; }\n"; }
+    {
+        std::ofstream f("test.cpp");
+        f << "int main() { return 0; }\n";
+    }
 
     kiln::Interpreter interp(".", &std::cout, &std::cerr, temp_dir);
 
@@ -6816,7 +6833,10 @@ TEST_CASE("add_compile_options applies to targets", "[interpreter][directory_pro
 TEST_CASE("add_link_options applies to targets", "[interpreter][directory_properties]") {
     std::string temp_dir = "build_test_add_link_options";
     std::filesystem::create_directories(temp_dir);
-    { std::ofstream f("test.cpp"); f << "int main() { return 0; }\n"; }
+    {
+        std::ofstream f("test.cpp");
+        f << "int main() { return 0; }\n";
+    }
 
     kiln::Interpreter interp(".", &std::cout, &std::cerr, temp_dir);
 
@@ -6844,8 +6864,14 @@ TEST_CASE("add_link_options applies to targets", "[interpreter][directory_proper
 TEST_CASE("link_libraries applies to targets", "[interpreter][directory_properties]") {
     std::string temp_dir = "build_test_link_libraries";
     std::filesystem::create_directories(temp_dir);
-    { std::ofstream f("test.cpp"); f << "int main() { return 0; }\n"; }
-    { std::ofstream f("lib.cpp"); f << "void lib_func() {}\n"; }
+    {
+        std::ofstream f("test.cpp");
+        f << "int main() { return 0; }\n";
+    }
+    {
+        std::ofstream f("lib.cpp");
+        f << "void lib_func() {}\n";
+    }
 
     kiln::Interpreter interp(".", &std::cout, &std::cerr, temp_dir);
 
@@ -6878,8 +6904,14 @@ TEST_CASE("link_libraries applies to targets", "[interpreter][directory_properti
 TEST_CASE("Directory properties apply retroactively", "[interpreter][directory_properties]") {
     std::string temp_dir = "build_test_retroactive";
     std::filesystem::create_directories(temp_dir);
-    { std::ofstream f("before.cpp"); f << "int main() { return 0; }\n"; }
-    { std::ofstream f("after.cpp"); f << "int main() { return 0; }\n"; }
+    {
+        std::ofstream f("before.cpp");
+        f << "int main() { return 0; }\n";
+    }
+    {
+        std::ofstream f("after.cpp");
+        f << "int main() { return 0; }\n";
+    }
 
     kiln::Interpreter interp(".", &std::cout, &std::cerr, temp_dir);
 
@@ -6918,7 +6950,10 @@ TEST_CASE("Directory properties apply retroactively", "[interpreter][directory_p
 TEST_CASE("Multiple directory properties accumulate", "[interpreter][directory_properties]") {
     std::string temp_dir = "build_test_accumulate";
     std::filesystem::create_directories(temp_dir);
-    { std::ofstream f("test.cpp"); f << "int main() { return 0; }\n"; }
+    {
+        std::ofstream f("test.cpp");
+        f << "int main() { return 0; }\n";
+    }
 
     kiln::Interpreter interp(".", &std::cout, &std::cerr, temp_dir);
 
@@ -7075,7 +7110,9 @@ TEST_CASE("VERSION comparison component-wise", "[interpreter][if][version]") {
             else()
                 message(STATUS "FAIL")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
     }
 
     SECTION("1.2 < 1.10 (not lexicographic)") {
@@ -7085,7 +7122,9 @@ TEST_CASE("VERSION comparison component-wise", "[interpreter][if][version]") {
             else()
                 message(STATUS "FAIL")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
     }
 
     SECTION("Missing components treated as zero") {
@@ -7093,19 +7132,25 @@ TEST_CASE("VERSION comparison component-wise", "[interpreter][if][version]") {
             if("1" VERSION_EQUAL "1.0")
                 message(STATUS "PASS")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
 
         CHECK(run_script(R"(
             if("1" VERSION_EQUAL "1.0.0")
                 message(STATUS "PASS")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
 
         CHECK(run_script(R"(
             if("1.0" VERSION_EQUAL "1.0.0")
                 message(STATUS "PASS")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
     }
 
     SECTION("Multi-component comparison") {
@@ -7113,13 +7158,17 @@ TEST_CASE("VERSION comparison component-wise", "[interpreter][if][version]") {
             if("3.21.1" VERSION_GREATER "3.21")
                 message(STATUS "PASS")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
 
         CHECK(run_script(R"(
             if("1.0.0.1" VERSION_GREATER "1.0.0")
                 message(STATUS "PASS")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
     }
 
     SECTION("VERSION_LESS_EQUAL and VERSION_GREATER_EQUAL") {
@@ -7127,19 +7176,25 @@ TEST_CASE("VERSION comparison component-wise", "[interpreter][if][version]") {
             if("1.0" VERSION_LESS_EQUAL "1.0")
                 message(STATUS "PASS")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
 
         CHECK(run_script(R"(
             if("1.0" VERSION_GREATER_EQUAL "1.0")
                 message(STATUS "PASS")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
 
         CHECK(run_script(R"(
             if("1.9" VERSION_LESS_EQUAL "1.10")
                 message(STATUS "PASS")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
     }
 }
 
@@ -7153,7 +7208,9 @@ TEST_CASE("Truthiness - CMake exact rules", "[interpreter][if][truthiness]") {
             else()
                 message(STATUS "FAIL")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
 
         CHECK(run_script(R"(
             set(V "3.14abc")
@@ -7162,7 +7219,9 @@ TEST_CASE("Truthiness - CMake exact rules", "[interpreter][if][truthiness]") {
             else()
                 message(STATUS "FAIL")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
     }
 
     SECTION("Only exact '0' is falsy, not variants") {
@@ -7174,7 +7233,9 @@ TEST_CASE("Truthiness - CMake exact rules", "[interpreter][if][truthiness]") {
             else()
                 message(STATUS "PASS")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
 
         // "0.0" is truthy
         CHECK(run_script(R"(
@@ -7184,7 +7245,9 @@ TEST_CASE("Truthiness - CMake exact rules", "[interpreter][if][truthiness]") {
             else()
                 message(STATUS "FAIL")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
 
         // "00" is truthy
         CHECK(run_script(R"(
@@ -7194,7 +7257,9 @@ TEST_CASE("Truthiness - CMake exact rules", "[interpreter][if][truthiness]") {
             else()
                 message(STATUS "FAIL")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
 
         // "-0" is truthy
         CHECK(run_script(R"(
@@ -7204,7 +7269,9 @@ TEST_CASE("Truthiness - CMake exact rules", "[interpreter][if][truthiness]") {
             else()
                 message(STATUS "FAIL")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
 
         // "+0" is truthy
         CHECK(run_script(R"(
@@ -7214,7 +7281,9 @@ TEST_CASE("Truthiness - CMake exact rules", "[interpreter][if][truthiness]") {
             else()
                 message(STATUS "FAIL")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
     }
 
     SECTION("Strings with trailing space are truthy") {
@@ -7225,7 +7294,9 @@ TEST_CASE("Truthiness - CMake exact rules", "[interpreter][if][truthiness]") {
             else()
                 message(STATUS "FAIL")
             endif()
-        )").find("PASS") != std::string::npos);
+        )")
+                  .find("PASS")
+              != std::string::npos);
     }
 }
 
@@ -7236,41 +7307,54 @@ TEST_CASE("IS_NEWER_THAN operator", "[interpreter][if][is_newer_than]") {
 
     SECTION("Newer file returns true") {
         auto td = temp_dir.string();
-        CHECK(run_script(
-            "file(MAKE_DIRECTORY \"" + td + "\")\n"
-            "file(WRITE \"" + td + "/older.txt\" \"older\")\n"
-            "execute_process(COMMAND sleep 0.1)\n"
-            "file(WRITE \"" + td + "/newer.txt\" \"newer\")\n"
-            "if(\"" + td + "/newer.txt\" IS_NEWER_THAN \"" + td + "/older.txt\")\n"
-            "    message(STATUS \"PASS\")\n"
-            "else()\n"
-            "    message(STATUS \"FAIL\")\n"
-            "endif()\n"
-        ).find("PASS") != std::string::npos);
+        CHECK(run_script("file(MAKE_DIRECTORY \"" + td
+                         + "\")\n"
+                           "file(WRITE \""
+                         + td
+                         + "/older.txt\" \"older\")\n"
+                           "execute_process(COMMAND sleep 0.1)\n"
+                           "file(WRITE \""
+                         + td
+                         + "/newer.txt\" \"newer\")\n"
+                           "if(\""
+                         + td + "/newer.txt\" IS_NEWER_THAN \"" + td
+                         + "/older.txt\")\n"
+                           "    message(STATUS \"PASS\")\n"
+                           "else()\n"
+                           "    message(STATUS \"FAIL\")\n"
+                           "endif()\n")
+                  .find("PASS")
+              != std::string::npos);
     }
 
     SECTION("Missing file returns true") {
         auto td = temp_dir.string();
-        CHECK(run_script(
-            "file(WRITE \"" + td + "/exists_file.txt\" \"exists\")\n"
-            "if(\"" + td + "/nonexistent_file_12345.txt\" IS_NEWER_THAN \"" + td + "/exists_file.txt\")\n"
-            "    message(STATUS \"PASS\")\n"
-            "else()\n"
-            "    message(STATUS \"FAIL\")\n"
-            "endif()\n"
-        ).find("PASS") != std::string::npos);
+        CHECK(run_script("file(WRITE \"" + td
+                         + "/exists_file.txt\" \"exists\")\n"
+                           "if(\""
+                         + td + "/nonexistent_file_12345.txt\" IS_NEWER_THAN \"" + td
+                         + "/exists_file.txt\")\n"
+                           "    message(STATUS \"PASS\")\n"
+                           "else()\n"
+                           "    message(STATUS \"FAIL\")\n"
+                           "endif()\n")
+                  .find("PASS")
+              != std::string::npos);
     }
 
     SECTION("Same file returns true (equal mtime)") {
         auto td = temp_dir.string();
-        CHECK(run_script(
-            "file(WRITE \"" + td + "/same_file.txt\" \"content\")\n"
-            "if(\"" + td + "/same_file.txt\" IS_NEWER_THAN \"" + td + "/same_file.txt\")\n"
-            "    message(STATUS \"PASS\")\n"
-            "else()\n"
-            "    message(STATUS \"FAIL\")\n"
-            "endif()\n"
-        ).find("PASS") != std::string::npos);
+        CHECK(run_script("file(WRITE \"" + td
+                         + "/same_file.txt\" \"content\")\n"
+                           "if(\""
+                         + td + "/same_file.txt\" IS_NEWER_THAN \"" + td
+                         + "/same_file.txt\")\n"
+                           "    message(STATUS \"PASS\")\n"
+                           "else()\n"
+                           "    message(STATUS \"FAIL\")\n"
+                           "endif()\n")
+                  .find("PASS")
+              != std::string::npos);
     }
 
     cleanup();
@@ -7282,13 +7366,11 @@ TEST_CASE("execute_process reports redirect open failures", "[interpreter][execu
     std::filesystem::create_directories(temp_dir);
     auto missing_dir = (temp_dir / "missing").string();
 
-    CHECK_THROWS_WITH(run_script(
-        "execute_process(COMMAND echo hi OUTPUT_FILE \"" + missing_dir + "/out.txt\")\n"
-    ), Catch::Matchers::ContainsSubstring("Failed to open OUTPUT_FILE"));
+    CHECK_THROWS_WITH(run_script("execute_process(COMMAND echo hi OUTPUT_FILE \"" + missing_dir + "/out.txt\")\n"),
+                      Catch::Matchers::ContainsSubstring("Failed to open OUTPUT_FILE"));
 
-    CHECK_THROWS_WITH(run_script(
-        "execute_process(COMMAND sh -c \"echo err >&2\" ERROR_FILE \"" + missing_dir + "/err.txt\")\n"
-    ), Catch::Matchers::ContainsSubstring("Failed to open ERROR_FILE"));
+    CHECK_THROWS_WITH(run_script("execute_process(COMMAND sh -c \"echo err >&2\" ERROR_FILE \"" + missing_dir + "/err.txt\")\n"),
+                      Catch::Matchers::ContainsSubstring("Failed to open ERROR_FILE"));
 
     std::filesystem::remove_all(temp_dir);
 }
@@ -7450,7 +7532,7 @@ TEST_CASE("if condition: undefined variable before binary operator", "[interpret
                 message("N")
             endif()
         )");
-        REQUIRE(output == "N\n");  // VAR is truthy, NOT VAR is false
+        REQUIRE(output == "N\n"); // VAR is truthy, NOT VAR is false
 
         output = run_script(R"(
             if(NOT UNDEFINED_VAR)
@@ -7459,7 +7541,7 @@ TEST_CASE("if condition: undefined variable before binary operator", "[interpret
                 message("N")
             endif()
         )");
-        REQUIRE(output == "Y\n");  // UNDEFINED_VAR is falsy, NOT UNDEFINED_VAR is true
+        REQUIRE(output == "Y\n"); // UNDEFINED_VAR is falsy, NOT UNDEFINED_VAR is true
     }
 
     SECTION("Binary operator without left operand errors (except MATCHES)") {
@@ -7469,25 +7551,29 @@ TEST_CASE("if condition: undefined variable before binary operator", "[interpret
             if(STREQUAL "")
                 message("Y")
             endif()
-        )"), Catch::Matchers::ContainsSubstring("missing left operand"));
+        )"),
+                          Catch::Matchers::ContainsSubstring("missing left operand"));
 
         CHECK_THROWS_WITH(run_script(R"(
             if(EQUAL 5)
                 message("Y")
             endif()
-        )"), Catch::Matchers::ContainsSubstring("missing left operand"));
+        )"),
+                          Catch::Matchers::ContainsSubstring("missing left operand"));
 
         CHECK_THROWS_WITH(run_script(R"(
             if(LESS 5)
                 message("Y")
             endif()
-        )"), Catch::Matchers::ContainsSubstring("missing left operand"));
+        )"),
+                          Catch::Matchers::ContainsSubstring("missing left operand"));
 
         CHECK_THROWS_WITH(run_script(R"(
             if(VERSION_LESS "1.0")
                 message("Y")
             endif()
-        )"), Catch::Matchers::ContainsSubstring("missing left operand"));
+        )"),
+                          Catch::Matchers::ContainsSubstring("missing left operand"));
     }
 }
 
@@ -7843,8 +7929,8 @@ TEST_CASE("Multi-line generator expressions", "[interpreter][multiline][genex]")
         )");
         // Each line becomes a separate argument, joined with semicolons
         // Verify no newlines or extra whitespace in output
-        REQUIRE(output.find('\n') == output.size() - 1);  // Only trailing newline
-        REQUIRE(output.find("    ") == std::string::npos);  // No indentation preserved
+        REQUIRE(output.find('\n') == output.size() - 1);   // Only trailing newline
+        REQUIRE(output.find("    ") == std::string::npos); // No indentation preserved
         REQUIRE(output == "$<$<BOOL:TRUE>:;-Wall;-Wextra;>\n");
     }
 
@@ -8026,13 +8112,15 @@ TEST_CASE("cmake_minimum_required accepts exact version", "[interpreter][cmake_m
 TEST_CASE("cmake_minimum_required rejects version higher than supported", "[interpreter][cmake_minimum_required]") {
     REQUIRE_THROWS_WITH(run_script(R"(
         cmake_minimum_required(VERSION 99.0)
-    )"), Catch::Matchers::ContainsSubstring("or higher is required"));
+    )"),
+                        Catch::Matchers::ContainsSubstring("or higher is required"));
 }
 
 TEST_CASE("cmake_minimum_required range with high minimum rejects", "[interpreter][cmake_minimum_required]") {
     REQUIRE_THROWS_WITH(run_script(R"(
         cmake_minimum_required(VERSION 99.0...100.0)
-    )"), Catch::Matchers::ContainsSubstring("or higher is required"));
+    )"),
+                        Catch::Matchers::ContainsSubstring("or higher is required"));
 }
 
 TEST_CASE("cmake_minimum_required with FATAL_ERROR keyword", "[interpreter][cmake_minimum_required]") {
@@ -8417,7 +8505,7 @@ TEST_CASE("Parser warns on old-style control flow commands", "[parser][warning]"
     std::cerr.rdbuf(old);
 
     REQUIRE(ast_or_error.has_value());
-    
+
     std::string warnings = buffer.str();
 
     // Assert that the matching cases did NOT generate warnings
@@ -8435,9 +8523,12 @@ TEST_CASE("Parser warns on old-style control flow commands", "[parser][warning]"
     // Assert that non-matching cases DID generate warnings
     CHECK(warnings.find("old style CMake syntax: 'else(...)' has arguments that do not match the opening command.") != std::string::npos);
     CHECK(warnings.find("old style CMake syntax: 'endif(...)' has arguments that do not match the opening command.") != std::string::npos);
-    CHECK(warnings.find("old style CMake syntax: 'endfunction(...)' has arguments that do not match the opening command.") != std::string::npos);
-    CHECK(warnings.find("old style CMake syntax: 'endmacro(...)' has arguments that do not match the opening command.") != std::string::npos);
-    CHECK(warnings.find("old style CMake syntax: 'endforeach(...)' has arguments that do not match the opening command.") != std::string::npos);
-    CHECK(warnings.find("old style CMake syntax: 'endwhile(...)' has arguments that do not match the opening command.") != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endfunction(...)' has arguments that do not match the opening command.")
+          != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endmacro(...)' has arguments that do not match the opening command.")
+          != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endforeach(...)' has arguments that do not match the opening command.")
+          != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endwhile(...)' has arguments that do not match the opening command.")
+          != std::string::npos);
 }
-

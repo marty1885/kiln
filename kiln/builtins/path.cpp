@@ -61,9 +61,7 @@ void handle_get(Interpreter& interp, const std::vector<std::string>& args) {
                 result = "";
             } else {
                 size_t dot_pos = last_only ? fname.find_last_of('.') : fname.find_first_of('.', 1);
-                if (dot_pos != std::string::npos && dot_pos > 0) {
-                    result = std::string(fname.substr(dot_pos));
-                }
+                if (dot_pos != std::string::npos && dot_pos > 0) { result = std::string(fname.substr(dot_pos)); }
             }
         }
     } else if (ci_equals(component, "STEM")) {
@@ -110,7 +108,7 @@ void handle_has(Interpreter& interp, const std::vector<std::string>& args) {
     bool result = false;
 
     if (ci_equals(subcommand, "HAS_ROOT_NAME")) {
-        result = false;  // Unix: never has root name
+        result = false; // Unix: never has root name
     } else if (ci_equals(subcommand, "HAS_ROOT_DIRECTORY")) {
         result = path.is_absolute();
     } else if (ci_equals(subcommand, "HAS_ROOT_PATH")) {
@@ -207,9 +205,7 @@ void handle_is(Interpreter& interp, const std::vector<std::string>& args) {
             ++other_it;
         }
 
-        if (path_it != prefix_path.end()) {
-            result = false;
-        }
+        if (path_it != prefix_path.end()) { result = false; }
     } else {
         interp.set_fatal_error("cmake_path: unknown query '" + args[2] + "'");
         return;
@@ -257,9 +253,7 @@ void handle_set(Interpreter& interp, const std::vector<std::string>& args) {
 
     // Check for NORMALIZE flag
     for (size_t i = 3; i < args.size(); ++i) {
-        if (ci_equals(args[i], "NORMALIZE")) {
-            normalize = true;
-        }
+        if (ci_equals(args[i], "NORMALIZE")) { normalize = true; }
     }
 
     if (normalize) {
@@ -293,9 +287,7 @@ void handle_append(Interpreter& interp, std::vector<std::string> args) {
     }
 
     // Append all remaining arguments as path components
-    for (size_t i = 2; i < args.size(); ++i) {
-        path = path / args[i];
-    }
+    for (size_t i = 2; i < args.size(); ++i) { path = path / args[i]; }
 
     interp.set_variable(output_var, path.str());
 }
@@ -324,9 +316,7 @@ void handle_append_string(Interpreter& interp, std::vector<std::string> args) {
     }
 
     // Append all remaining arguments as strings
-    for (size_t i = 2; i < args.size(); ++i) {
-        path_str += args[i];
-    }
+    for (size_t i = 2; i < args.size(); ++i) { path_str += args[i]; }
 
     interp.set_variable(output_var, path_str);
 }
@@ -343,9 +333,7 @@ void handle_remove_filename(Interpreter& interp, const std::vector<std::string>&
 
     // Check for OUTPUT_VARIABLE
     std::string output_var = path_var;
-    if (args.size() > 2 && ci_equals(args[2], "OUTPUT_VARIABLE") && args.size() > 3) {
-        output_var = args[3];
-    }
+    if (args.size() > 2 && ci_equals(args[2], "OUTPUT_VARIABLE") && args.size() > 3) { output_var = args[3]; }
 
     // parent_path gives the directory part; add trailing slash to match CMake behavior
     auto pp = path.parent_path();
@@ -370,9 +358,7 @@ void handle_replace_filename(Interpreter& interp, const std::vector<std::string>
 
     // Check for OUTPUT_VARIABLE
     std::string output_var = path_var;
-    if (args.size() > 3 && ci_equals(args[3], "OUTPUT_VARIABLE") && args.size() > 4) {
-        output_var = args[4];
-    }
+    if (args.size() > 3 && ci_equals(args[3], "OUTPUT_VARIABLE") && args.size() > 4) { output_var = args[4]; }
 
     // Replace filename: parent_path / new_filename
     interp.set_variable(output_var, Path::join(path.parent_path(), new_filename));
@@ -459,9 +445,7 @@ void handle_replace_extension(Interpreter& interp, const std::vector<std::string
     }
 
     // Ensure extension starts with '.' if not empty
-    if (!new_ext.empty() && new_ext[0] != '.') {
-        new_ext = "." + new_ext;
-    }
+    if (!new_ext.empty() && new_ext[0] != '.') { new_ext = "." + new_ext; }
 
     interp.set_variable(output_var, Path::join(path.parent_path(), stem + new_ext));
 }
@@ -538,9 +522,7 @@ void handle_absolute_path(Interpreter& interp, const std::vector<std::string>& a
 
     Path result = path.is_absolute() ? path : Path(Path::join(base_dir, path.str()));
 
-    if (normalize) {
-        result = result.lexically_normal();
-    }
+    if (normalize) { result = result.lexically_normal(); }
 
     interp.set_variable(out_var, result.str());
 }
@@ -566,9 +548,7 @@ void handle_native_path(Interpreter& interp, const std::vector<std::string>& arg
         }
     }
 
-    if (normalize) {
-        path_str = Path(path_str).lexically_normal().str();
-    }
+    if (normalize) { path_str = Path(path_str).lexically_normal().str(); }
 
     // On Unix, native path == cmake path (forward slashes)
     interp.set_variable(out_var, path_str);
@@ -705,9 +685,7 @@ void register_path_builtins(Interpreter& interp) {
             auto name = path.filename();
             if (!name.empty() && !is_dotfile(name)) {
                 size_t first_dot = name.find_first_of('.', 1);
-                if (first_dot != std::string::npos) {
-                    result = std::string(name.substr(first_dot));
-                }
+                if (first_dot != std::string::npos) { result = std::string(name.substr(first_dot)); }
             }
         } else if (mode == "NAME_WE") {
             auto name = path.filename();
@@ -727,9 +705,7 @@ void register_path_builtins(Interpreter& interp) {
             auto name = path.filename();
             if (!name.empty() && !is_dotfile(name)) {
                 size_t last_dot = name.find_last_of('.');
-                if (last_dot != std::string::npos && last_dot > 0) {
-                    result = std::string(name.substr(last_dot));
-                }
+                if (last_dot != std::string::npos && last_dot > 0) { result = std::string(name.substr(last_dot)); }
             }
         } else if (mode == "NAME_WLE") {
             auto name = path.filename();
@@ -748,8 +724,7 @@ void register_path_builtins(Interpreter& interp) {
         } else if (mode == "ABSOLUTE" || mode == "REALPATH") {
             Path abs_path = path;
             if (!path.is_absolute()) {
-                std::string base = !base_dir.empty() ?
-                    base_dir : interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
+                std::string base = !base_dir.empty() ? base_dir : interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
                 abs_path = Path(Path::join(base, path.str()));
             }
 
@@ -779,15 +754,13 @@ void register_path_builtins(Interpreter& interp) {
             handle_get(interp, args);
         }
         // HAS_* queries
-        else if (ci_equals(subcmd, "HAS_ROOT_NAME") || ci_equals(subcmd, "HAS_ROOT_DIRECTORY") ||
-                 ci_equals(subcmd, "HAS_ROOT_PATH") || ci_equals(subcmd, "HAS_FILENAME") ||
-                 ci_equals(subcmd, "HAS_EXTENSION") || ci_equals(subcmd, "HAS_STEM") ||
-                 ci_equals(subcmd, "HAS_RELATIVE_PATH") || ci_equals(subcmd, "HAS_PARENT_PATH")) {
+        else if (ci_equals(subcmd, "HAS_ROOT_NAME") || ci_equals(subcmd, "HAS_ROOT_DIRECTORY") || ci_equals(subcmd, "HAS_ROOT_PATH")
+                 || ci_equals(subcmd, "HAS_FILENAME") || ci_equals(subcmd, "HAS_EXTENSION") || ci_equals(subcmd, "HAS_STEM")
+                 || ci_equals(subcmd, "HAS_RELATIVE_PATH") || ci_equals(subcmd, "HAS_PARENT_PATH")) {
             handle_has(interp, args);
         }
         // IS_* queries
-        else if (ci_equals(subcmd, "IS_ABSOLUTE") || ci_equals(subcmd, "IS_RELATIVE") ||
-                 ci_equals(subcmd, "IS_PREFIX")) {
+        else if (ci_equals(subcmd, "IS_ABSOLUTE") || ci_equals(subcmd, "IS_RELATIVE") || ci_equals(subcmd, "IS_PREFIX")) {
             handle_is(interp, args);
         }
         // COMPARE
@@ -845,8 +818,7 @@ void register_path_builtins(Interpreter& interp) {
         // HASH
         else if (ci_equals(subcmd, "HASH")) {
             handle_hash(interp, args);
-        }
-        else {
+        } else {
             interp.set_fatal_error("cmake_path: unknown subcommand '" + args[0] + "'");
         }
     });

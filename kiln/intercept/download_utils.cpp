@@ -13,10 +13,7 @@ namespace kiln {
 
 // ── DownloadProgress ──────────────────────────────────────────────────
 
-DownloadProgress::DownloadProgress(std::ostream* stream)
-    : stream_(stream)
-    , is_tty_(stream && is_color_enabled(*stream))
-{}
+DownloadProgress::DownloadProgress(std::ostream* stream) : stream_(stream), is_tty_(stream && is_color_enabled(*stream)) {}
 
 void DownloadProgress::apply(void* curl) {
     if (!stream_) return;
@@ -35,8 +32,7 @@ void DownloadProgress::finish() {
     *stream_ << "\n";
 }
 
-int DownloadProgress::curl_callback(void* clientp, long long dltotal, long long dlnow,
-                                     long long /*ultotal*/, long long /*ulnow*/) {
+int DownloadProgress::curl_callback(void* clientp, long long dltotal, long long dlnow, long long /*ultotal*/, long long /*ulnow*/) {
     auto* self = static_cast<DownloadProgress*>(clientp);
     if (dltotal > 0) {
         int pct = static_cast<int>(dlnow * 100 / dltotal);
@@ -44,9 +40,7 @@ int DownloadProgress::curl_callback(void* clientp, long long dltotal, long long 
             if (self->is_tty_) {
                 *self->stream_ << "\r[download] " << pct << "% (" << dlnow << "/" << dltotal << " bytes)" << std::flush;
             } else {
-                for (int p = self->last_pct_ + 1; p <= pct; ++p) {
-                    *self->stream_ << '*';
-                }
+                for (int p = self->last_pct_ + 1; p <= pct; ++p) { *self->stream_ << '*'; }
                 self->stream_->flush();
             }
             self->last_pct_ = pct;
@@ -57,19 +51,13 @@ int DownloadProgress::curl_callback(void* clientp, long long dltotal, long long 
 
 // ── download_url ──────────────────────────────────────────────────────
 
-std::expected<void, std::string> download_url(
-    const std::string& url,
-    const std::string& dest_file,
-    const std::string& hash_algo,
-    const std::string& hash_value,
-    std::ostream* progress_stream)
-{
+std::expected<void, std::string> download_url(const std::string& url, const std::string& dest_file, const std::string& hash_algo,
+                                              const std::string& hash_value, std::ostream* progress_stream) {
     // If we have a hash and the file exists, check if it already matches
     if (!hash_algo.empty() && !hash_value.empty() && std::filesystem::exists(dest_file)) {
         std::ifstream existing(dest_file, std::ios::binary);
         if (existing) {
-            std::string content((std::istreambuf_iterator<char>(existing)),
-                                std::istreambuf_iterator<char>());
+            std::string content((std::istreambuf_iterator<char>(existing)), std::istreambuf_iterator<char>());
             std::string existing_hash;
             if (hash_algo == "SHA256") {
                 existing_hash = sha256(content).to_string();
@@ -77,11 +65,9 @@ std::expected<void, std::string> download_url(
                 existing_hash = md5(content).to_string();
             }
             std::string normalized_expected = hash_value;
-            std::transform(normalized_expected.begin(), normalized_expected.end(),
-                           normalized_expected.begin(), [](unsigned char c) { return std::tolower(c); });
-            if (existing_hash == normalized_expected) {
-                return {};
-            }
+            std::transform(normalized_expected.begin(), normalized_expected.end(), normalized_expected.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            if (existing_hash == normalized_expected) { return {}; }
         }
     }
 
@@ -98,9 +84,7 @@ std::expected<void, std::string> download_url(
     };
 
     CURL* curl = curl_easy_init();
-    if (!curl) {
-        return std::unexpected<std::string>("Failed to initialize curl");
-    }
+    if (!curl) { return std::unexpected<std::string>("Failed to initialize curl"); }
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
@@ -117,16 +101,11 @@ std::expected<void, std::string> download_url(
 
     CURLcode res = curl_easy_perform(curl);
 
-    if (res == CURLE_OK) {
-        progress.finish();
-    }
+    if (res == CURLE_OK) { progress.finish(); }
 
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK) {
-        return std::unexpected<std::string>(
-            "Download failed for \"" + url + "\": " + curl_easy_strerror(res));
-    }
+    if (res != CURLE_OK) { return std::unexpected<std::string>("Download failed for \"" + url + "\": " + curl_easy_strerror(res)); }
 
     // Verify hash
     if (!hash_algo.empty() && !hash_value.empty()) {
@@ -139,11 +118,11 @@ std::expected<void, std::string> download_url(
             return std::unexpected<std::string>("Unsupported hash algorithm: " + hash_algo);
         }
         std::string normalized_expected = hash_value;
-        std::transform(normalized_expected.begin(), normalized_expected.end(),
-                       normalized_expected.begin(), [](unsigned char c) { return std::tolower(c); });
+        std::transform(normalized_expected.begin(), normalized_expected.end(), normalized_expected.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
         if (computed != normalized_expected) {
-            return std::unexpected<std::string>(
-                "Hash mismatch for \"" + url + "\"\n  expected: " + normalized_expected + "\n  actual:   " + computed);
+            return std::unexpected<std::string>("Hash mismatch for \"" + url + "\"\n  expected: " + normalized_expected
+                                                + "\n  actual:   " + computed);
         }
     }
 
@@ -151,21 +130,14 @@ std::expected<void, std::string> download_url(
     std::filesystem::path out_path(dest_file);
     std::filesystem::create_directories(out_path.parent_path());
     std::ofstream out(out_path, std::ios::binary);
-    if (!out) {
-        return std::unexpected<std::string>("Could not write to: " + dest_file);
-    }
+    if (!out) { return std::unexpected<std::string>("Could not write to: " + dest_file); }
     out.write(dl_data.buffer.data(), static_cast<std::streamsize>(dl_data.buffer.size()));
 
     return {};
 }
 
-std::expected<void, std::string> extract_archive(
-    const std::string& archive_path,
-    const std::string& dest_dir)
-{
-    if (!std::filesystem::exists(archive_path)) {
-        return std::unexpected<std::string>("Archive does not exist: " + archive_path);
-    }
+std::expected<void, std::string> extract_archive(const std::string& archive_path, const std::string& dest_dir) {
+    if (!std::filesystem::exists(archive_path)) { return std::unexpected<std::string>("Archive does not exist: " + archive_path); }
 
     std::filesystem::create_directories(dest_dir);
 
@@ -217,12 +189,7 @@ std::expected<void, std::string> extract_archive(
     return {};
 }
 
-std::expected<void, std::string> git_clone(
-    const std::string& repo_url,
-    const std::string& dest_dir,
-    const std::string& tag,
-    bool shallow)
-{
+std::expected<void, std::string> git_clone(const std::string& repo_url, const std::string& dest_dir, const std::string& tag, bool shallow) {
     // Strategy: try --branch first (works for branches/tags, efficient for shallow).
     // If that fails, fall back to full clone + checkout (works for commit hashes).
 
@@ -239,9 +206,7 @@ std::expected<void, std::string> git_clone(
         cmd.push_back(dest_dir);
 
         auto result = run_command(cmd);
-        if (result.exit_code == 0) {
-            return {};
-        }
+        if (result.exit_code == 0) { return {}; }
 
         // --branch failed (likely a commit hash). Fall back to clone + checkout.
         // Clean up any partial clone first.
@@ -252,37 +217,24 @@ std::expected<void, std::string> git_clone(
     // Clone without --branch (gets default branch)
     std::vector<std::string> cmd = {"git", "clone", "--", repo_url, dest_dir};
     auto result = run_command(cmd);
-    if (result.exit_code != 0) {
-        return std::unexpected<std::string>(
-            "git clone failed for " + repo_url + ":\n" + result.output);
-    }
+    if (result.exit_code != 0) { return std::unexpected<std::string>("git clone failed for " + repo_url + ":\n" + result.output); }
 
     // Checkout the specific ref if requested
     if (!tag.empty()) {
         auto checkout = run_command(std::vector<std::string>{"git", "-C", dest_dir, "checkout", tag});
-        if (checkout.exit_code != 0) {
-            return std::unexpected<std::string>(
-                "git checkout failed for " + tag + ":\n" + checkout.output);
-        }
+        if (checkout.exit_code != 0) { return std::unexpected<std::string>("git checkout failed for " + tag + ":\n" + checkout.output); }
     }
 
     return {};
 }
 
-void replace_tokens(std::vector<std::string>& command,
-                    const std::vector<std::pair<std::string, std::string>>& replacements)
-{
+void replace_tokens(std::vector<std::string>& command, const std::vector<std::pair<std::string, std::string>>& replacements) {
     for (auto& arg : command) {
-        for (const auto& [token, value] : replacements) {
-            arg = kiln::replace_all(std::move(arg), token, value);
-        }
+        for (const auto& [token, value] : replacements) { arg = kiln::replace_all(std::move(arg), token, value); }
     }
 }
 
-std::expected<void, std::string> run_steps(
-    const std::vector<std::vector<std::string>>& commands,
-    const std::string& working_dir)
-{
+std::expected<void, std::string> run_steps(const std::vector<std::vector<std::string>>& commands, const std::string& working_dir) {
     for (const auto& cmd : commands) {
         if (cmd.empty()) continue;
 
@@ -293,8 +245,7 @@ std::expected<void, std::string> run_steps(
                 if (!cmd_str.empty()) cmd_str += ' ';
                 cmd_str += a;
             }
-            return std::unexpected<std::string>(
-                "Command failed: " + cmd_str + "\n" + result.output);
+            return std::unexpected<std::string>("Command failed: " + cmd_str + "\n" + result.output);
         }
     }
     return {};

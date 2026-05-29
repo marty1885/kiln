@@ -1,0 +1,29 @@
+name: Format
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        # Pinned to match the version used to apply the format locally.
+        # Bump here and re-run clang-format across the tree together.
+        run: pipx install clang-format==22.1.5
+
+      - name: Check formatting
+        run: |
+          # Excludes vendored code: linenoise-ng, kiln/inner (third-party hashes),
+          # and tests/integration fixtures (sample projects, not our source).
+          find kiln kiln-cli tests benchmark \
+            -path '*/linenoise-ng/*' -prune -o \
+            -path 'kiln/inner/*' -prune -o \
+            -path 'tests/integration/*' -prune -o \
+            \( -name '*.cpp' -o -name '*.hpp' -o -name '*.cc' \) -print0 \
+            | xargs -0 clang-format --dry-run --Werror --verbose

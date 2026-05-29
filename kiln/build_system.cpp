@@ -42,12 +42,8 @@ struct CompileCommand {
 // Helper: Compute install task inputs and pre-compute target install paths.
 // Returns the output paths of targets being installed (so install task depends on link tasks).
 // Also populates ep_target with pre-computed (artifact_path, dest_path) pairs for TARGETS rules.
-static std::vector<std::string> compute_install_inputs(
-    const std::vector<std::shared_ptr<InstallRule>>& rules,
-    Interpreter* ep_interp,
-    const std::string& install_prefix,
-    ExternalProjectTarget* ep_target)
-{
+static std::vector<std::string> compute_install_inputs(const std::vector<std::shared_ptr<InstallRule>>& rules, Interpreter* ep_interp,
+                                                       const std::string& install_prefix, ExternalProjectTarget* ep_target) {
     std::vector<std::string> inputs;
     if (!ep_interp) return inputs;
 
@@ -100,9 +96,7 @@ static bool is_make_install_command(const std::vector<std::string>& cmd) {
 
     // Check if the command is "make" or ends with "/make" or is "$(MAKE)"
     const std::string& exe = cmd[0];
-    bool is_make = (exe == "make" || exe == "$(MAKE)" ||
-                    exe.ends_with("/make") ||
-                    exe.find("make") != std::string::npos);
+    bool is_make = (exe == "make" || exe == "$(MAKE)" || exe.ends_with("/make") || exe.find("make") != std::string::npos);
     if (!is_make) return false;
 
     // A bare "make" in install context is likely "make install" with default target
@@ -157,11 +151,9 @@ struct ExecutionState {
     // route the sub-build's command output back into OUTPUT_VARIABLE.
     std::string* output_capture = nullptr;
 
-    ExecutionState(std::string build_dir_, bool is_tty, int task_count,
-                   std::map<std::string, std::string> loaded_cache)
-        : build_dir(std::move(build_dir_)), stdout_is_tty(is_tty)
-        , progress(task_count, is_tty)
-        , cache(std::move(loaded_cache)), new_cache(cache) {}
+    ExecutionState(std::string build_dir_, bool is_tty, int task_count, std::map<std::string, std::string> loaded_cache)
+        : build_dir(std::move(build_dir_)), stdout_is_tty(is_tty), progress(task_count, is_tty), cache(std::move(loaded_cache)),
+          new_cache(cache) {}
 };
 
 // Promote a task into the ready set if it's a tracked dirty task that isn't
@@ -182,22 +174,23 @@ static bool try_promote_to_ready(BuildTask* t, ExecutionState& state) {
 // Short tag for a BuildTask::kind variant — used in stall diagnostics.
 static const char* task_kind_name(const BuildTask& t) {
     return std::visit(overloaded{
-        [](const CompileTask&)        { return "compile"; },
-        [](const PCHTask&)            { return "pch"; },
-        [](const LinkTask&)           { return "link"; },
-        [](const CustomCommandTask&)  { return "custom_command"; },
-        [](const CustomTargetTask&)   { return "custom_target"; },
-        [](const PreBuildTask&)       { return "pre_build"; },
-        [](const PostBuildTask&)      { return "post_build"; },
-        [](const ModuleScannerTask&)  { return "module_scan"; },
-        [](const ModuleCollatorTask&) { return "module_collate"; },
-        [](const EPOrchestratorTask&) { return "ep_orchestrate"; },
-        [](const EPSentinelTask&)     { return "ep_sentinel"; },
-        [](const EPInstallTask&)      { return "ep_install"; },
-        [](const MocTask&)            { return "moc"; },
-        [](const UicTask&)            { return "uic"; },
-        [](const RccTask&)            { return "rcc"; },
-    }, t.kind);
+                          [](const CompileTask&) { return "compile"; },
+                          [](const PCHTask&) { return "pch"; },
+                          [](const LinkTask&) { return "link"; },
+                          [](const CustomCommandTask&) { return "custom_command"; },
+                          [](const CustomTargetTask&) { return "custom_target"; },
+                          [](const PreBuildTask&) { return "pre_build"; },
+                          [](const PostBuildTask&) { return "post_build"; },
+                          [](const ModuleScannerTask&) { return "module_scan"; },
+                          [](const ModuleCollatorTask&) { return "module_collate"; },
+                          [](const EPOrchestratorTask&) { return "ep_orchestrate"; },
+                          [](const EPSentinelTask&) { return "ep_sentinel"; },
+                          [](const EPInstallTask&) { return "ep_install"; },
+                          [](const MocTask&) { return "moc"; },
+                          [](const UicTask&) { return "uic"; },
+                          [](const RccTask&) { return "rcc"; },
+                      },
+                      t.kind);
 }
 
 // Which scheduler bucket a task is currently in. "limbo" means the task
@@ -207,11 +200,11 @@ static const char* task_kind_name(const BuildTask& t) {
 // Caller must hold state.mutex.
 static const char* task_bucket(BuildTask* t, const ExecutionState& state) {
     if (state.completed.count(t)) return "completed";
-    if (state.running.count(t))   return "running";
+    if (state.running.count(t)) return "running";
     if (state.ready_set.count(t)) return "ready";
     auto it = state.dirty_state.find(t);
     if (it == state.dirty_state.end()) return "limbo";
-    if (!it->second.has_value())       return "maybe-dirty";
+    if (!it->second.has_value()) return "maybe-dirty";
     return *it->second ? "dirty" : "clean";
 }
 
@@ -221,10 +214,7 @@ static const char* task_bucket(BuildTask* t, const ExecutionState& state) {
 // dirty_state) so a "limbo" task shows up as its own entry, not merely as a
 // dangling name on someone else's "waiting on" line.
 // Caller must hold state.mutex.
-static std::string format_stall_diagnostic(
-    const std::vector<std::unique_ptr<BuildTask>>& tasks,
-    const ExecutionState& state)
-{
+static std::string format_stall_diagnostic(const std::vector<std::unique_ptr<BuildTask>>& tasks, const ExecutionState& state) {
     // A task is worth dumping if it's in dirty_state, or if some uncompleted
     // dirty task lists it as a dep. Anything else is a clean task the
     // scheduler correctly skipped, and dumping those would bury the signal.
@@ -239,19 +229,19 @@ static std::string format_stall_diagnostic(
     for (const auto& task_ptr : tasks) {
         BuildTask* t = task_ptr.get();
         if (state.completed.count(t)) continue;
-        const bool tracked = state.dirty_state.count(t)
-                          || referenced_as_dep.count(t);
+        const bool tracked = state.dirty_state.count(t) || referenced_as_dep.count(t);
         if (!tracked) continue;
 
-        oss << "\n  - [" << task_bucket(t, state) << "] ("
-            << task_kind_name(*t) << ") " << t->id;
+        oss << "\n  - [" << task_bucket(t, state) << "] (" << task_kind_name(*t) << ") " << t->id;
 
         bool any_unmet = false;
         for (auto* dep : t->dependencies) {
             if (state.completed.count(dep)) continue;
-            if (!any_unmet) { oss << "\n      waiting on:"; any_unmet = true; }
-            oss << "\n        [" << task_bucket(dep, state) << "] ("
-                << task_kind_name(*dep) << ") " << dep->id;
+            if (!any_unmet) {
+                oss << "\n      waiting on:";
+                any_unmet = true;
+            }
+            oss << "\n        [" << task_bucket(dep, state) << "] (" << task_kind_name(*dep) << ") " << dep->id;
         }
     }
     return oss.str();
@@ -260,29 +250,24 @@ static std::string format_stall_diagnostic(
 std::expected<void, std::string> BuildGraph::generate_compile_commands(const std::string& build_dir) {
     std::string current_dir = std::filesystem::current_path().string();
 
-    auto commands = filter_map(tasks_,
-        [](const auto& ptr) { return ptr->is_compilation() && !ptr->commands.empty(); },
+    auto commands = filter_map(
+        tasks_, [](const auto& ptr) { return ptr->is_compilation() && !ptr->commands.empty(); },
         [&](const auto& ptr) -> CompileCommand {
             const auto& task = *ptr;
-            return {
-                .directory = current_dir,
-                .command = join_command(task.commands[0]),
-                .file = std::string(task.get_source_file()),
-                .output = task.outputs.empty() ? "" : task.outputs[0]
-            };
+            return {.directory = current_dir,
+                    .command = join_command(task.commands[0]),
+                    .file = std::string(task.get_source_file()),
+                    .output = task.outputs.empty() ? "" : task.outputs[0]};
         });
 
     std::string json;
-    if (auto ec = glz::write_json(commands, json)) {
-        return std::unexpected<std::string>(glz::format_error(ec));
-    }
+    if (auto ec = glz::write_json(commands, json)) { return std::unexpected<std::string>(glz::format_error(ec)); }
 
     std::string path = Path::join(build_dir, "compile_commands.json");
     std::ofstream file(path);
     if (file) {
         file << json;
-    }
-    else {
+    } else {
         return std::unexpected<std::string>("Failed to create compile_commands.json for writing");
     }
     return {};
@@ -296,9 +281,7 @@ std::expected<void, std::string> BuildGraph::evaluate_genex(const GenexEvaluatio
         // Create per-task context with compile_language if set
         GenexEvaluationContext task_ctx = ctx;
         auto task_lang = task.get_compile_language();
-        if (task_lang) {
-            task_ctx.compile_language = task_lang;
-        }
+        if (task_lang) { task_ctx.compile_language = task_lang; }
         GenexEvaluator evaluator(task_ctx);
 
         // Evaluate all command arguments
@@ -314,28 +297,25 @@ std::expected<void, std::string> BuildGraph::evaluate_genex(const GenexEvaluatio
                 auto eval = evaluator.evaluate(arg);
                 if (!eval) {
                     std::string target_name = task.parent_target ? task.parent_target->get_name() : "<unknown>";
-                    return std::unexpected(
-                        "Generator expression error in task '" + id + "' (target '" + target_name + "')\n"
-                        "  Argument: '" + arg + "'\n"
-                        "  Error: " + eval.error());
+                    return std::unexpected("Generator expression error in task '" + id + "' (target '" + target_name
+                                           + "')\n"
+                                             "  Argument: '"
+                                           + arg
+                                           + "'\n"
+                                             "  Error: "
+                                           + eval.error());
                 }
                 if (!eval->empty()) {
-                    for (auto sv : CMakeArrayIterator(*eval)) {
-                        evaluated_cmd.emplace_back(sv);
-                    }
+                    for (auto sv : CMakeArrayIterator(*eval)) { evaluated_cmd.emplace_back(sv); }
                 }
             }
-            if (!evaluated_cmd.empty()) {
-                evaluated_commands.push_back(std::move(evaluated_cmd));
-            }
+            if (!evaluated_cmd.empty()) { evaluated_commands.push_back(std::move(evaluated_cmd)); }
         }
         task.commands = std::move(evaluated_commands);
 
         // Hard gate: no unevaluated genex may survive into shell commands
         for (const auto& cmd : task.commands) {
-            for (const auto& arg : cmd) {
-                assert_no_genex(arg, "task command for " + id);
-            }
+            for (const auto& arg : cmd) { assert_no_genex(arg, "task command for " + id); }
         }
 
         // Infer dependencies from command arguments that reference target outputs.
@@ -351,9 +331,7 @@ std::expected<void, std::string> BuildGraph::evaluate_genex(const GenexEvaluatio
                 for (const auto& arg : cmd) {
                     if (arg.empty() || arg[0] != '/') continue;
                     auto it = output_to_task_.find(arg);
-                    if (it != output_to_task_.end() && it->second != task_ptr.get()) {
-                        task.inputs.push_back(arg);
-                    }
+                    if (it != output_to_task_.end() && it->second != task_ptr.get()) { task.inputs.push_back(arg); }
                 }
             }
         }
@@ -368,7 +346,7 @@ std::expected<void, std::string> BuildGraph::evaluate_genex(const GenexEvaluatio
                 }
                 auto eval = evaluator.evaluate(input);
                 if (!eval || eval->empty()) {
-                    continue;  // Drop unevaluable dependency
+                    continue; // Drop unevaluable dependency
                 }
                 // Result may be a semicolon-separated CMake list — split into individual inputs
                 for (auto sv : CMakeArrayIterator(*eval)) {
@@ -379,9 +357,7 @@ std::expected<void, std::string> BuildGraph::evaluate_genex(const GenexEvaluatio
                         auto it = ctx.all_targets->find(item);
                         if (it == ctx.all_targets->end() && ctx.target_aliases) {
                             auto alias_it = ctx.target_aliases->find(item);
-                            if (alias_it != ctx.target_aliases->end()) {
-                                it = ctx.all_targets->find(alias_it->second);
-                            }
+                            if (alias_it != ctx.target_aliases->end()) { it = ctx.all_targets->find(alias_it->second); }
                         }
                         if (it != ctx.all_targets->end()) {
                             std::string out = it->second->get_output_path();
@@ -404,27 +380,19 @@ std::expected<void, std::string> BuildGraph::evaluate_genex(const GenexEvaluatio
         for (auto& dep : task.explicit_deps) {
             if (!GenexParser::contains_genex(dep)) continue;
             auto eval = evaluator.evaluate(dep);
-            if (eval && !eval->empty()) {
-                dep = *eval;
-            }
+            if (eval && !eval->empty()) { dep = *eval; }
         }
 
         // Hard gate: no unevaluated genex in inputs
-        for (const auto& input : task.inputs) {
-            assert_no_genex(input, "task input for " + id);
-        }
+        for (const auto& input : task.inputs) { assert_no_genex(input, "task input for " + id); }
 
         // Evaluate working_dir if it contains genex
         if (!task.working_dir.empty() && GenexParser::contains_genex(task.working_dir)) {
             auto result = evaluator.evaluate(task.working_dir);
-            if (!result) {
-                return std::unexpected("Generator expression error in working_dir for task '" + id + "': " + result.error());
-            }
+            if (!result) { return std::unexpected("Generator expression error in working_dir for task '" + id + "': " + result.error()); }
             task.working_dir = *result;
         }
-        if (!task.working_dir.empty()) {
-            assert_no_genex(task.working_dir, "working_dir for " + id);
-        }
+        if (!task.working_dir.empty()) { assert_no_genex(task.working_dir, "working_dir for " + id); }
 
         // Evaluate outputs that contain genex and update output_to_task_ index
         for (auto& output : task.outputs) {
@@ -432,9 +400,7 @@ std::expected<void, std::string> BuildGraph::evaluate_genex(const GenexEvaluatio
             // Remove old key from index
             output_to_task_.erase(output);
             auto eval = evaluator.evaluate(output);
-            if (eval && !eval->empty()) {
-                output = *eval;
-            }
+            if (eval && !eval->empty()) { output = *eval; }
             // Re-register with evaluated path
             output_to_task_[output] = task_ptr.get();
         }
@@ -443,9 +409,7 @@ std::expected<void, std::string> BuildGraph::evaluate_genex(const GenexEvaluatio
         if (GenexParser::contains_genex(task.id)) {
             task_by_id_.erase(id);
             auto eval = evaluator.evaluate(task.id);
-            if (eval && !eval->empty()) {
-                task.id = *eval;
-            }
+            if (eval && !eval->empty()) { task.id = *eval; }
             task_by_id_[task.id] = task_ptr.get();
         }
     }
@@ -481,9 +445,7 @@ void BuildGraph::apply_cmake_compat_deps() {
             auto* cur = bfs_stack.back();
             bfs_stack.pop_back();
             if (!excluded_tasks.insert(cur).second) continue;
-            for (auto* dep : cur->dependencies) {
-                bfs_stack.push_back(dep);
-            }
+            for (auto* dep : cur->dependencies) { bfs_stack.push_back(dep); }
         }
     }
 
@@ -492,9 +454,7 @@ void BuildGraph::apply_cmake_compat_deps() {
             if (!task_ptr->is_compilation() || excluded_tasks.count(task_ptr.get())) continue;
             std::unordered_set<BuildTask*> dep_set(task_ptr->dependencies.begin(), task_ptr->dependencies.end());
             for (auto* ct : all_custom_tasks) {
-                if (dep_set.insert(ct).second) {
-                    add_dependency(task_ptr.get(), ct);
-                }
+                if (dep_set.insert(ct).second) { add_dependency(task_ptr.get(), ct); }
             }
         }
     }
@@ -512,8 +472,7 @@ std::expected<void, std::string> BuildGraph::validate() {
     // This scan catches them before any shell command runs.
     auto check_genex = [](std::string_view value, std::string_view ctx) -> std::optional<std::string> {
         if (value.find("$<") != std::string_view::npos) {
-            return std::string("Unevaluated generator expression in ") + std::string(ctx) +
-                   ": '" + std::string(value) + "'";
+            return std::string("Unevaluated generator expression in ") + std::string(ctx) + ": '" + std::string(value) + "'";
         }
         return std::nullopt;
     };
@@ -535,7 +494,7 @@ std::expected<void, std::string> BuildGraph::validate() {
     // Check for missing inputs.
     // Compile tasks with missing source files are errors (the source won't appear).
     // Other missing inputs are warnings (resource files, etc.).
-    std::map<std::string, std::vector<std::string>> missing_sources_by_target;  // target name -> source files
+    std::map<std::string, std::vector<std::string>> missing_sources_by_target; // target name -> source files
 
     for (const auto& task_ptr : tasks_) {
         for (const auto& in : task_ptr->inputs) {
@@ -546,8 +505,8 @@ std::expected<void, std::string> BuildGraph::validate() {
                 missing_sources_by_target[task_ptr->parent_target->get_name()].push_back(in);
             } else {
                 kiln::print_message(std::cerr, "WARNING",
-                    "Task '" + task_ptr->id + "' references '" + in +
-                    "' which doesn't exist and isn't produced by any task");
+                                    "Task '" + task_ptr->id + "' references '" + in
+                                        + "' which doesn't exist and isn't produced by any task");
             }
         }
     }
@@ -556,9 +515,7 @@ std::expected<void, std::string> BuildGraph::validate() {
         std::string err;
         for (const auto& [target_name, sources] : missing_sources_by_target) {
             err += "Target '" + target_name + "' has source files that do not exist:\n";
-            for (const auto& src : sources) {
-                err += "    " + src + "\n";
-            }
+            for (const auto& src : sources) { err += "    " + src + "\n"; }
         }
         err += "Remove them from the target's source list, or ensure they are generated.";
         return std::unexpected(err);
@@ -574,22 +531,16 @@ void BuildGraph::add_dependency(BuildTask* from, BuildTask* to) {
 
 std::span<BuildTask* const> BuildGraph::get_dependents(BuildTask* task) const {
     auto it = dependents_.find(task);
-    if (it != dependents_.end()) {
-        return it->second;
-    }
+    if (it != dependents_.end()) { return it->second; }
     static const std::vector<BuildTask*> empty;
     return empty;
 }
 
 std::expected<BuildTask*, std::string> BuildGraph::add_task_internal(std::unique_ptr<BuildTask> task) {
     auto* raw = task.get();
-    if (task_by_id_.count(raw->id)) {
-        return std::unexpected("Task ID already exists: " + raw->id);
-    }
+    if (task_by_id_.count(raw->id)) { return std::unexpected("Task ID already exists: " + raw->id); }
     task_by_id_[raw->id] = raw;
-    for (const auto& out : raw->outputs) {
-        output_to_task_[out] = raw;
-    }
+    for (const auto& out : raw->outputs) { output_to_task_[out] = raw; }
     tasks_.push_back(std::move(task));
     return raw;
 }
@@ -608,9 +559,7 @@ void BuildGraph::resolve_explicit_deps(std::span<BuildTask*> batch) {
         task->explicit_deps = std::move(unresolved);
         // Deduplicate
         std::sort(task->dependencies.begin(), task->dependencies.end());
-        task->dependencies.erase(
-            std::unique(task->dependencies.begin(), task->dependencies.end()),
-            task->dependencies.end());
+        task->dependencies.erase(std::unique(task->dependencies.begin(), task->dependencies.end()), task->dependencies.end());
     }
 }
 
@@ -620,9 +569,7 @@ void BuildGraph::resolve_file_deps(std::span<BuildTask*> batch) {
         for (const auto& in : task->inputs) {
             auto it = output_to_task_.find(in);
             if (it != output_to_task_.end() && it->second != task) {
-                if (dep_set.insert(it->second).second) {
-                    add_dependency(task, it->second);
-                }
+                if (dep_set.insert(it->second).second) { add_dependency(task, it->second); }
             }
         }
     }
@@ -637,9 +584,7 @@ void BuildGraph::drain_pending_deps(std::span<BuildTask*> batch) {
                 if (it->second != task) {
                     auto& deps = it->second->dependencies;
                     // Linear search is acceptable here — pending deps are rare
-                    if (std::find(deps.begin(), deps.end(), task) == deps.end()) {
-                        add_dependency(it->second, task);
-                    }
+                    if (std::find(deps.begin(), deps.end(), task) == deps.end()) { add_dependency(it->second, task); }
                 }
             }
             pending_file_deps_.erase(out);
@@ -649,9 +594,7 @@ void BuildGraph::drain_pending_deps(std::span<BuildTask*> batch) {
     // Register any still-unresolved inputs from batch tasks as pending
     for (auto* task : batch) {
         for (const auto& in : task->inputs) {
-            if (!output_to_task_.count(in)) {
-                pending_file_deps_.emplace(in, task);
-            }
+            if (!output_to_task_.count(in)) { pending_file_deps_.emplace(in, task); }
         }
     }
 }
@@ -661,17 +604,13 @@ void BuildGraph::drain_pending_deps(std::span<BuildTask*> batch) {
 std::expected<BuildTask*, std::string> GraphTransaction::add(BuildTask task) {
     auto ptr = std::make_unique<BuildTask>(std::move(task));
     auto result = graph_.add_task_internal(std::move(ptr));
-    if (result) {
-        batch_.push_back(*result);
-    }
+    if (result) { batch_.push_back(*result); }
     return result;
 }
 
 std::expected<BuildTask*, std::string> GraphTransaction::add_owned(std::unique_ptr<BuildTask> task) {
     auto result = graph_.add_task_internal(std::move(task));
-    if (result) {
-        batch_.push_back(*result);
-    }
+    if (result) { batch_.push_back(*result); }
     return result;
 }
 
@@ -703,9 +642,7 @@ std::expected<void, std::string> GraphTransaction::commit() {
     // Build reverse edges for pre-existing pointer dependencies
     // (e.g. EP tasks transferred via add_owned that already have internal deps)
     for (auto* task : batch_) {
-        for (auto* dep : task->dependencies) {
-            graph_.dependents_[dep].push_back(task);
-        }
+        for (auto* dep : task->dependencies) { graph_.dependents_[dep].push_back(task); }
     }
 
     // Resolve explicit deps → pointer edges (via add_dependency which maintains reverse edges)
@@ -777,10 +714,7 @@ bool BuildGraph::all_outputs_exist(const BuildTask& task) {
     return true;
 }
 
-std::optional<std::string> BuildGraph::clean_signature(
-    const BuildTask& task,
-    const std::map<std::string, std::string>& cache)
-{
+std::optional<std::string> BuildGraph::clean_signature(const BuildTask& task, const std::map<std::string, std::string>& cache) {
     if (task.always_run) return std::nullopt;
     if (!all_outputs_exist(task)) return std::nullopt;
     auto sig_res = calculate_signature(task);
@@ -790,9 +724,7 @@ std::optional<std::string> BuildGraph::clean_signature(
     return *sig_res;
 }
 
-void BuildGraph::propagate_dirty_bfs(
-    std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state)
-{
+void BuildGraph::propagate_dirty_bfs(std::unordered_map<BuildTask*, std::optional<bool>>& dirty_state) {
     if (dirty_state.empty()) return;
     std::vector<BuildTask*> worklist;
     worklist.reserve(dirty_state.size());
@@ -807,8 +739,7 @@ void BuildGraph::propagate_dirty_bfs(
         // byproduct (e.g. copy_if_different version.cpp) won't cascade.
         bool definite = (dirty_state[t] == true) && !t->always_run;
         for (auto* dependent : get_dependents(t)) {
-            auto [it, inserted] = dirty_state.try_emplace(dependent,
-                definite ? std::optional<bool>(true) : std::nullopt);
+            auto [it, inserted] = dirty_state.try_emplace(dependent, definite ? std::optional<bool>(true) : std::nullopt);
             if (inserted) {
                 worklist.push_back(dependent);
             } else if (definite && !it->second.has_value()) {
@@ -824,12 +755,13 @@ void BuildGraph::propagate_dirty_bfs(
 void BuildGraph::report_command_failure(ExecutionState& state, std::string_view captured_output) {
     std::lock_guard<std::mutex> lock(output_mutex_);
     state.progress.erase();
-    std::cout.flush();  // erase wrote to cout; flush before cerr
-    if (!captured_output.empty()) std::cerr << "[t=" << std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count() << "] " << captured_output << std::endl;
+    std::cout.flush(); // erase wrote to cout; flush before cerr
+    if (!captured_output.empty())
+        std::cerr << "[t=" << std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count() << "] "
+                  << captured_output << std::endl;
 }
 
-std::expected<void, std::string> BuildGraph::execute(const std::string& build_dir, int jobs,
-                                                     std::string* output_capture) {
+std::expected<void, std::string> BuildGraph::execute(const std::string& build_dir, int jobs, std::string* output_capture) {
     // Graph setup (dep resolution, cmake compat, reverse edges, validation) is now
     // handled by transaction commit + post-transaction methods before execute() is called.
 
@@ -852,16 +784,13 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
         // POST_BUILD tasks have no outputs but should only run when their
         // dependency (the link task) actually rebuilds. Skip direct marking —
         // they'll become dirty via propagation from the link task if needed.
-        if (std::holds_alternative<PostBuildTask>(task.kind) && !all_outputs_exist(task)) {
-            continue;
-        }
+        if (std::holds_alternative<PostBuildTask>(task.kind) && !all_outputs_exist(task)) { continue; }
 
         if (clean_signature(task, cache)) continue;
 
         // EP sentinels and orchestrators are "maybe" — we can't know if EP
         // will inject tasks. Their dependents are re-checked at runtime.
-        dirty_state[task_ptr.get()] =
-            task.is_ep_task() ? std::nullopt : std::optional<bool>(true);
+        dirty_state[task_ptr.get()] = task.is_ep_task() ? std::nullopt : std::optional<bool>(true);
     }
 
     propagate_dirty_bfs(dirty_state);
@@ -870,8 +799,10 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     int dirty_task_count = 0;
     int maybe_dirty_count = 0;
     for (const auto& [ptr, ds] : dirty_state) {
-        if (ds == true) dirty_task_count++;
-        else maybe_dirty_count++;
+        if (ds == true)
+            dirty_task_count++;
+        else
+            maybe_dirty_count++;
     }
     pre_scan_profile.stop();
 
@@ -879,8 +810,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
 
     // 3. Parallel execution with fixed worker threads
     // Bundle all execution-phase state into a single struct.
-    ExecutionState state(build_dir, stdout_is_tty,
-                         dirty_task_count + maybe_dirty_count, std::move(cache));
+    ExecutionState state(build_dir, stdout_is_tty, dirty_task_count + maybe_dirty_count, std::move(cache));
     state.dirty_state = std::move(dirty_state);
     state.output_capture = output_capture;
 
@@ -900,11 +830,12 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
         }
         bool has_dirty_dep = false;
         for (auto* dep : task_ptr->dependencies) {
-            if (state.dirty_state.count(dep)) { has_dirty_dep = true; break; }
+            if (state.dirty_state.count(dep)) {
+                has_dirty_dep = true;
+                break;
+            }
         }
-        if (!has_dirty_dep) {
-            state.completed.insert(task_ptr.get());
-        }
+        if (!has_dirty_dep) { state.completed.insert(task_ptr.get()); }
     }
 
     if (jobs <= 0) {
@@ -913,9 +844,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     }
 
     // Initialize ready_set with dirty/maybe tasks whose deps are all complete.
-    for (const auto& [ptr, _] : state.dirty_state) {
-        try_promote_to_ready(ptr, state);
-    }
+    for (const auto& [ptr, _] : state.dirty_state) { try_promote_to_ready(ptr, state); }
 
     auto start_time = std::chrono::steady_clock::now();
 
@@ -941,15 +870,16 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         return g_interrupted.load(std::memory_order_relaxed);
                     });
 
-                    if (!state.fatal_error.empty()) {
-                        return;
-                    }
+                    if (!state.fatal_error.empty()) { return; }
                     // Check termination: all tasks are either completed or not in dirty_state
                     if (state.ready_set.empty() && state.running.empty()) {
                         // Check if we're truly done
                         bool all_done = true;
                         for (const auto& [ptr, ds] : state.dirty_state) {
-                            if (!state.completed.count(ptr)) { all_done = false; break; }
+                            if (!state.completed.count(ptr)) {
+                                all_done = false;
+                                break;
+                            }
                         }
                         if (all_done) return;
                     }
@@ -970,8 +900,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         // hold the lock, so the post-unlock work below never
                         // touches the map directly.
                         auto it2 = state.dirty_state.find(current);
-                        current_is_maybe_dirty = it2 != state.dirty_state.end()
-                                              && !it2->second.has_value();
+                        current_is_maybe_dirty = it2 != state.dirty_state.end() && !it2->second.has_value();
                     } else if (state.running.empty()) {
                         // Stall: nothing ready, nothing running, but
                         // uncompleted tasks remain. Hand the diagnostic off
@@ -992,7 +921,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                 const auto& id = task.id;
                 std::string sig;
                 std::string task_error;
-                std::string active_display_name;  // tracks name in progress bar's active list
+                std::string active_display_name; // tracks name in progress bar's active list
                 auto task_start = std::chrono::steady_clock::now();
 
                 do { // do-while(false) for break-on-error
@@ -1003,7 +932,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         if (auto clean_sig = clean_signature(task, state.cache)) {
                             state.progress.bump_total(-1);
                             sig = std::move(*clean_sig);
-                            break;  // Skip to completion handling
+                            break; // Skip to completion handling
                         }
                     }
 
@@ -1012,17 +941,17 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                     if (profiling) {
                         profile_start = Profiler::instance().now_us();
                         std::string artifact = task.parent_target ? task.parent_target->get_name() : "";
-                        profile_name = std::visit(overloaded{
-                            [&](const ModuleCollatorTask&) { return "collate " + artifact; },
-                            [&](const ModuleScannerTask& t) { return "scan " + std::string(Path(t.source_file).filename()); },
-                            [&](const CompileTask& t) { return "compile " + std::string(Path(t.source_file).filename()); },
-                            [&](const PCHTask& t) { return "compile " + std::string(Path(t.source_file).filename()); },
-                            [&](const LinkTask&) { return "link " + artifact; },
-                            [&](const MocTask& t) { return "moc " + std::string(Path(t.source_file).filename()); },
-                            [&](const UicTask& t) { return "uic " + std::string(Path(t.source_file).filename()); },
-                            [&](const RccTask& t) { return "rcc " + std::string(Path(t.source_file).filename()); },
-                            [&](const auto&) { return "run " + std::string(Path(id).filename()); }
-                        }, task.kind);
+                        profile_name = std::visit(
+                            overloaded{[&](const ModuleCollatorTask&) { return "collate " + artifact; },
+                                       [&](const ModuleScannerTask& t) { return "scan " + std::string(Path(t.source_file).filename()); },
+                                       [&](const CompileTask& t) { return "compile " + std::string(Path(t.source_file).filename()); },
+                                       [&](const PCHTask& t) { return "compile " + std::string(Path(t.source_file).filename()); },
+                                       [&](const LinkTask&) { return "link " + artifact; },
+                                       [&](const MocTask& t) { return "moc " + std::string(Path(t.source_file).filename()); },
+                                       [&](const UicTask& t) { return "uic " + std::string(Path(t.source_file).filename()); },
+                                       [&](const RccTask& t) { return "rcc " + std::string(Path(t.source_file).filename()); },
+                                       [&](const auto&) { return "run " + std::string(Path(id).filename()); }},
+                            task.kind);
                     }
 
                     std::string artifact_name = task.parent_target ? task.parent_target->get_name() : "unknown";
@@ -1030,12 +959,13 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                     // Pre-create output directories and working directory
                     {
                         std::error_code ec;
-                        if (!task.working_dir.empty()) {
-                            std::filesystem::create_directories(task.working_dir, ec);
-                        }
+                        if (!task.working_dir.empty()) { std::filesystem::create_directories(task.working_dir, ec); }
                         for (const auto& out : task.outputs) {
                             std::filesystem::create_directories(std::string(Path(out).parent_path()), ec);
-                            if (ec) { task_error = "Failed to create directory for " + out + ": " + ec.message(); break; }
+                            if (ec) {
+                                task_error = "Failed to create directory for " + out + ": " + ec.message();
+                                break;
+                            }
                         }
                     }
                     if (!task_error.empty()) break;
@@ -1065,8 +995,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                         } else {
                             int tot = state.progress.total();
                             int width = static_cast<int>(std::to_string(tot).size());
-                            oss << "   [" << std::setw(width) << done << "/" << tot << "] "
-                                << color(kiln::colors::BOLD_GREEN) << verb
+                            oss << "   [" << std::setw(width) << done << "/" << tot << "] " << color(kiln::colors::BOLD_GREEN) << verb
                                 << color(kiln::colors::RESET) << ' ' << detail;
                         }
 
@@ -1080,521 +1009,506 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                     };
 
                     // Dispatch based on task kind
-                    std::visit(overloaded{
-                        [&](const EPOrchestratorTask& ep) {
-                            print_status("Configuring", ep.ep_name);
+                    std::visit(
+                        overloaded{[&](const EPOrchestratorTask& ep) {
+                                       print_status("Configuring", ep.ep_name);
 
-                            // Run the EP orchestrator outside the lock - it acquires state.mutex when attaching the graph
-                            auto ep_result = run_ep_orchestrator(task, state);
-                            if (ep_result) {
-                                task_error = *ep_result;
-                            }
-                        },
-                        [&](const EPInstallTask& ep) {
-                            // EP install task - runs install rules after EP build tasks complete
-                            print_status("Installing", ep.ep_name);
-                            // Bar-aware sink: every install line goes through the bar's
-                            // atomic erase+print+redraw so it can't tear against concurrent
-                            // build output.
-                            kiln::OutputCtx ep_out{
-                                [this, &state](std::string_view line) {
-                                    std::lock_guard<std::mutex> lock(output_mutex_);
-                                    state.progress.print_line(std::string(line));
-                                },
-                                state.stdout_is_tty
-                            };
-                            auto* ep_target = dynamic_cast<ExternalProjectTarget*>(task.parent_target);
-                            if (ep_target) {
-                                // 1. Install pre-computed target artifacts (TARGETS rules)
-                                for (const auto& install : ep_target->get_pending_target_installs()) {
-                                    std::string dest_dir(Path(install.dest_path).parent_path());
-                                    std::filesystem::create_directories(dest_dir);
-                                    std::error_code ec;
-                                    std::filesystem::copy_file(install.artifact_path, install.dest_path,
-                                                              std::filesystem::copy_options::overwrite_existing, ec);
-                                    if (ec) {
-                                        task_error = "EP " + ep.ep_name + " install failed: cannot copy " +
-                                                    install.artifact_path + " to " + install.dest_path + ": " + ec.message();
-                                        return;
-                                    }
-                                    kiln::print_action(ep_out, "Installing", install.dest_path);
-                                }
-                                if (!task_error.empty()) return;
+                                       // Run the EP orchestrator outside the lock - it acquires state.mutex when attaching the graph
+                                       auto ep_result = run_ep_orchestrator(task, state);
+                                       if (ep_result) { task_error = *ep_result; }
+                                   },
+                                   [&](const EPInstallTask& ep) {
+                                       // EP install task - runs install rules after EP build tasks complete
+                                       print_status("Installing", ep.ep_name);
+                                       // Bar-aware sink: every install line goes through the bar's
+                                       // atomic erase+print+redraw so it can't tear against concurrent
+                                       // build output.
+                                       kiln::OutputCtx ep_out{[this, &state](std::string_view line) {
+                                                                  std::lock_guard<std::mutex> lock(output_mutex_);
+                                                                  state.progress.print_line(std::string(line));
+                                                              },
+                                                              state.stdout_is_tty};
+                                       auto* ep_target = dynamic_cast<ExternalProjectTarget*>(task.parent_target);
+                                       if (ep_target) {
+                                           // 1. Install pre-computed target artifacts (TARGETS rules)
+                                           for (const auto& install : ep_target->get_pending_target_installs()) {
+                                               std::string dest_dir(Path(install.dest_path).parent_path());
+                                               std::filesystem::create_directories(dest_dir);
+                                               std::error_code ec;
+                                               std::filesystem::copy_file(install.artifact_path, install.dest_path,
+                                                                          std::filesystem::copy_options::overwrite_existing, ec);
+                                               if (ec) {
+                                                   task_error = "EP " + ep.ep_name + " install failed: cannot copy " + install.artifact_path
+                                                                + " to " + install.dest_path + ": " + ec.message();
+                                                   return;
+                                               }
+                                               kiln::print_action(ep_out, "Installing", install.dest_path);
+                                           }
+                                           if (!task_error.empty()) return;
 
-                                // 2. Run other install rules (FILES, DIRECTORY, SCRIPT, CODE)
-                                // TARGETS rules are skipped since interp is null (we handled them above)
-                                const auto& install_rules = ep_target->get_pending_install_rules();
-                                if (!install_rules.empty()) {
-                                    // Mirror compute_install_inputs path: prefer the EP's
-                                    // CMAKE_INSTALL_PREFIX (set via CMAKE_ARGS) over the
-                                    // ExternalProject INSTALL_DIR default.
-                                    std::string install_prefix;
-                                    if (auto* ep_interp_for_prefix = ep_target->get_ep_interpreter())
-                                        install_prefix = ep_interp_for_prefix->get_variable("CMAKE_INSTALL_PREFIX");
-                                    if (install_prefix.empty())
-                                        install_prefix = ep_target->get_ep_install_dir();
-                                    std::string config = ep_target->get_pending_install_config();
-                                    auto plan_or = build_install_plan(ep_target->get_ep_interpreter(),
-                                                                      install_rules,
-                                                                      install_prefix, config, ep_out);
-                                    if (!plan_or) {
-                                        task_error = "EP " + ep.ep_name + " install plan failed: " + plan_or.error();
-                                        return;
-                                    }
-                                    auto install_result = execute_install_plan(*plan_or, install_prefix, config,
-                                                                              /*component_filter=*/"", ep_out);
-                                    if (!install_result) {
-                                        task_error = "EP " + ep.ep_name + " install failed: " + install_result.error();
-                                        return;
-                                    }
-                                }
-                                // Run extra install commands from INSTALL_COMMAND (skip "make install")
-                                const auto& install_cmd = ep_target->get_install_command();
-                                if (!install_cmd.is_empty && !install_cmd.commands.empty()) {
-                                    std::string working_dir = ep_target->get_ep_binary_dir();
-                                    for (const auto& cmd : install_cmd.commands) {
-                                        // Skip "make install" / "cmake --install" - we handle install rules ourselves
-                                        if (is_make_install_command(cmd) || is_cmake_install_command(cmd)) continue;
-                                        auto result = kiln::run_command(cmd, working_dir);
-                                        if (result.exit_code != 0) {
-                                            report_command_failure(state, result.output);
-                                            task_error = "EP " + ep.ep_name + " install command failed";
-                                            return;
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        [&](const EPSentinelTask& ep) {
-                            // Sentinel task - pure synchronization point, signals EP completion
-                            // Install is now handled by a separate install task that sentinel depends on
-                            print_status("Ready", ep.ep_name);
-                        },
-                        [&](const ModuleCollatorTask& collator) {
-                            // C++20 modules: handle collator tasks specially (in-process execution).
-                            //
-                            // Inputs to this task are a mix of:
-                            //   - per-source DDI files (P1689 JSON, ".ddi" suffix) from this
-                            //     target's own scanners, and
-                            //   - foreign module-export manifests (".module-exports.json")
-                            //     from transitive PUBLIC/INTERFACE link deps that provide
-                            //     modules. The graph guarantees those manifests are written
-                            //     before this task runs.
-                            print_status("Collating", "modules");
+                                           // 2. Run other install rules (FILES, DIRECTORY, SCRIPT, CODE)
+                                           // TARGETS rules are skipped since interp is null (we handled them above)
+                                           const auto& install_rules = ep_target->get_pending_install_rules();
+                                           if (!install_rules.empty()) {
+                                               // Mirror compute_install_inputs path: prefer the EP's
+                                               // CMAKE_INSTALL_PREFIX (set via CMAKE_ARGS) over the
+                                               // ExternalProject INSTALL_DIR default.
+                                               std::string install_prefix;
+                                               if (auto* ep_interp_for_prefix = ep_target->get_ep_interpreter())
+                                                   install_prefix = ep_interp_for_prefix->get_variable("CMAKE_INSTALL_PREFIX");
+                                               if (install_prefix.empty()) install_prefix = ep_target->get_ep_install_dir();
+                                               std::string config = ep_target->get_pending_install_config();
+                                               auto plan_or = build_install_plan(ep_target->get_ep_interpreter(), install_rules,
+                                                                                 install_prefix, config, ep_out);
+                                               if (!plan_or) {
+                                                   task_error = "EP " + ep.ep_name + " install plan failed: " + plan_or.error();
+                                                   return;
+                                               }
+                                               auto install_result = execute_install_plan(*plan_or, install_prefix, config,
+                                                                                          /*component_filter=*/"", ep_out);
+                                               if (!install_result) {
+                                                   task_error = "EP " + ep.ep_name + " install failed: " + install_result.error();
+                                                   return;
+                                               }
+                                           }
+                                           // Run extra install commands from INSTALL_COMMAND (skip "make install")
+                                           const auto& install_cmd = ep_target->get_install_command();
+                                           if (!install_cmd.is_empty && !install_cmd.commands.empty()) {
+                                               std::string working_dir = ep_target->get_ep_binary_dir();
+                                               for (const auto& cmd : install_cmd.commands) {
+                                                   // Skip "make install" / "cmake --install" - we handle install rules ourselves
+                                                   if (is_make_install_command(cmd) || is_cmake_install_command(cmd)) continue;
+                                                   auto result = kiln::run_command(cmd, working_dir);
+                                                   if (result.exit_code != 0) {
+                                                       report_command_failure(state, result.output);
+                                                       task_error = "EP " + ep.ep_name + " install command failed";
+                                                       return;
+                                                   }
+                                               }
+                                           }
+                                       }
+                                   },
+                                   [&](const EPSentinelTask& ep) {
+                                       // Sentinel task - pure synchronization point, signals EP completion
+                                       // Install is now handled by a separate install task that sentinel depends on
+                                       print_status("Ready", ep.ep_name);
+                                   },
+                                   [&](const ModuleCollatorTask& collator) {
+                                       // C++20 modules: handle collator tasks specially (in-process execution).
+                                       //
+                                       // Inputs to this task are a mix of:
+                                       //   - per-source DDI files (P1689 JSON, ".ddi" suffix) from this
+                                       //     target's own scanners, and
+                                       //   - foreign module-export manifests (".module-exports.json")
+                                       //     from transitive PUBLIC/INTERFACE link deps that provide
+                                       //     modules. The graph guarantees those manifests are written
+                                       //     before this task runs.
+                                       print_status("Collating", "modules");
 
-                            std::map<std::string, std::string> module_to_task;
-                            std::map<std::string, std::vector<std::string>> task_requires;
-                            std::vector<ModuleMapEntry> mapper_entries;
-                            // Track who first claimed each logical name, so a conflict
-                            // diagnostic can name both source paths.
-                            std::map<std::string, std::string> module_to_source;
-                            // Local provides (for the manifest we'll write).
-                            ModuleManifest own_manifest;
+                                       std::map<std::string, std::string> module_to_task;
+                                       std::map<std::string, std::vector<std::string>> task_requires;
+                                       std::vector<ModuleMapEntry> mapper_entries;
+                                       // Track who first claimed each logical name, so a conflict
+                                       // diagnostic can name both source paths.
+                                       std::map<std::string, std::string> module_to_source;
+                                       // Local provides (for the manifest we'll write).
+                                       ModuleManifest own_manifest;
 
-                            // Header-unit imports surfaced by the scanner. Keyed by
-                            // resolved header path so the same header imported with
-                            // both `<h>` and `"h"` collapses to a single BMI.
-                            using HeaderUnitNeeded = BuildGraph::HeaderUnitInfo;
-                            std::map<std::string, HeaderUnitNeeded> header_units;
-                            // Per-importer-task list of header-unit source paths that
-                            // task imports. Used to wire compile-task → header-unit
-                            // dependencies once header-unit tasks exist.
-                            std::map<std::string, std::vector<std::string>> task_header_units;
+                                       // Header-unit imports surfaced by the scanner. Keyed by
+                                       // resolved header path so the same header imported with
+                                       // both `<h>` and `"h"` collapses to a single BMI.
+                                       using HeaderUnitNeeded = BuildGraph::HeaderUnitInfo;
+                                       std::map<std::string, HeaderUnitNeeded> header_units;
+                                       // Per-importer-task list of header-unit source paths that
+                                       // task imports. Used to wire compile-task → header-unit
+                                       // dependencies once header-unit tasks exist.
+                                       std::map<std::string, std::vector<std::string>> task_header_units;
 
-                            auto record_provider = [&](const std::string& logical_name,
-                                                       const std::string& obj_path,
-                                                       const std::string& bmi_path,
-                                                       const std::string& source_path) -> bool {
-                                auto existing = module_to_task.find(logical_name);
-                                if (existing != module_to_task.end()) {
-                                    task_error = "Module '" + logical_name + "' is provided by two sources: '" +
-                                                 module_to_source[logical_name] + "' and '" + source_path + "'";
-                                    return false;
-                                }
-                                module_to_task[logical_name] = obj_path;
-                                module_to_source[logical_name] = source_path;
-                                ModuleMapEntry entry;
-                                entry.module_name = logical_name;
-                                entry.bmi_path = bmi_path;
-                                entry.source_path = source_path;
-                                entry.object_task_id = obj_path;
-                                mapper_entries.push_back(std::move(entry));
-                                return true;
-                            };
+                                       auto record_provider = [&](const std::string& logical_name, const std::string& obj_path,
+                                                                  const std::string& bmi_path, const std::string& source_path) -> bool {
+                                           auto existing = module_to_task.find(logical_name);
+                                           if (existing != module_to_task.end()) {
+                                               task_error = "Module '" + logical_name + "' is provided by two sources: '"
+                                                            + module_to_source[logical_name] + "' and '" + source_path + "'";
+                                               return false;
+                                           }
+                                           module_to_task[logical_name] = obj_path;
+                                           module_to_source[logical_name] = source_path;
+                                           ModuleMapEntry entry;
+                                           entry.module_name = logical_name;
+                                           entry.bmi_path = bmi_path;
+                                           entry.source_path = source_path;
+                                           entry.object_task_id = obj_path;
+                                           mapper_entries.push_back(std::move(entry));
+                                           return true;
+                                       };
 
-                            // Every local module-bearing TU's obj path (= rule.primary_output).
-                            // Used below to emit per-task clang response files: every TU that
-                            // imports/exports a module needs an rsp file at <obj>.modules.rsp,
-                            // even one that doesn't import anything (still needs -fmodule-output=).
-                            std::vector<std::string> local_module_objs;
-                            for (const auto& input_path : task.inputs) {
-                                if (input_path.size() >= 20 &&
-                                    input_path.compare(input_path.size() - 20, 20, ".module-exports.json") == 0) {
-                                    // Foreign manifest: producer collator wrote this.
-                                    auto man = read_module_manifest(input_path);
-                                    if (!man) { task_error = man.error(); return; }
-                                    for (const auto& e : man->entries) {
-                                        // Defense in depth — producer should have already filtered.
-                                        if (e.visibility != "PUBLIC" && e.visibility != "INTERFACE") continue;
-                                        if (!record_provider(e.logical_name, e.primary_output,
-                                                             e.bmi_path, e.source_path)) return;
-                                    }
-                                    continue;
-                                }
+                                       // Every local module-bearing TU's obj path (= rule.primary_output).
+                                       // Used below to emit per-task clang response files: every TU that
+                                       // imports/exports a module needs an rsp file at <obj>.modules.rsp,
+                                       // even one that doesn't import anything (still needs -fmodule-output=).
+                                       std::vector<std::string> local_module_objs;
+                                       for (const auto& input_path : task.inputs) {
+                                           if (input_path.size() >= 20
+                                               && input_path.compare(input_path.size() - 20, 20, ".module-exports.json") == 0) {
+                                               // Foreign manifest: producer collator wrote this.
+                                               auto man = read_module_manifest(input_path);
+                                               if (!man) {
+                                                   task_error = man.error();
+                                                   return;
+                                               }
+                                               for (const auto& e : man->entries) {
+                                                   // Defense in depth — producer should have already filtered.
+                                                   if (e.visibility != "PUBLIC" && e.visibility != "INTERFACE") continue;
+                                                   if (!record_provider(e.logical_name, e.primary_output, e.bmi_path, e.source_path))
+                                                       return;
+                                               }
+                                               continue;
+                                           }
 
-                                // Local DDI (P1689 JSON).
-                                auto p1689 = parse_p1689_file(input_path);
-                                if (!p1689) { task_error = p1689.error(); return; }
-                                if (p1689->rules.empty()) {
-                                    task_error = "P1689 file has no rules: " + input_path;
-                                    return;
-                                }
-                                if (p1689->rules.size() > 1) {
-                                    task_error = "P1689 file has more than one rule: " + input_path;
-                                    return;
-                                }
-                                const auto& rule = p1689->rules[0];
+                                           // Local DDI (P1689 JSON).
+                                           auto p1689 = parse_p1689_file(input_path);
+                                           if (!p1689) {
+                                               task_error = p1689.error();
+                                               return;
+                                           }
+                                           if (p1689->rules.empty()) {
+                                               task_error = "P1689 file has no rules: " + input_path;
+                                               return;
+                                           }
+                                           if (p1689->rules.size() > 1) {
+                                               task_error = "P1689 file has more than one rule: " + input_path;
+                                               return;
+                                           }
+                                           const auto& rule = p1689->rules[0];
 
-                                // primary-output is what we passed via -fdeps-target;
-                                // it equals get_obj_path(...) at scanner-task generation
-                                // time, so it's the obj task id directly.
-                                const std::string& obj_path = rule.primary_output;
-                                local_module_objs.push_back(obj_path);
+                                           // primary-output is what we passed via -fdeps-target;
+                                           // it equals get_obj_path(...) at scanner-task generation
+                                           // time, so it's the obj task id directly.
+                                           const std::string& obj_path = rule.primary_output;
+                                           local_module_objs.push_back(obj_path);
 
-                                if (rule.provides.size() > 1) {
-                                    task_error = "P1689 rule provides more than one module: " + input_path;
-                                    return;
-                                }
-                                if (!rule.provides.empty()) {
-                                    const auto& prov = rule.provides[0];
-                                    std::string bmi = get_bmi_path(task.parent_target->get_binary_dir(), prov.logical_name);
-                                    // GCC's P1689 doesn't populate provides[].source-path,
-                                    // so recover it from the upstream scanner task that
-                                    // produced this DDI.
-                                    std::string src = prov.source_path.value_or("");
-                                    if (src.empty()) {
-                                        auto scanner_it = task_by_id_.find(input_path);
-                                        if (scanner_it != task_by_id_.end()) {
-                                            if (auto* st = std::get_if<ModuleScannerTask>(&scanner_it->second->kind)) {
-                                                src = st->source_file;
-                                            }
-                                        }
-                                    }
-                                    if (!record_provider(prov.logical_name, obj_path, bmi, src)) return;
+                                           if (rule.provides.size() > 1) {
+                                               task_error = "P1689 rule provides more than one module: " + input_path;
+                                               return;
+                                           }
+                                           if (!rule.provides.empty()) {
+                                               const auto& prov = rule.provides[0];
+                                               std::string bmi = get_bmi_path(task.parent_target->get_binary_dir(), prov.logical_name);
+                                               // GCC's P1689 doesn't populate provides[].source-path,
+                                               // so recover it from the upstream scanner task that
+                                               // produced this DDI.
+                                               std::string src = prov.source_path.value_or("");
+                                               if (src.empty()) {
+                                                   auto scanner_it = task_by_id_.find(input_path);
+                                                   if (scanner_it != task_by_id_.end()) {
+                                                       if (auto* st = std::get_if<ModuleScannerTask>(&scanner_it->second->kind)) {
+                                                           src = st->source_file;
+                                                       }
+                                                   }
+                                               }
+                                               if (!record_provider(prov.logical_name, obj_path, bmi, src)) return;
 
-                                    // This module is exported iff its source lives in a
-                                    // PUBLIC or INTERFACE cxx_modules file set. Otherwise
-                                    // it stays internal to this target.
-                                    auto vis = task.parent_target->file_set_visibility_for_source(src);
-                                    if (vis && (*vis == PropertyVisibility::PUBLIC ||
-                                                *vis == PropertyVisibility::INTERFACE)) {
-                                        ModuleManifestEntry me;
-                                        me.logical_name = prov.logical_name;
-                                        me.bmi_path = bmi;
-                                        me.primary_output = obj_path;
-                                        me.source_path = src;
-                                        me.visibility = (*vis == PropertyVisibility::PUBLIC ? "PUBLIC" : "INTERFACE");
-                                        own_manifest.entries.push_back(std::move(me));
-                                    }
-                                }
+                                               // This module is exported iff its source lives in a
+                                               // PUBLIC or INTERFACE cxx_modules file set. Otherwise
+                                               // it stays internal to this target.
+                                               auto vis = task.parent_target->file_set_visibility_for_source(src);
+                                               if (vis && (*vis == PropertyVisibility::PUBLIC || *vis == PropertyVisibility::INTERFACE)) {
+                                                   ModuleManifestEntry me;
+                                                   me.logical_name = prov.logical_name;
+                                                   me.bmi_path = bmi;
+                                                   me.primary_output = obj_path;
+                                                   me.source_path = src;
+                                                   me.visibility = (*vis == PropertyVisibility::PUBLIC ? "PUBLIC" : "INTERFACE");
+                                                   own_manifest.entries.push_back(std::move(me));
+                                               }
+                                           }
 
-                                std::vector<std::string> requires_names;
-                                for (const auto& req : rule.requires_) {
-                                    if (req.lookup_method == "by-name") {
-                                        requires_names.push_back(req.logical_name);
-                                        continue;
-                                    }
-                                    // Header unit. The scanner gives us the resolved
-                                    // header path in source_path; that's the key both
-                                    // GCC and we use to identify the header unit.
-                                    if (req.lookup_method != "include-angle" &&
-                                        req.lookup_method != "include-quote") {
-                                        task_error = "Unsupported lookup-method '" + req.lookup_method +
-                                                     "' for import of '" + req.logical_name +
-                                                     "' in " + input_path;
-                                        return;
-                                    }
-                                    if (!req.source_path.has_value() || req.source_path->empty()) {
-                                        task_error = "Header-unit import '" + req.logical_name +
-                                                     "' has no resolved source-path in " + input_path +
-                                                     " — scanner failed to locate the header on the include path";
-                                        return;
-                                    }
-                                    HeaderUnitNeeded hu;
-                                    hu.source_path = *req.source_path;
-                                    hu.is_system = (req.lookup_method == "include-angle");
-                                    // First sighting wins; later sightings just confirm.
-                                    auto it = header_units.find(hu.source_path);
-                                    if (it == header_units.end()) {
-                                        header_units.emplace(hu.source_path, hu);
-                                    } else if (it->second.is_system != hu.is_system) {
-                                        // Mixed angle/quote include of the same resolved
-                                        // path — pick angle ("system") since it's the more
-                                        // permissive include search.
-                                        it->second.is_system = it->second.is_system || hu.is_system;
-                                    }
-                                    task_header_units[obj_path].push_back(hu.source_path);
-                                }
-                                if (!requires_names.empty()) {
-                                    task_requires[obj_path] = std::move(requires_names);
-                                }
-                            }
-                            if (!task_error.empty()) return;
+                                           std::vector<std::string> requires_names;
+                                           for (const auto& req : rule.requires_) {
+                                               if (req.lookup_method == "by-name") {
+                                                   requires_names.push_back(req.logical_name);
+                                                   continue;
+                                               }
+                                               // Header unit. The scanner gives us the resolved
+                                               // header path in source_path; that's the key both
+                                               // GCC and we use to identify the header unit.
+                                               if (req.lookup_method != "include-angle" && req.lookup_method != "include-quote") {
+                                                   task_error = "Unsupported lookup-method '" + req.lookup_method + "' for import of '"
+                                                                + req.logical_name + "' in " + input_path;
+                                                   return;
+                                               }
+                                               if (!req.source_path.has_value() || req.source_path->empty()) {
+                                                   task_error = "Header-unit import '" + req.logical_name
+                                                                + "' has no resolved source-path in " + input_path
+                                                                + " — scanner failed to locate the header on the include path";
+                                                   return;
+                                               }
+                                               HeaderUnitNeeded hu;
+                                               hu.source_path = *req.source_path;
+                                               hu.is_system = (req.lookup_method == "include-angle");
+                                               // First sighting wins; later sightings just confirm.
+                                               auto it = header_units.find(hu.source_path);
+                                               if (it == header_units.end()) {
+                                                   header_units.emplace(hu.source_path, hu);
+                                               } else if (it->second.is_system != hu.is_system) {
+                                                   // Mixed angle/quote include of the same resolved
+                                                   // path — pick angle ("system") since it's the more
+                                                   // permissive include search.
+                                                   it->second.is_system = it->second.is_system || hu.is_system;
+                                               }
+                                               task_header_units[obj_path].push_back(hu.source_path);
+                                           }
+                                           if (!requires_names.empty()) { task_requires[obj_path] = std::move(requires_names); }
+                                       }
+                                       if (!task_error.empty()) return;
 
-                            // Validate every required module has a provider.
-                            // The most common failure mode is `import std;` on
-                            // a GCC<15 toolchain (no libstdc++.modules.json) —
-                            // emit a targeted diagnostic for that case.
-                            for (const auto& [importer_obj, reqs] : task_requires) {
-                                for (const auto& mod : reqs) {
-                                    if (module_to_task.count(mod)) continue;
-                                    if (mod == "std" || mod == "std.compat") {
-                                        task_error =
-                                            "Module '" + mod + "' is not available: "
-                                            "kiln couldn't locate libstdc++.modules.json. "
-                                            "`import std;` requires GCC >= 15 with libstdc++ "
-                                            "module support installed. (importer: " + importer_obj + ")";
-                                    } else {
-                                        task_error =
-                                            "Module '" + mod + "' has no provider in this build. "
-                                            "Did you forget a target_link_libraries() to the providing target? "
-                                            "(importer: " + importer_obj + ")";
-                                    }
-                                    return;
-                                }
-                            }
+                                       // Validate every required module has a provider.
+                                       // The most common failure mode is `import std;` on
+                                       // a GCC<15 toolchain (no libstdc++.modules.json) —
+                                       // emit a targeted diagnostic for that case.
+                                       for (const auto& [importer_obj, reqs] : task_requires) {
+                                           for (const auto& mod : reqs) {
+                                               if (module_to_task.count(mod)) continue;
+                                               if (mod == "std" || mod == "std.compat") {
+                                                   task_error = "Module '" + mod
+                                                                + "' is not available: "
+                                                                  "kiln couldn't locate libstdc++.modules.json. "
+                                                                  "`import std;` requires GCC >= 15 with libstdc++ "
+                                                                  "module support installed. (importer: "
+                                                                + importer_obj + ")";
+                                               } else {
+                                                   task_error = "Module '" + mod
+                                                                + "' has no provider in this build. "
+                                                                  "Did you forget a target_link_libraries() to the providing target? "
+                                                                  "(importer: "
+                                                                + importer_obj + ")";
+                                               }
+                                               return;
+                                           }
+                                       }
 
-                            // Header-unit imports: each unique header gets a single
-                            // BMI under bmis/header_units/. We add a mapper entry
-                            // (key = resolved header path, value = BMI path) so
-                            // GCC finds the BMI when an importer compiles, and
-                            // remember the path so the next pass can spawn a
-                            // header-unit compile task and wire the dep edge.
-                            std::map<std::string, std::string> header_unit_to_bmi;
-                            if (!header_units.empty()) {
-                                if (!task.parent_target) {
-                                    task_error = "Header-unit imports require a parent target on the collator task";
-                                    return;
-                                }
-                                if (!collator.cxx_compiler) {
-                                    task_error = "Header-unit imports need a C++ compiler, but none was resolved for target '" +
-                                                 task.parent_target->get_name() + "'";
-                                    return;
-                                }
-                                const std::string& bin_dir = task.parent_target->get_binary_dir();
-                                for (auto& [src, hu] : header_units) {
-                                    std::string bmi = get_header_unit_bmi_path(bin_dir, src);
-                                    header_unit_to_bmi[src] = bmi;
-                                    ModuleMapEntry entry;
-                                    entry.module_name = src;          // header path is the key
-                                    entry.bmi_path = bmi;
-                                    entry.source_path = src;
-                                    entry.object_task_id = bmi;        // header-unit task id = BMI path
-                                    entry.is_header_unit = true;
-                                    mapper_entries.push_back(std::move(entry));
-                                }
-                            }
+                                       // Header-unit imports: each unique header gets a single
+                                       // BMI under bmis/header_units/. We add a mapper entry
+                                       // (key = resolved header path, value = BMI path) so
+                                       // GCC finds the BMI when an importer compiles, and
+                                       // remember the path so the next pass can spawn a
+                                       // header-unit compile task and wire the dep edge.
+                                       std::map<std::string, std::string> header_unit_to_bmi;
+                                       if (!header_units.empty()) {
+                                           if (!task.parent_target) {
+                                               task_error = "Header-unit imports require a parent target on the collator task";
+                                               return;
+                                           }
+                                           if (!collator.cxx_compiler) {
+                                               task_error = "Header-unit imports need a C++ compiler, but none was resolved for target '"
+                                                            + task.parent_target->get_name() + "'";
+                                               return;
+                                           }
+                                           const std::string& bin_dir = task.parent_target->get_binary_dir();
+                                           for (auto& [src, hu] : header_units) {
+                                               std::string bmi = get_header_unit_bmi_path(bin_dir, src);
+                                               header_unit_to_bmi[src] = bmi;
+                                               ModuleMapEntry entry;
+                                               entry.module_name = src; // header path is the key
+                                               entry.bmi_path = bmi;
+                                               entry.source_path = src;
+                                               entry.object_task_id = bmi; // header-unit task id = BMI path
+                                               entry.is_header_unit = true;
+                                               mapper_entries.push_back(std::move(entry));
+                                           }
+                                       }
 
-                            // GCC writes BMIs straight to the mapper-advertised path
-                            // without creating intermediate dirs — so bmis/ must exist
-                            // before any compile reads/writes the mapper.
-                            for (const auto& entry : mapper_entries) {
-                                std::error_code dir_ec;
-                                std::filesystem::create_directories(
-                                    std::string(Path(entry.bmi_path).parent_path()), dir_ec);
-                            }
+                                       // GCC writes BMIs straight to the mapper-advertised path
+                                       // without creating intermediate dirs — so bmis/ must exist
+                                       // before any compile reads/writes the mapper.
+                                       for (const auto& entry : mapper_entries) {
+                                           std::error_code dir_ec;
+                                           std::filesystem::create_directories(std::string(Path(entry.bmi_path).parent_path()), dir_ec);
+                                       }
 
-                            std::string mapper_content = generate_module_mapper_content(mapper_entries);
-                            // task.outputs[0] is the mapper, [1] is the manifest (set in
-                            // generate_module_collator_task). Write both.
-                            std::ofstream mapper_file(task.outputs[0]);
-                            if (!mapper_file) { task_error = "Failed to write module mapper: " + task.outputs[0]; return; }
-                            mapper_file << mapper_content;
-                            mapper_file.close();
+                                       std::string mapper_content = generate_module_mapper_content(mapper_entries);
+                                       // task.outputs[0] is the mapper, [1] is the manifest (set in
+                                       // generate_module_collator_task). Write both.
+                                       std::ofstream mapper_file(task.outputs[0]);
+                                       if (!mapper_file) {
+                                           task_error = "Failed to write module mapper: " + task.outputs[0];
+                                           return;
+                                       }
+                                       mapper_file << mapper_content;
+                                       mapper_file.close();
 
-                            if (task.outputs.size() >= 2) {
-                                auto wm = write_module_manifest(task.outputs[1], own_manifest);
-                                if (!wm) { task_error = wm.error(); return; }
-                            }
+                                       if (task.outputs.size() >= 2) {
+                                           auto wm = write_module_manifest(task.outputs[1], own_manifest);
+                                           if (!wm) {
+                                               task_error = wm.error();
+                                               return;
+                                           }
+                                       }
 
-                            // Clang-style consumption: per-importer response files.
-                            // Clang has no -fmodule-mapper= equivalent, so we materialize
-                            // the same name -> BMI bindings into per-task rsp files at
-                            // <obj>.modules.rsp. ClangCompiler::emit_module_compile_flags
-                            // bakes `@<that-path>` into argv at scheduling time; the file
-                            // here is the late-bound contents.
-                            if (collator.cxx_compiler &&
-                                collator.cxx_compiler->uses_per_task_module_rsp()) {
-                                // Build logical_name -> bmi_path lookup once.
-                                std::map<std::string, std::string> name_to_bmi;
-                                for (const auto& e : mapper_entries) {
-                                    if (!e.is_header_unit) name_to_bmi[e.module_name] = e.bmi_path;
-                                }
-                                // Reverse module_to_task to find: obj_path -> logical_name
-                                // (so a producer task can emit -fmodule-output=<bmi>).
-                                std::map<std::string, std::string> obj_to_provided;
-                                for (const auto& [name, obj] : module_to_task) {
-                                    obj_to_provided[obj] = name;
-                                }
-                                for (const auto& obj : local_module_objs) {
-                                    std::string rsp_path = obj + ".modules.rsp";
-                                    std::error_code dir_ec;
-                                    std::filesystem::create_directories(
-                                        std::string(Path(rsp_path).parent_path()), dir_ec);
-                                    std::ofstream rsp(rsp_path);
-                                    if (!rsp) {
-                                        task_error = "Failed to write modules rsp: " + rsp_path;
-                                        return;
-                                    }
-                                    auto req_it = task_requires.find(obj);
-                                    if (req_it != task_requires.end()) {
-                                        for (const auto& name : req_it->second) {
-                                            auto bit = name_to_bmi.find(name);
-                                            if (bit == name_to_bmi.end()) continue;
-                                            rsp << "-fmodule-file=" << name << "=" << bit->second << "\n";
-                                        }
-                                    }
-                                    auto prov_it = obj_to_provided.find(obj);
-                                    if (prov_it != obj_to_provided.end()) {
-                                        auto bit = name_to_bmi.find(prov_it->second);
-                                        if (bit != name_to_bmi.end()) {
-                                            rsp << "-fmodule-output=" << bit->second << "\n";
-                                        }
-                                    }
-                                }
-                            }
+                                       // Clang-style consumption: per-importer response files.
+                                       // Clang has no -fmodule-mapper= equivalent, so we materialize
+                                       // the same name -> BMI bindings into per-task rsp files at
+                                       // <obj>.modules.rsp. ClangCompiler::emit_module_compile_flags
+                                       // bakes `@<that-path>` into argv at scheduling time; the file
+                                       // here is the late-bound contents.
+                                       if (collator.cxx_compiler && collator.cxx_compiler->uses_per_task_module_rsp()) {
+                                           // Build logical_name -> bmi_path lookup once.
+                                           std::map<std::string, std::string> name_to_bmi;
+                                           for (const auto& e : mapper_entries) {
+                                               if (!e.is_header_unit) name_to_bmi[e.module_name] = e.bmi_path;
+                                           }
+                                           // Reverse module_to_task to find: obj_path -> logical_name
+                                           // (so a producer task can emit -fmodule-output=<bmi>).
+                                           std::map<std::string, std::string> obj_to_provided;
+                                           for (const auto& [name, obj] : module_to_task) { obj_to_provided[obj] = name; }
+                                           for (const auto& obj : local_module_objs) {
+                                               std::string rsp_path = obj + ".modules.rsp";
+                                               std::error_code dir_ec;
+                                               std::filesystem::create_directories(std::string(Path(rsp_path).parent_path()), dir_ec);
+                                               std::ofstream rsp(rsp_path);
+                                               if (!rsp) {
+                                                   task_error = "Failed to write modules rsp: " + rsp_path;
+                                                   return;
+                                               }
+                                               auto req_it = task_requires.find(obj);
+                                               if (req_it != task_requires.end()) {
+                                                   for (const auto& name : req_it->second) {
+                                                       auto bit = name_to_bmi.find(name);
+                                                       if (bit == name_to_bmi.end()) continue;
+                                                       rsp << "-fmodule-file=" << name << "=" << bit->second << "\n";
+                                                   }
+                                               }
+                                               auto prov_it = obj_to_provided.find(obj);
+                                               if (prov_it != obj_to_provided.end()) {
+                                                   auto bit = name_to_bmi.find(prov_it->second);
+                                                   if (bit != name_to_bmi.end()) { rsp << "-fmodule-output=" << bit->second << "\n"; }
+                                               }
+                                           }
+                                       }
 
-                            inject_module_dependencies(module_to_task, task_requires);
+                                       inject_module_dependencies(module_to_task, task_requires);
 
-                            // Spawn header-unit compile tasks and wire compile-task
-                            // → header-unit-task edges. The mapper file already has
-                            // each header unit's BMI path advertised, so GCC will
-                            // place the BMI exactly where downstream importers expect.
-                            if (!header_units.empty()) {
-                                inject_header_unit_tasks(*task.parent_target,
-                                                         collator.cxx_compiler,
-                                                         collator.cxx_standard,
-                                                         collator.cxx_extensions_enabled,
-                                                         task.outputs[0],   // mapper path
-                                                         header_units,
-                                                         header_unit_to_bmi,
-                                                         task_header_units,
-                                                         task_error);
-                                if (!task_error.empty()) return;
-                            }
-                        },
-                        [&](const ModuleScannerTask& scanner) {
-                            std::string scan_display(Path(scanner.source_file).filename());
-                            print_status("Scanning", scan_display);
+                                       // Spawn header-unit compile tasks and wire compile-task
+                                       // → header-unit-task edges. The mapper file already has
+                                       // each header unit's BMI path advertised, so GCC will
+                                       // place the BMI exactly where downstream importers expect.
+                                       if (!header_units.empty()) {
+                                           inject_header_unit_tasks(*task.parent_target, collator.cxx_compiler, collator.cxx_standard,
+                                                                    collator.cxx_extensions_enabled,
+                                                                    task.outputs[0], // mapper path
+                                                                    header_units, header_unit_to_bmi, task_header_units, task_error);
+                                           if (!task_error.empty()) return;
+                                       }
+                                   },
+                                   [&](const ModuleScannerTask& scanner) {
+                                       std::string scan_display(Path(scanner.source_file).filename());
+                                       print_status("Scanning", scan_display);
 
-                            // GCC writes the P1689 JSON directly to ctx.output via
-                            // -fdeps-file=. We only need to surface compiler errors;
-                            // the DDI is parsed later by the collator.
-                            auto result = run_command(task.commands[0], task.working_dir);
-                            if (result.exit_code != 0) {
-                                report_command_failure(state, result.output);
-                                task_error = "Module scan failed for " + scanner.source_file;
-                                return;
-                            }
-                            if (!std::filesystem::exists(task.outputs[0])) {
-                                task_error = "Module scan produced no DDI: " + task.outputs[0];
-                            }
-                        },
-                        [&](const auto&) {
-                            // Regular task execution (compile, PCH, link, custom command/target, pre/post-build)
-                            std::string verb = "Running";
-                            auto src = task.get_source_file();
-                            std::string target_display(src.empty() ?
-                                Path(id).filename() :
-                                Path(src).filename());
+                                       // GCC writes the P1689 JSON directly to ctx.output via
+                                       // -fdeps-file=. We only need to surface compiler errors;
+                                       // the DDI is parsed later by the collator.
+                                       auto result = run_command(task.commands[0], task.working_dir);
+                                       if (result.exit_code != 0) {
+                                           report_command_failure(state, result.output);
+                                           task_error = "Module scan failed for " + scanner.source_file;
+                                           return;
+                                       }
+                                       if (!std::filesystem::exists(task.outputs[0])) {
+                                           task_error = "Module scan produced no DDI: " + task.outputs[0];
+                                       }
+                                   },
+                                   [&](const auto&) {
+                                       // Regular task execution (compile, PCH, link, custom command/target, pre/post-build)
+                                       std::string verb = "Running";
+                                       auto src = task.get_source_file();
+                                       std::string target_display(src.empty() ? Path(id).filename() : Path(src).filename());
 
-                            if (task.is_compilation()) {
-                                 verb = "Compiling";
-                            } else if (std::holds_alternative<MocTask>(task.kind)) {
-                                verb = "  Moc'ing";
-                            } else if (std::holds_alternative<UicTask>(task.kind)) {
-                                verb = "  Uic'ing";
-                            } else if (std::holds_alternative<RccTask>(task.kind)) {
-                                verb = "  Rcc'ing";
-                            } else if (task.parent_target && id == task.parent_target->get_output_path() && task.parent_target->get_type() != TargetType::CUSTOM) {
-                                verb = "  Linking";
-                            }
+                                       if (task.is_compilation()) {
+                                           verb = "Compiling";
+                                       } else if (std::holds_alternative<MocTask>(task.kind)) {
+                                           verb = "  Moc'ing";
+                                       } else if (std::holds_alternative<UicTask>(task.kind)) {
+                                           verb = "  Uic'ing";
+                                       } else if (std::holds_alternative<RccTask>(task.kind)) {
+                                           verb = "  Rcc'ing";
+                                       } else if (task.parent_target && id == task.parent_target->get_output_path()
+                                                  && task.parent_target->get_type() != TargetType::CUSTOM) {
+                                           verb = "  Linking";
+                                       }
 
-                            if (task.parent_target && task.parent_target->get_type() == TargetType::CUSTOM) {
-                                std::string comment = task.parent_target->get_property("COMMENT");
-                                if (!comment.empty()) {
-                                    target_display = comment;
-                                }
-                            }
+                                       if (task.parent_target && task.parent_target->get_type() == TargetType::CUSTOM) {
+                                           std::string comment = task.parent_target->get_property("COMMENT");
+                                           if (!comment.empty()) { target_display = comment; }
+                                       }
 
-                            print_status(verb, target_display);
+                                       print_status(verb, target_display);
 
-                            for (auto cmd : task.commands) {
-                                // Strip shell-style quoting from COMMAND args.
-                                // CMake expects shell to strip quotes like -flag="value".
-                                // Since we use execvp (no shell), we strip them here.
-                                if (task.is_shell_command()) {
-                                    for (auto& arg : cmd) {
-                                        arg = strip_shell_quoting(arg);
-                                    }
-                                }
-                                auto result = kiln::run_command(cmd, task.working_dir);
-                                if (result.exit_code != 0) {
-                                    report_command_failure(state, result.output);
-                                    task_error = "Command failed: " + join_command(cmd);
-                                    return;
-                                } else if (!result.output.empty()) {
-                                    std::lock_guard<std::mutex> lock(output_mutex_);
-                                    if (state.output_capture) {
-                                        state.output_capture->append(result.output);
-                                        if (state.output_capture->empty() ||
-                                            state.output_capture->back() != '\n') {
-                                            state.output_capture->push_back('\n');
-                                        }
-                                    } else {
-                                        state.progress.print_line(result.output);
-                                    }
-                                }
-                            }
+                                       for (auto cmd : task.commands) {
+                                           // Strip shell-style quoting from COMMAND args.
+                                           // CMake expects shell to strip quotes like -flag="value".
+                                           // Since we use execvp (no shell), we strip them here.
+                                           if (task.is_shell_command()) {
+                                               for (auto& arg : cmd) { arg = strip_shell_quoting(arg); }
+                                           }
+                                           auto result = kiln::run_command(cmd, task.working_dir);
+                                           if (result.exit_code != 0) {
+                                               report_command_failure(state, result.output);
+                                               task_error = "Command failed: " + join_command(cmd);
+                                               return;
+                                           } else if (!result.output.empty()) {
+                                               std::lock_guard<std::mutex> lock(output_mutex_);
+                                               if (state.output_capture) {
+                                                   state.output_capture->append(result.output);
+                                                   if (state.output_capture->empty() || state.output_capture->back() != '\n') {
+                                                       state.output_capture->push_back('\n');
+                                                   }
+                                               } else {
+                                                   state.progress.print_line(result.output);
+                                               }
+                                           }
+                                       }
 
-                            // For custom_command tasks: warn if declared OUTPUTs
-                            // were not actually produced. CMake's Make/Ninja
-                            // generators do NOT error out here — they happily
-                            // accept rules whose touch lands somewhere other
-                            // than the declared OUTPUT (e.g. a relative OUTPUT
-                            // combined with a WORKING_DIRECTORY pointing at a
-                            // different binary subdir). A warning still flags
-                            // commands that exit 0 but write nothing, which
-                            // would otherwise cause confusing downstream
-                            // "missing header" errors.
-                            if (std::holds_alternative<CustomCommandTask>(task.kind)) {
-                                auto color = [&](std::string_view code) -> std::string_view {
-                                    return state.stdout_is_tty ? code : std::string_view{};
-                                };
-                                for (const auto& out : task.outputs) {
-                                    std::error_code ec;
-                                    if (std::filesystem::exists(out, ec)) continue;
+                                       // For custom_command tasks: warn if declared OUTPUTs
+                                       // were not actually produced. CMake's Make/Ninja
+                                       // generators do NOT error out here — they happily
+                                       // accept rules whose touch lands somewhere other
+                                       // than the declared OUTPUT (e.g. a relative OUTPUT
+                                       // combined with a WORKING_DIRECTORY pointing at a
+                                       // different binary subdir). A warning still flags
+                                       // commands that exit 0 but write nothing, which
+                                       // would otherwise cause confusing downstream
+                                       // "missing header" errors.
+                                       if (std::holds_alternative<CustomCommandTask>(task.kind)) {
+                                           auto color = [&](std::string_view code) -> std::string_view {
+                                               return state.stdout_is_tty ? code : std::string_view{};
+                                           };
+                                           for (const auto& out : task.outputs) {
+                                               std::error_code ec;
+                                               if (std::filesystem::exists(out, ec)) continue;
 
-                                    std::filesystem::path expected(out);
-                                    std::string detail;
-                                    detail += std::string(color(kiln::colors::BOLD_YELLOW)) + "warning:" + std::string(color(kiln::colors::RESET));
-                                    detail += " custom_command rule for '" + expected.filename().string() + "' exited 0 but did not create its declared OUTPUT\n";
-                                    detail += "         declared OUTPUT: " + out + "\n";
-                                    detail += "         working dir:     " + task.working_dir + "\n";
-                                    detail += std::string(color(kiln::colors::DIM));
-                                    detail += "         downstream rules depending on this OUTPUT may fail, and this\n";
-                                    detail += "         rule will re-run on every build since its OUTPUT never appears.\n";
-                                    detail += std::string(color(kiln::colors::RESET));
-                                    detail += "         commands run:\n";
-                                    for (const auto& cmd : task.commands) {
-                                        detail += "           $ " + join_command(cmd) + "\n";
-                                    }
-                                    std::lock_guard<std::mutex> lock(output_mutex_);
-                                    state.progress.print_line(detail);
-                                }
-                            }
-                        }
-                    }, task.kind);
+                                               std::filesystem::path expected(out);
+                                               std::string detail;
+                                               detail += std::string(color(kiln::colors::BOLD_YELLOW))
+                                                         + "warning:" + std::string(color(kiln::colors::RESET));
+                                               detail += " custom_command rule for '" + expected.filename().string()
+                                                         + "' exited 0 but did not create its declared OUTPUT\n";
+                                               detail += "         declared OUTPUT: " + out + "\n";
+                                               detail += "         working dir:     " + task.working_dir + "\n";
+                                               detail += std::string(color(kiln::colors::DIM));
+                                               detail += "         downstream rules depending on this OUTPUT may fail, and this\n";
+                                               detail += "         rule will re-run on every build since its OUTPUT never appears.\n";
+                                               detail += std::string(color(kiln::colors::RESET));
+                                               detail += "         commands run:\n";
+                                               for (const auto& cmd : task.commands) {
+                                                   detail += "           $ " + join_command(cmd) + "\n";
+                                               }
+                                               std::lock_guard<std::mutex> lock(output_mutex_);
+                                               state.progress.print_line(detail);
+                                           }
+                                       }
+                                   }},
+                        task.kind);
                     if (!task_error.empty()) break;
 
                     // Emit profiling event with full command details
@@ -1616,23 +1530,22 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                     // see fresh mtimes (e.g. link task sees recompiled .o)
                     {
                         std::lock_guard<std::mutex> lock(state_mutex_);
-                        for (const auto& out : task.outputs) {
-                            stat_cache_.erase(out);
-                        }
+                        for (const auto& out : task.outputs) { stat_cache_.erase(out); }
                     }
 
                     // Recalculate signature after compilation (now .d files exist)
                     if (!task.always_run) {
                         auto new_sig_res = calculate_signature(task);
-                        if (!new_sig_res) { task_error = new_sig_res.error(); break; }
+                        if (!new_sig_res) {
+                            task_error = new_sig_res.error();
+                            break;
+                        }
                         sig = *new_sig_res;
                     }
                 } while (false);
 
                 // Remove from active task list if we added it
-                if (!active_display_name.empty()) {
-                    state.progress.task_finished(active_display_name);
-                }
+                if (!active_display_name.empty()) { state.progress.task_finished(active_display_name); }
 
                 // Mark task complete (or failed)
                 {
@@ -1658,9 +1571,7 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
                     state.running.erase(current);
 
                     // Check if any dirty/maybe dependents are now ready
-                    for (auto* dep_task : get_dependents(current)) {
-                        try_promote_to_ready(dep_task, state);
-                    }
+                    for (auto* dep_task : get_dependents(current)) { try_promote_to_ready(dep_task, state); }
 
                     state.cv.notify_all();
                 }
@@ -1676,28 +1587,22 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     // so we don't redo them on the next build. Cache-save errors are logged
     // but never override an in-flight build error.
     if (auto r = save_cache(state.build_dir, state.new_cache); !r) {
-        kiln::print_message(std::cerr, "WARNING",
-            "Failed to save build cache (" + state.build_dir + "): " + r.error());
+        kiln::print_message(std::cerr, "WARNING", "Failed to save build cache (" + state.build_dir + "): " + r.error());
     }
 
     // Save EP-specific caches to their respective build directories
     for (const auto& [ep_dir, ep_cache_entries] : state.ep_caches) {
         // Load existing EP cache and merge with new entries
         auto ep_cache = load_cache(ep_dir);
-        for (const auto& [task_id, sig] : ep_cache_entries) {
-            ep_cache[task_id] = sig;
-        }
+        for (const auto& [task_id, sig] : ep_cache_entries) { ep_cache[task_id] = sig; }
         if (auto r = save_cache(ep_dir, ep_cache); !r) {
-            kiln::print_message(std::cerr, "WARNING",
-                "Failed to save EP cache (" + ep_dir + "): " + r.error());
+            kiln::print_message(std::cerr, "WARNING", "Failed to save EP cache (" + ep_dir + "): " + r.error());
         }
     }
 
     state.progress.finish();
 
-    if (!state.fatal_error.empty()) {
-        return std::unexpected(state.fatal_error);
-    }
+    if (!state.fatal_error.empty()) { return std::unexpected(state.fatal_error); }
 
     auto end_time = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -1707,30 +1612,24 @@ std::expected<void, std::string> BuildGraph::execute(const std::string& build_di
     if (dirty_task_count > 1) {
         std::unordered_set<BuildTask*> visited;
         std::function<double(BuildTask*)> compute_critical = [&](BuildTask* t) -> double {
-            if (t->critical_path_s > 0.0) return t->critical_path_s;  // memoized
-            if (!visited.insert(t).second) return 0.0;  // cycle guard
+            if (t->critical_path_s > 0.0) return t->critical_path_s; // memoized
+            if (!visited.insert(t).second) return 0.0;               // cycle guard
 
             double dep_max = 0.0;
-            for (auto* dep : t->dependencies) {
-                dep_max = std::max(dep_max, compute_critical(dep));
-            }
+            for (auto* dep : t->dependencies) { dep_max = std::max(dep_max, compute_critical(dep)); }
             t->critical_path_s = t->execution_time_s + dep_max;
             return t->critical_path_s;
         };
 
-        for (const auto& task_ptr : tasks_) {
-            max_critical_path = std::max(max_critical_path, compute_critical(task_ptr.get()));
-        }
+        for (const auto& task_ptr : tasks_) { max_critical_path = std::max(max_critical_path, compute_critical(task_ptr.get())); }
     }
 
     {
         std::lock_guard<std::mutex> lock(output_mutex_);
         double wall_s = duration.count() / 1000.0;
-        std::cout << kiln::c(std::cout, kiln::colors::BOLD_GREEN) << std::setw(12) << "Finished" << kiln::c(std::cout, kiln::colors::RESET) << " build in "
-                << std::fixed << std::setprecision(2) << wall_s << "s";
-        if (max_critical_path > 0.0) {
-            std::cout << " (critical path: " << std::setprecision(2) << max_critical_path << "s)";
-        }
+        std::cout << kiln::c(std::cout, kiln::colors::BOLD_GREEN) << std::setw(12) << "Finished" << kiln::c(std::cout, kiln::colors::RESET)
+                  << " build in " << std::fixed << std::setprecision(2) << wall_s << "s";
+        if (max_critical_path > 0.0) { std::cout << " (critical path: " << std::setprecision(2) << max_critical_path << "s)"; }
         std::cout << std::endl;
     }
 
@@ -1756,9 +1655,7 @@ std::vector<std::string> BuildGraph::get_deps_for_output(const std::string& outp
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
         auto it = deps_cache_.find(deps_file);
-        if (it != deps_cache_.end() && it->second.d_file_mtime == *d_mtime) {
-            return it->second.deps;
-        }
+        if (it != deps_cache_.end() && it->second.d_file_mtime == *d_mtime) { return it->second.deps; }
     }
 
     // Cache miss - parse the .d file
@@ -1777,9 +1674,7 @@ std::vector<std::string> BuildGraph::get_deps_for_output(const std::string& outp
     std::vector<std::string> deps;
     std::stringstream ss(deps_part);
     std::string dep;
-    while (ss >> dep) {
-        deps.push_back(dep);
-    }
+    while (ss >> dep) { deps.push_back(dep); }
 
     // Store in cache
     {
@@ -1807,12 +1702,9 @@ static std::expected<std::vector<std::string>, std::string> get_headers_via_h_fl
     std::string source;
     for (size_t i = 1; i < command.size(); ++i) {
         const auto& arg = command[i];
-        if (arg.starts_with("-I") || arg.starts_with("-D") || arg.starts_with("-std=") ||
-            arg.starts_with("-f") || arg == "-include") {
+        if (arg.starts_with("-I") || arg.starts_with("-D") || arg.starts_with("-std=") || arg.starts_with("-f") || arg == "-include") {
             scan_cmd.push_back(arg);
-            if (arg == "-include" && i + 1 < command.size()) {
-                scan_cmd.push_back(command[++i]);
-            }
+            if (arg == "-include" && i + 1 < command.size()) { scan_cmd.push_back(command[++i]); }
         } else if (arg.ends_with(".cpp") || arg.ends_with(".c") || arg.ends_with(".cc")) {
             source = arg;
         }
@@ -1830,27 +1722,28 @@ static std::expected<std::vector<std::string>, std::string> get_headers_via_h_fl
     FILE* pipe = popen(full_cmd.c_str(), "r");
     if (!pipe) return std::unexpected("Failed to execute " + scan_cmd[0] + " for header scanning");
 
-        std::string full_output;
-        while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
-            std::string line(buffer.data());
-            full_output += line;
-            if (line.starts_with(".")) {
-                // Lines look like ". /path/to/header.h" or ".. /path/to/header.h"
-                size_t first_space = line.find(' ');
-                if (first_space != std::string::npos) {
-                    std::string header = line.substr(first_space + 1);
-                    if (!header.empty() && header.back() == '\n') header.pop_back();
-                    headers.push_back(header);
-                }
+    std::string full_output;
+    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+        std::string line(buffer.data());
+        full_output += line;
+        if (line.starts_with(".")) {
+            // Lines look like ". /path/to/header.h" or ".. /path/to/header.h"
+            size_t first_space = line.find(' ');
+            if (first_space != std::string::npos) {
+                std::string header = line.substr(first_space + 1);
+                if (!header.empty() && header.back() == '\n') header.pop_back();
+                headers.push_back(header);
             }
         }
-
-        int status = pclose(pipe);
-        if (status != 0) {
-            return std::unexpected("Header scanning failed for " + source + " with exit code " + std::to_string(status) + "\nOutput:\n" + full_output);
-        }
-        return headers;
     }
+
+    int status = pclose(pipe);
+    if (status != 0) {
+        return std::unexpected("Header scanning failed for " + source + " with exit code " + std::to_string(status) + "\nOutput:\n"
+                               + full_output);
+    }
+    return headers;
+}
 std::optional<std::filesystem::file_time_type> BuildGraph::get_file_time_if_exists(const std::string& path) {
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
@@ -1875,9 +1768,9 @@ std::expected<std::string, std::string> BuildGraph::calculate_signature(const Bu
     // -fdiagnostics-color=always) are stripped there so toggling color
     // doesn't invalidate object cache. Fall back to the real argv when a
     // task didn't go through a Compiler driver (custom commands etc).
-    const auto& sig_cmds = (!task.signature_commands.empty() &&
-                            task.signature_commands.size() == task.commands.size())
-                            ? task.signature_commands : task.commands;
+    const auto& sig_cmds = (!task.signature_commands.empty() && task.signature_commands.size() == task.commands.size())
+                               ? task.signature_commands
+                               : task.commands;
     for (const auto& cmd : sig_cmds) oss << join_command(cmd) << ";";
     oss << "|";
 
@@ -1901,9 +1794,7 @@ std::expected<std::string, std::string> BuildGraph::calculate_signature(const Bu
         }
         for (const auto& binary : unique_binaries) {
             std::string ver = toolchain_->version_for(binary);
-            if (!ver.empty()) {
-                oss << "tool:" << binary << ":" << ver << "|";
-            }
+            if (!ver.empty()) { oss << "tool:" << binary << ":" << ver << "|"; }
         }
     }
 
@@ -1911,9 +1802,7 @@ std::expected<std::string, std::string> BuildGraph::calculate_signature(const Bu
 
     // 1. Primary inputs (combined exists+stat)
     for (const auto& in : task.inputs) {
-        if (auto mtime = get_file_time_if_exists(in)) {
-            oss << in << ":" << mtime->time_since_epoch().count() << "|";
-        }
+        if (auto mtime = get_file_time_if_exists(in)) { oss << in << ":" << mtime->time_since_epoch().count() << "|"; }
     }
 
     // 2. Header dependencies from .d files (cached parsing + combined exists+stat).
@@ -1929,9 +1818,7 @@ std::expected<std::string, std::string> BuildGraph::calculate_signature(const Bu
         if (!deps.empty()) {
             for (const auto& dep : deps) {
                 if (own_outputs.count(dep)) continue;
-                if (auto mtime = get_file_time_if_exists(dep)) {
-                    oss << "dep:" << dep << ":" << mtime->time_since_epoch().count() << "|";
-                }
+                if (auto mtime = get_file_time_if_exists(dep)) { oss << "dep:" << dep << ":" << mtime->time_since_epoch().count() << "|"; }
             }
             found_deps = true;
         }
@@ -1976,9 +1863,7 @@ std::map<std::string, std::string> BuildGraph::load_cache(const std::string& bui
     std::string line;
     while (std::getline(file, line)) {
         size_t sep = line.find('=');
-        if (sep != std::string::npos) {
-            cache[line.substr(0, sep)] = line.substr(sep + 1);
-        }
+        if (sep != std::string::npos) { cache[line.substr(0, sep)] = line.substr(sep + 1); }
     }
     return cache;
 }
@@ -1986,47 +1871,31 @@ std::map<std::string, std::string> BuildGraph::load_cache(const std::string& bui
 std::expected<void, std::string> BuildGraph::save_cache(const std::string& build_dir, const std::map<std::string, std::string>& cache) {
     std::error_code ec;
     std::filesystem::create_directories(build_dir, ec);
-    if (ec) {
-        return std::unexpected("Failed to create build directory: " + build_dir + " (" + ec.message() + ")");
-    }
+    if (ec) { return std::unexpected("Failed to create build directory: " + build_dir + " (" + ec.message() + ")"); }
 
     // Write build_dir validation file
     auto canonical_build_dir = std::filesystem::canonical(build_dir, ec);
-    if (ec) {
-        return std::unexpected("Failed to canonicalize build directory: " + build_dir);
-    }
+    if (ec) { return std::unexpected("Failed to canonicalize build directory: " + build_dir); }
     std::ofstream meta_file(Path::join(build_dir, ".kiln_build_path"));
-    if (meta_file) {
-        meta_file << canonical_build_dir.string();
-    }
+    if (meta_file) { meta_file << canonical_build_dir.string(); }
 
     std::string cache_path = Path::join(build_dir, ".kiln_cache");
     std::ofstream file(cache_path);
-    if (!file) {
-        return std::unexpected("Failed to open cache file for writing: " + cache_path);
-    }
+    if (!file) { return std::unexpected("Failed to open cache file for writing: " + cache_path); }
 
-    for (const auto& [id, sig] : cache) {
-        file << id << "=" << sig << "\n";
-    }
+    for (const auto& [id, sig] : cache) { file << id << "=" << sig << "\n"; }
 
-    if (!file) {
-        return std::unexpected("Failed to write to cache file");
-    }
+    if (!file) { return std::unexpected("Failed to write to cache file"); }
 
     return {};
 }
 
-void BuildGraph::inject_header_unit_tasks(
-    Target& parent_target,
-    const Compiler* cxx_compiler,
-    const std::string& cxx_standard,
-    bool cxx_extensions_enabled,
-    const std::string& mapper_path,
-    const std::map<std::string, HeaderUnitInfo>& header_units,
-    const std::map<std::string, std::string>& header_unit_to_bmi,
-    const std::map<std::string, std::vector<std::string>>& task_header_units,
-    std::string& task_error) {
+void BuildGraph::inject_header_unit_tasks(Target& parent_target, const Compiler* cxx_compiler, const std::string& cxx_standard,
+                                          bool cxx_extensions_enabled, const std::string& mapper_path,
+                                          const std::map<std::string, HeaderUnitInfo>& header_units,
+                                          const std::map<std::string, std::string>& header_unit_to_bmi,
+                                          const std::map<std::string, std::vector<std::string>>& task_header_units,
+                                          std::string& task_error) {
 
     if (!cxx_compiler) return;
 
@@ -2108,9 +1977,8 @@ void BuildGraph::inject_header_unit_tasks(
     }
 }
 
-void BuildGraph::inject_module_dependencies(
-    const std::map<std::string, std::string>& module_to_task,
-    const std::map<std::string, std::vector<std::string>>& task_requires) {
+void BuildGraph::inject_module_dependencies(const std::map<std::string, std::string>& module_to_task,
+                                            const std::map<std::string, std::vector<std::string>>& task_requires) {
 
     auto txn = begin_locked(graph_mutation_mutex_);
 
@@ -2123,9 +1991,7 @@ void BuildGraph::inject_module_dependencies(
 
         for (const auto& required_module : required_modules) {
             auto provider_it = module_to_task.find(required_module);
-            if (provider_it == module_to_task.end()) {
-                continue;
-            }
+            if (provider_it == module_to_task.end()) { continue; }
 
             auto task_it = task_by_id_.find(provider_it->second);
             if (task_it == task_by_id_.end()) continue;
@@ -2139,9 +2005,8 @@ void BuildGraph::inject_module_dependencies(
     // txn commits + releases lock on destruction
 }
 
-std::expected<int, std::string>
-BuildGraph::attach_ep_graph(
-    BuildGraph&& ep_graph, const std::string& ep_binary_dir, ExecutionState& state) {
+std::expected<int, std::string> BuildGraph::attach_ep_graph(BuildGraph&& ep_graph, const std::string& ep_binary_dir,
+                                                            ExecutionState& state) {
 
     // Lock state.mutex for thread safety - same lock used by execute() worker threads
     std::lock_guard<std::mutex> lock(state.mutex);
@@ -2167,7 +2032,6 @@ BuildGraph::attach_ep_graph(
 
         task.ep_binary_dir = ep_binary_dir;
         dirty_info.push_back({task_uptr.get(), is_marker, is_dirty});
-
     }
 
     // 3. Transfer task ownership via transaction
@@ -2235,9 +2099,7 @@ BuildGraph::attach_ep_graph(
     // 7. Update progress and add ready dirty tasks to ready_set
     state.progress.bump_total(dirty_count);
 
-    for (const auto& [ptr, _] : state.dirty_state) {
-        try_promote_to_ready(ptr, state);
-    }
+    for (const auto& [ptr, _] : state.dirty_state) { try_promote_to_ready(ptr, state); }
 
     // Notify waiting threads that new tasks are available
     state.cv.notify_all();
@@ -2245,28 +2107,24 @@ BuildGraph::attach_ep_graph(
     return dirty_count;
 }
 
-std::optional<std::string> BuildGraph::run_ep_orchestrator(
-    BuildTask& task, ExecutionState& state) {
+std::optional<std::string> BuildGraph::run_ep_orchestrator(BuildTask& task, ExecutionState& state) {
 
     // Get the ExternalProjectTarget from the task
     auto* ep_target = dynamic_cast<ExternalProjectTarget*>(task.parent_target);
-    if (!ep_target) {
-        return "EP orchestrator task has no ExternalProjectTarget";
-    }
+    if (!ep_target) { return "EP orchestrator task has no ExternalProjectTarget"; }
 
     std::string ep_name = ep_target->get_name();
-    std::string sentinel_id = ep_name;  // Sentinel task ID is the EP name
+    std::string sentinel_id = ep_name; // Sentinel task ID is the EP name
 
     // Helper to print output lines with EP name prefix (for child interpreter output)
     auto print_prefixed_output = [&](const std::string& output) {
         if (output.empty()) return;
-        std::string prefix = std::string(c(state.stdout_is_tty, colors::DIM)) + std::string(c(state.stdout_is_tty, colors::WHITE)) + "[" + ep_name + "] " + std::string(c(state.stdout_is_tty, colors::RESET));
+        std::string prefix = std::string(c(state.stdout_is_tty, colors::DIM)) + std::string(c(state.stdout_is_tty, colors::WHITE)) + "["
+                             + ep_name + "] " + std::string(c(state.stdout_is_tty, colors::RESET));
         std::istringstream iss(output);
         std::string line;
         std::lock_guard<std::mutex> lock(output_mutex_);
-        while (std::getline(iss, line)) {
-            state.progress.print_line(prefix + line);
-        }
+        while (std::getline(iss, line)) { state.progress.print_line(prefix + line); }
     };
 
     // Check if this is a cmake-based EP or custom commands EP
@@ -2287,9 +2145,7 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
         bool ep_interpreter_handed_off = false;
 
         // Force colors in child interpreter if parent stdout is a TTY
-        if (state.stdout_is_tty) {
-            ep_interp->set_force_colors(true);
-        }
+        if (state.stdout_is_tty) { ep_interp->set_force_colors(true); }
 
         // Apply CMAKE_ARGS and CMAKE_CACHE_ARGS.
         // Hard gate: values forwarded into the child interpreter's variables must
@@ -2321,47 +2177,37 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
         for (const auto& arg : ep_target->get_cmake_cache_args()) apply_arg(arg, "CMAKE_CACHE_ARGS");
 
         // Set CMAKE_INSTALL_PREFIX if not already set
-        if (ep_interp->get_variable("CMAKE_INSTALL_PREFIX").empty()) {
-            ep_interp->set_variable("CMAKE_INSTALL_PREFIX", install_dir);
-        }
+        if (ep_interp->get_variable("CMAKE_INSTALL_PREFIX").empty()) { ep_interp->set_variable("CMAKE_INSTALL_PREFIX", install_dir); }
 
         // Pre-load any initial-cache scripts from -C<file>. CMake interprets
         // these before CMakeLists.txt; projects use this to seed cache vars
         // (e.g. CMAKE_MODULE_PATH) for sub-builds.
         for (const auto& script_path : initial_cache_scripts) {
-            if (!std::filesystem::exists(script_path)) {
-                return "EP " + ep_name + ": initial-cache script not found: " + script_path;
-            }
+            if (!std::filesystem::exists(script_path)) { return "EP " + ep_name + ": initial-cache script not found: " + script_path; }
             std::ifstream cfs(script_path);
             std::string cscript((std::istreambuf_iterator<char>(cfs)), std::istreambuf_iterator<char>());
             Parser cparser(cscript, script_path);
             auto cast_ = cparser.parse();
-            if (!cast_) {
-                return "EP " + ep_name + ": parse error in -C " + script_path + ": " + cast_.error().reason;
-            }
+            if (!cast_) { return "EP " + ep_name + ": parse error in -C " + script_path + ": " + cast_.error().reason; }
             ep_interp->set_current_file(script_path);
             auto cres = ep_interp->interpret(*cast_);
             if (!cres) {
                 std::string output = ep_output.str();
-                return "EP " + ep_name + ": -C " + script_path + ": " + cres.error().message +
-                       (output.empty() ? "" : "\nOutput:\n" + output);
+                return "EP " + ep_name + ": -C " + script_path + ": " + cres.error().message
+                       + (output.empty() ? "" : "\nOutput:\n" + output);
             }
         }
 
         // Read and parse CMakeLists.txt
         std::string cmake_file = source_dir + "/CMakeLists.txt";
-        if (!std::filesystem::exists(cmake_file)) {
-            return "EP " + ep_name + ": CMakeLists.txt not found at " + cmake_file;
-        }
+        if (!std::filesystem::exists(cmake_file)) { return "EP " + ep_name + ": CMakeLists.txt not found at " + cmake_file; }
 
         std::ifstream file(cmake_file);
         std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
         Parser parser(content, cmake_file);
         auto ast = parser.parse();
-        if (!ast) {
-            return "EP " + ep_name + ": Parse error in " + cmake_file + ": " + ast.error().reason;
-        }
+        if (!ast) { return "EP " + ep_name + ": Parse error in " + cmake_file + ": " + ast.error().reason; }
 
         ep_interp->set_current_file(cmake_file);
 
@@ -2374,11 +2220,9 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
             // top-level errors. Plain string concatenation lost the backtrace.
             std::ostringstream diag;
             const auto& err = interp_result.error();
-            kiln::print_diagnostic(diag, kiln::DiagnosticSeverity::Error,
-                                   err.message, err.file, err.row, err.col,
-                                   err.offset, err.length, err.backtrace, err.source_content);
-            return "EP " + ep_name + ": Interpretation error:\n" + diag.str() +
-                   (output.empty() ? "" : "\nOutput:\n" + output);
+            kiln::print_diagnostic(diag, kiln::DiagnosticSeverity::Error, err.message, err.file, err.row, err.col, err.offset, err.length,
+                                   err.backtrace, err.source_content);
+            return "EP " + ep_name + ": Interpretation error:\n" + diag.str() + (output.empty() ? "" : "\nOutput:\n" + output);
         }
 
         // Apply accumulated directory properties (include_directories, add_definitions, etc.)
@@ -2387,15 +2231,15 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
 
         // Print any buffered interpretation output (with EP name prefix)
         print_prefixed_output(ep_output.str());
-        ep_output.str("");  // Clear for next phase
+        ep_output.str(""); // Clear for next phase
 
         // Generate full build graph (not just dirty tasks)
         // attach_ep_graph will handle dirty detection for each task
         auto graph_result = ep_interp->generate_build_graph({});
         if (!graph_result) {
             std::string output = ep_output.str();
-            return "EP " + ep_name + ": Task generation error: " + graph_result.error().message +
-                   (output.empty() ? "" : "\nOutput:\n" + output);
+            return "EP " + ep_name + ": Task generation error: " + graph_result.error().message
+                   + (output.empty() ? "" : "\nOutput:\n" + output);
         }
 
         // Print any buffered task generation output
@@ -2411,9 +2255,7 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
         // Attach full EP graph to main graph
         // This handles dirty detection and proper dependency wiring
         auto attach_result = attach_ep_graph(std::move(*graph_result), binary_dir, state);
-        if (!attach_result) {
-            return "EP " + ep_name + ": " + attach_result.error();
-        }
+        if (!attach_result) { return "EP " + ep_name + ": " + attach_result.error(); }
 
         int dirty_count = *attach_result;
 
@@ -2450,13 +2292,9 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
             if (!install_rules.empty()) {
                 print_prefixed_output("Installing...");
                 auto plan_or = build_install_plan(ep_interp.get(), install_rules, install_prefix, config);
-                if (!plan_or) {
-                    return "EP " + ep_name + " install plan failed: " + plan_or.error();
-                }
+                if (!plan_or) { return "EP " + ep_name + " install plan failed: " + plan_or.error(); }
                 auto install_result = execute_install_plan(*plan_or, install_prefix, config);
-                if (!install_result) {
-                    return "EP " + ep_name + " install failed: " + install_result.error();
-                }
+                if (!install_result) { return "EP " + ep_name + " install failed: " + install_result.error(); }
             }
             // Run extra install commands (e.g., cp for internal headers)
             if (auto err = run_extra_install_cmds()) return *err;
@@ -2468,8 +2306,7 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
 
                 // Compute install task inputs and pre-compute target destinations
                 // (MUST be done BEFORE storing interpreter on ep_target)
-                auto install_inputs = compute_install_inputs(install_rules, ep_interp.get(),
-                                                             install_prefix, ep_target);
+                auto install_inputs = compute_install_inputs(install_rules, ep_interp.get(), install_prefix, ep_target);
 
                 // Create install task
                 std::string install_id = ep_name + ":install";
@@ -2531,9 +2368,7 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
         // Keep EP interpreter alive — injected tasks hold raw parent_target
         // pointers into its target map. If we didn't hand it off above (e.g.
         // no install task was injected), do it here.
-        if (!ep_interpreter_handed_off) {
-            ep_target->set_ep_interpreter(std::move(ep_interp));
-        }
+        if (!ep_interpreter_handed_off) { ep_target->set_ep_interpreter(std::move(ep_interp)); }
 
     } else {
         // === CUSTOM COMMANDS EP ===
@@ -2542,8 +2377,7 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
         std::string working_dir = ep_target->get_ep_binary_dir();
         std::filesystem::create_directories(working_dir);
 
-        auto run_step = [&](const EPStepCommand& step, const char* step_name)
-            -> std::optional<std::string> {
+        auto run_step = [&](const EPStepCommand& step, const char* step_name) -> std::optional<std::string> {
             if (step.is_empty || step.commands.empty()) return std::nullopt;
             for (const auto& cmd : step.commands) {
                 auto result = kiln::run_command(cmd, working_dir);
@@ -2561,7 +2395,7 @@ std::optional<std::string> BuildGraph::run_ep_orchestrator(
         if (auto err = run_step(ep_target->get_install_command(), "install")) return *err;
     }
 
-    return std::nullopt;  // Success
+    return std::nullopt; // Success
 }
 
 } // namespace kiln

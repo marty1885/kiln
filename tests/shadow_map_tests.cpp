@@ -45,38 +45,38 @@ TEST_CASE("ShadowMap variable shadowing", "[shadow_map]") {
 
         map.push_scope();
         REQUIRE(map.depth() == 1);
-        REQUIRE(map.get("VAR") == "outer");  // Parent value visible
+        REQUIRE(map.get("VAR") == "outer"); // Parent value visible
 
         map.set("VAR", "inner");
-        REQUIRE(map.get("VAR") == "inner");  // Shadowed
+        REQUIRE(map.get("VAR") == "inner"); // Shadowed
 
         map.pop_scope();
         REQUIRE(map.depth() == 0);
-        REQUIRE(map.get("VAR") == "outer");  // Original value restored
+        REQUIRE(map.get("VAR") == "outer"); // Original value restored
     }
 
     SECTION("Multiple levels of shadowing") {
         map.set("VAR", "depth0");
 
-        map.push_scope();  // depth 1
+        map.push_scope(); // depth 1
         map.set("VAR", "depth1");
         REQUIRE(map.get("VAR") == "depth1");
 
-        map.push_scope();  // depth 2
+        map.push_scope(); // depth 2
         map.set("VAR", "depth2");
         REQUIRE(map.get("VAR") == "depth2");
 
-        map.push_scope();  // depth 3
+        map.push_scope(); // depth 3
         map.set("VAR", "depth3");
         REQUIRE(map.get("VAR") == "depth3");
 
-        map.pop_scope();  // back to depth 2
+        map.pop_scope(); // back to depth 2
         REQUIRE(map.get("VAR") == "depth2");
 
-        map.pop_scope();  // back to depth 1
+        map.pop_scope(); // back to depth 1
         REQUIRE(map.get("VAR") == "depth1");
 
-        map.pop_scope();  // back to depth 0
+        map.pop_scope(); // back to depth 0
         REQUIRE(map.get("VAR") == "depth0");
     }
 
@@ -85,11 +85,11 @@ TEST_CASE("ShadowMap variable shadowing", "[shadow_map]") {
         map.set("VAR2", "outer2");
 
         map.push_scope();
-        map.set("VAR1", "inner1");  // Shadow VAR1
+        map.set("VAR1", "inner1"); // Shadow VAR1
         // Don't shadow VAR2
 
         REQUIRE(map.get("VAR1") == "inner1");
-        REQUIRE(map.get("VAR2") == "outer2");  // Still visible
+        REQUIRE(map.get("VAR2") == "outer2"); // Still visible
 
         map.pop_scope();
         REQUIRE(map.get("VAR1") == "outer1");
@@ -126,17 +126,17 @@ TEST_CASE("ShadowMap scope cleanup", "[shadow_map]") {
 
         map.pop_scope();
 
-        REQUIRE(map.get("VAR") == "outer");  // Restored
-        REQUIRE_FALSE(map.is_defined("VAR2"));  // Gone
+        REQUIRE(map.get("VAR") == "outer");    // Restored
+        REQUIRE_FALSE(map.is_defined("VAR2")); // Gone
     }
 
     SECTION("Empty scopes don't cause issues") {
         map.set("VAR", "value");
 
-        map.push_scope();  // Don't modify anything
+        map.push_scope(); // Don't modify anything
         map.pop_scope();
 
-        REQUIRE(map.get("VAR") == "value");  // Unchanged
+        REQUIRE(map.get("VAR") == "value"); // Unchanged
     }
 }
 
@@ -160,12 +160,12 @@ TEST_CASE("ShadowMap unset behavior", "[shadow_map]") {
         REQUIRE(map.get("VAR") == "inner");
 
         map.unset("VAR");
-        REQUIRE(map.get("VAR") == "");  // Parent masked by tombstone
+        REQUIRE(map.get("VAR") == ""); // Parent masked by tombstone
         REQUIRE_FALSE(map.is_defined("VAR"));
     }
 
     SECTION("Unset non-existent variable is safe") {
-        map.unset("NONEXISTENT");  // Should not crash
+        map.unset("NONEXISTENT"); // Should not crash
         REQUIRE_FALSE(map.is_defined("NONEXISTENT"));
     }
 
@@ -177,16 +177,16 @@ TEST_CASE("ShadowMap unset behavior", "[shadow_map]") {
 
         map.push_scope();
         map.set("VAR", "depth2");
-        map.unset("VAR");  // Remove depth2 version, tombstone masks depth1
+        map.unset("VAR"); // Remove depth2 version, tombstone masks depth1
 
-        REQUIRE(map.get("VAR") == "");  // Masked by tombstone
+        REQUIRE(map.get("VAR") == ""); // Masked by tombstone
         REQUIRE_FALSE(map.is_defined("VAR"));
 
         map.pop_scope();
-        REQUIRE(map.get("VAR") == "depth1");  // Tombstone removed, depth1 visible
+        REQUIRE(map.get("VAR") == "depth1"); // Tombstone removed, depth1 visible
 
         map.pop_scope();
-        REQUIRE(map.get("VAR") == "depth0");  // Back to root
+        REQUIRE(map.get("VAR") == "depth0"); // Back to root
     }
 }
 
@@ -199,21 +199,21 @@ TEST_CASE("ShadowMap PARENT_SCOPE", "[shadow_map]") {
         map.push_scope();
         auto result = map.set_parent_scope("VAR", "modified_parent");
         REQUIRE(result.has_value());
-        REQUIRE(result.value() == true);  // Replaced existing
+        REQUIRE(result.value() == true); // Replaced existing
 
         // CMake semantics: PARENT_SCOPE does NOT affect current scope's view
         // The current scope sees the snapshotted "original" value
         REQUIRE(map.get("VAR") == "original");
 
         map.pop_scope();
-        REQUIRE(map.get("VAR") == "modified_parent");  // Parent was modified
+        REQUIRE(map.get("VAR") == "modified_parent"); // Parent was modified
     }
 
     SECTION("Set parent scope creates new variable in parent") {
         map.push_scope();
         auto result = map.set_parent_scope("NEW_VAR", "parent_value");
         REQUIRE(result.has_value());
-        REQUIRE(result.value() == false);  // Created new
+        REQUIRE(result.value() == false); // Created new
 
         // CMake semantics: a new variable created via PARENT_SCOPE is NOT
         // visible in the current scope - only after exiting
@@ -221,51 +221,51 @@ TEST_CASE("ShadowMap PARENT_SCOPE", "[shadow_map]") {
         REQUIRE_FALSE(map.is_defined("NEW_VAR"));
 
         map.pop_scope();
-        REQUIRE(map.get("NEW_VAR") == "parent_value");  // Now visible in parent
+        REQUIRE(map.get("NEW_VAR") == "parent_value"); // Now visible in parent
     }
 
     SECTION("Set parent scope with local shadow") {
         map.set("VAR", "original");
 
         map.push_scope();
-        map.set("VAR", "local");  // Shadow it locally
+        map.set("VAR", "local"); // Shadow it locally
         auto result = map.set_parent_scope("VAR", "modified_parent");
         REQUIRE(result.has_value());
-        REQUIRE(result.value() == true);  // Replaced existing
+        REQUIRE(result.value() == true); // Replaced existing
 
         // Local value takes precedence
         REQUIRE(map.get("VAR") == "local");
 
         map.pop_scope();
-        REQUIRE(map.get("VAR") == "modified_parent");  // Parent was modified
+        REQUIRE(map.get("VAR") == "modified_parent"); // Parent was modified
     }
 
     SECTION("Set parent scope at root returns error") {
         auto result = map.set_parent_scope("VAR", "value");
-        REQUIRE_FALSE(result.has_value());  // Error - no parent scope
+        REQUIRE_FALSE(result.has_value()); // Error - no parent scope
         REQUIRE_FALSE(map.is_defined("VAR"));
     }
 
     SECTION("Set parent scope multiple levels deep") {
         map.set("VAR", "depth0");
 
-        map.push_scope();  // depth 1
+        map.push_scope(); // depth 1
         map.set("VAR", "depth1");
 
-        map.push_scope();  // depth 2
+        map.push_scope(); // depth 2
         auto result = map.set_parent_scope("VAR", "modified_depth1");
         REQUIRE(result.has_value());
-        REQUIRE(result.value() == true);  // Replaced existing
+        REQUIRE(result.value() == true); // Replaced existing
 
         // CMake semantics: depth2 sees the snapshotted value ("depth1") from
         // before PARENT_SCOPE was called, NOT the modified parent value
         REQUIRE(map.get("VAR") == "depth1");
 
-        map.pop_scope();  // back to depth 1
-        REQUIRE(map.get("VAR") == "modified_depth1");  // depth1 has new value
+        map.pop_scope();                              // back to depth 1
+        REQUIRE(map.get("VAR") == "modified_depth1"); // depth1 has new value
 
-        map.pop_scope();  // back to depth 0
-        REQUIRE(map.get("VAR") == "depth0");  // depth0 unchanged
+        map.pop_scope();                     // back to depth 0
+        REQUIRE(map.get("VAR") == "depth0"); // depth0 unchanged
     }
 }
 
@@ -287,9 +287,7 @@ TEST_CASE("ShadowMap deep nesting", "[shadow_map]") {
         // Pop back to root
         for (int i = DEPTH - 1; i >= 0; --i) {
             map.pop_scope();
-            if (i > 0) {
-                REQUIRE(map.get("VAR") == "value" + std::to_string(i - 1));
-            }
+            if (i > 0) { REQUIRE(map.get("VAR") == "value" + std::to_string(i - 1)); }
         }
 
         REQUIRE(map.depth() == 0);
@@ -314,9 +312,7 @@ TEST_CASE("ShadowMap deep nesting", "[shadow_map]") {
         }
 
         // Pop all scopes
-        for (int depth = 0; depth < 5; ++depth) {
-            map.pop_scope();
-        }
+        for (int depth = 0; depth < 5; ++depth) { map.pop_scope(); }
 
         // All variables should be gone
         for (int var = 0; var < 10; ++var) {
@@ -336,37 +332,37 @@ TEST_CASE("ShadowMap mixed operations", "[shadow_map]") {
 
         // Level 1
         map.push_scope();
-        map.set("VAR1", "level1_1");  // Shadow VAR1
-        map.set("VAR3", "level1_3");  // New variable
+        map.set("VAR1", "level1_1"); // Shadow VAR1
+        map.set("VAR3", "level1_3"); // New variable
 
         // Level 2
         map.push_scope();
-        map.set("VAR2", "level2_2");  // Shadow VAR2
-        auto result = map.set_parent_scope("VAR1", "modified_level1_1");  // Modify parent's VAR1
+        map.set("VAR2", "level2_2");                                     // Shadow VAR2
+        auto result = map.set_parent_scope("VAR1", "modified_level1_1"); // Modify parent's VAR1
         REQUIRE(result.has_value());
-        REQUIRE(result.value() == true);  // Replaced existing
+        REQUIRE(result.value() == true); // Replaced existing
 
         // CMake semantics: PARENT_SCOPE does NOT affect current scope's view
         // Level 2 sees snapshotted value from before the PARENT_SCOPE call
-        REQUIRE(map.get("VAR1") == "level1_1");  // Snapshotted value at level 2
-        REQUIRE(map.get("VAR2") == "level2_2");  // Shadowed
-        REQUIRE(map.get("VAR3") == "level1_3");  // From parent
+        REQUIRE(map.get("VAR1") == "level1_1"); // Snapshotted value at level 2
+        REQUIRE(map.get("VAR2") == "level2_2"); // Shadowed
+        REQUIRE(map.get("VAR3") == "level1_3"); // From parent
 
-        map.unset("VAR2");  // Remove shadow, tombstone masks root
-        REQUIRE(map.get("VAR2") == "");  // Masked by tombstone
+        map.unset("VAR2");              // Remove shadow, tombstone masks root
+        REQUIRE(map.get("VAR2") == ""); // Masked by tombstone
         REQUIRE_FALSE(map.is_defined("VAR2"));
 
-        map.pop_scope();  // Back to level 1
+        map.pop_scope(); // Back to level 1
 
-        REQUIRE(map.get("VAR1") == "modified_level1_1");  // Was modified by child
-        REQUIRE(map.get("VAR2") == "root2");  // Tombstone gone, root visible
-        REQUIRE(map.get("VAR3") == "level1_3");  // Local
+        REQUIRE(map.get("VAR1") == "modified_level1_1"); // Was modified by child
+        REQUIRE(map.get("VAR2") == "root2");             // Tombstone gone, root visible
+        REQUIRE(map.get("VAR3") == "level1_3");          // Local
 
-        map.pop_scope();  // Back to root
+        map.pop_scope(); // Back to root
 
-        REQUIRE(map.get("VAR1") == "root1");  // Original root value
-        REQUIRE(map.get("VAR2") == "root2");  // Original root value
-        REQUIRE_FALSE(map.is_defined("VAR3"));  // Was only at level 1
+        REQUIRE(map.get("VAR1") == "root1");   // Original root value
+        REQUIRE(map.get("VAR2") == "root2");   // Original root value
+        REQUIRE_FALSE(map.is_defined("VAR3")); // Was only at level 1
     }
 }
 
@@ -387,7 +383,7 @@ TEST_CASE("ShadowMap modification at same depth", "[shadow_map]") {
         map.set("VAR", "nested");
         map.pop_scope();
 
-        REQUIRE(map.get("VAR") == "value3");  // Only one version at root
+        REQUIRE(map.get("VAR") == "value3"); // Only one version at root
     }
 }
 
@@ -411,7 +407,7 @@ TEST_CASE("ShadowMap edge cases", "[shadow_map]") {
     }
 
     SECTION("Pop scope at root is safe") {
-        map.pop_scope();  // Should not crash
+        map.pop_scope(); // Should not crash
         REQUIRE(map.depth() == 0);
     }
 
@@ -586,9 +582,7 @@ TEST_CASE("ShadowMap Entry", "[shadow_map]") {
         auto ce = map.const_entry("VAR1");
 
         // Insert many other variables to potentially trigger rehash
-        for (int i = 0; i < 1000; ++i) {
-            map.set("OTHER_" + std::to_string(i), "x");
-        }
+        for (int i = 0; i < 1000; ++i) { map.set("OTHER_" + std::to_string(i), "x"); }
 
         // Original handles still valid (reference stability guarantee)
         REQUIRE(e.get() == "val1");

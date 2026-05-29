@@ -19,19 +19,42 @@ namespace {
 
 // Set of keywords that should not be dereferenced as variables
 // All keywords are in uppercase; comparisons are done case-insensitively
-constexpr std::array keywords = {
-    "(", ")", "AND", "COMMAND", "DEFINED", "EQUAL", "EXISTS", "GREATER",
-    "GREATER_EQUAL", "IN_LIST", "IS_ABSOLUTE", "IS_DIRECTORY", "IS_NEWER_THAN",
-    "IS_SYMLINK", "LESS", "LESS_EQUAL", "MATCHES", "NOT", "NOT_EQUAL", "OR",
-    "POLICY", "STREQUAL", "STRGREATER", "STRGREATER_EQUAL", "STRLESS",
-    "STRLESS_EQUAL", "TARGET", "TEST", "VERSION_EQUAL", "VERSION_GREATER",
-    "VERSION_GREATER_EQUAL", "VERSION_LESS", "VERSION_LESS_EQUAL"
-};
+constexpr std::array keywords = {"(",
+                                 ")",
+                                 "AND",
+                                 "COMMAND",
+                                 "DEFINED",
+                                 "EQUAL",
+                                 "EXISTS",
+                                 "GREATER",
+                                 "GREATER_EQUAL",
+                                 "IN_LIST",
+                                 "IS_ABSOLUTE",
+                                 "IS_DIRECTORY",
+                                 "IS_NEWER_THAN",
+                                 "IS_SYMLINK",
+                                 "LESS",
+                                 "LESS_EQUAL",
+                                 "MATCHES",
+                                 "NOT",
+                                 "NOT_EQUAL",
+                                 "OR",
+                                 "POLICY",
+                                 "STREQUAL",
+                                 "STRGREATER",
+                                 "STRGREATER_EQUAL",
+                                 "STRLESS",
+                                 "STRLESS_EQUAL",
+                                 "TARGET",
+                                 "TEST",
+                                 "VERSION_EQUAL",
+                                 "VERSION_GREATER",
+                                 "VERSION_GREATER_EQUAL",
+                                 "VERSION_LESS",
+                                 "VERSION_LESS_EQUAL"};
 
 // Boolean constants that have fixed truthiness values (case-insensitive)
-constexpr std::array boolean_constants = {
-    "FALSE", "IGNORE", "N", "NO", "NOTFOUND", "OFF", "ON", "TRUE", "Y", "YES"
-};
+constexpr std::array boolean_constants = {"FALSE", "IGNORE", "N", "NO", "NOTFOUND", "OFF", "ON", "TRUE", "Y", "YES"};
 
 // Case-insensitive check against boolean_constants using length-based dispatch.
 // All constants are pure ASCII letters so (c | 0x20) gives case-insensitive comparison.
@@ -42,31 +65,49 @@ bool is_boolean_constant_ci(std::string_view token) {
         return true;
     };
     switch (token.size()) {
-    case 1: return (token[0] | 0x20) == 'n' || (token[0] | 0x20) == 'y';
-    case 2: return ci_eq(token, "NO") || ci_eq(token, "ON");
-    case 3: return ci_eq(token, "OFF") || ci_eq(token, "YES");
-    case 4: return ci_eq(token, "TRUE");
-    case 5: return ci_eq(token, "FALSE");
-    case 6: return ci_eq(token, "IGNORE");
-    case 8: return ci_eq(token, "NOTFOUND");
-    default: return false;
+    case 1:
+        return (token[0] | 0x20) == 'n' || (token[0] | 0x20) == 'y';
+    case 2:
+        return ci_eq(token, "NO") || ci_eq(token, "ON");
+    case 3:
+        return ci_eq(token, "OFF") || ci_eq(token, "YES");
+    case 4:
+        return ci_eq(token, "TRUE");
+    case 5:
+        return ci_eq(token, "FALSE");
+    case 6:
+        return ci_eq(token, "IGNORE");
+    case 8:
+        return ci_eq(token, "NOTFOUND");
+    default:
+        return false;
     }
 }
 
 // Set of binary operator keywords
-constexpr std::array binary_operators = {
-    "EQUAL", "GREATER", "GREATER_EQUAL", "IN_LIST", "IS_NEWER_THAN",
-    "LESS", "LESS_EQUAL", "MATCHES", "NOT_EQUAL", "STREQUAL",
-    "STRGREATER", "STRGREATER_EQUAL", "STRLESS", "STRLESS_EQUAL",
-    "VERSION_EQUAL", "VERSION_GREATER", "VERSION_GREATER_EQUAL",
-    "VERSION_LESS", "VERSION_LESS_EQUAL"
-};
+constexpr std::array binary_operators = {"EQUAL",
+                                         "GREATER",
+                                         "GREATER_EQUAL",
+                                         "IN_LIST",
+                                         "IS_NEWER_THAN",
+                                         "LESS",
+                                         "LESS_EQUAL",
+                                         "MATCHES",
+                                         "NOT_EQUAL",
+                                         "STREQUAL",
+                                         "STRGREATER",
+                                         "STRGREATER_EQUAL",
+                                         "STRLESS",
+                                         "STRLESS_EQUAL",
+                                         "VERSION_EQUAL",
+                                         "VERSION_GREATER",
+                                         "VERSION_GREATER_EQUAL",
+                                         "VERSION_LESS",
+                                         "VERSION_LESS_EQUAL"};
 
 // Unary operator keywords
-constexpr std::array unary_keywords = {
-    "COMMAND", "DEFINED", "EXISTS", "IS_ABSOLUTE", "IS_DIRECTORY",
-    "IS_SYMLINK", "POLICY", "TARGET", "TEST"
-};
+constexpr std::array unary_keywords = {"COMMAND",    "DEFINED", "EXISTS", "IS_ABSOLUTE", "IS_DIRECTORY",
+                                       "IS_SYMLINK", "POLICY",  "TARGET", "TEST"};
 
 // --- Shared helpers used by both ConditionParser and fast-path ---
 
@@ -94,38 +135,57 @@ const std::string& get_token_string(Interpreter& interp, const Argument& arg, st
 
 bool is_keyword(std::string_view token) {
     // Arrays are sorted — use binary search instead of linear scan.
-    return std::binary_search(keywords.begin(), keywords.end(), token,
-        [](std::string_view a, std::string_view b) { return a < b; });
+    return std::binary_search(keywords.begin(), keywords.end(), token, [](std::string_view a, std::string_view b) { return a < b; });
 }
 
 bool is_binary_operator(std::string_view token) {
     // Length-based dispatch eliminates most comparisons for non-operator tokens.
     switch (token.size()) {
-    case 4: return token == "LESS";
-    case 5: return token == "EQUAL";
-    case 7: return token == "GREATER" || token == "IN_LIST" || token == "MATCHES" || token == "STRLESS";
-    case 8: return token == "STREQUAL";
-    case 9: return token == "NOT_EQUAL";
-    case 10: return token == "LESS_EQUAL" || token == "STRGREATER";
-    case 12: return token == "VERSION_LESS";
-    case 13: return token == "GREATER_EQUAL" || token == "IS_NEWER_THAN" || token == "STRLESS_EQUAL" || token == "VERSION_EQUAL";
-    case 15: return token == "VERSION_GREATER";
-    case 16: return token == "STRGREATER_EQUAL";
-    case 18: return token == "VERSION_LESS_EQUAL";
-    case 21: return token == "VERSION_GREATER_EQUAL";
-    default: return false;
+    case 4:
+        return token == "LESS";
+    case 5:
+        return token == "EQUAL";
+    case 7:
+        return token == "GREATER" || token == "IN_LIST" || token == "MATCHES" || token == "STRLESS";
+    case 8:
+        return token == "STREQUAL";
+    case 9:
+        return token == "NOT_EQUAL";
+    case 10:
+        return token == "LESS_EQUAL" || token == "STRGREATER";
+    case 12:
+        return token == "VERSION_LESS";
+    case 13:
+        return token == "GREATER_EQUAL" || token == "IS_NEWER_THAN" || token == "STRLESS_EQUAL" || token == "VERSION_EQUAL";
+    case 15:
+        return token == "VERSION_GREATER";
+    case 16:
+        return token == "STRGREATER_EQUAL";
+    case 18:
+        return token == "VERSION_LESS_EQUAL";
+    case 21:
+        return token == "VERSION_GREATER_EQUAL";
+    default:
+        return false;
     }
 }
 
 bool is_unary_keyword(std::string_view token) {
     switch (token.size()) {
-    case 4: return token == "TEST";
-    case 6: return token == "EXISTS" || token == "POLICY" || token == "TARGET";
-    case 7: return token == "COMMAND" || token == "DEFINED";
-    case 10: return token == "IS_SYMLINK";
-    case 11: return token == "IS_ABSOLUTE";
-    case 12: return token == "IS_DIRECTORY";
-    default: return false;
+    case 4:
+        return token == "TEST";
+    case 6:
+        return token == "EXISTS" || token == "POLICY" || token == "TARGET";
+    case 7:
+        return token == "COMMAND" || token == "DEFINED";
+    case 10:
+        return token == "IS_SYMLINK";
+    case 11:
+        return token == "IS_ABSOLUTE";
+    case 12:
+        return token == "IS_DIRECTORY";
+    default:
+        return false;
     }
 }
 
@@ -136,29 +196,19 @@ struct MatchesResult {
 };
 
 MatchesResult evaluate_matches(Interpreter& interp, const std::string& left, const std::string& pattern) {
-    thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) {
-        return Regex::from_cmake_regex(p);
-    });
+    thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) { return Regex::from_cmake_regex(p); });
     auto re = cache.get(pattern);
-    if (!re) {
-        return {false, "MATCHES: invalid regex: " + re.error()};
-    }
+    if (!re) { return {false, "MATCHES: invalid regex: " + re.error()}; }
     std::vector<std::string> captures;
     bool result = (*re)->search(left, captures);
 
     if (result) {
         interp.set_variable("CMAKE_MATCH_COUNT", std::to_string(captures.size() - 1));
-        for (size_t i = 0; i < captures.size() && i < 10; ++i) {
-            interp.set_variable("CMAKE_MATCH_" + std::to_string(i), captures[i]);
-        }
-        for (size_t i = captures.size(); i < 10; ++i) {
-            interp.set_variable("CMAKE_MATCH_" + std::to_string(i), "");
-        }
+        for (size_t i = 0; i < captures.size() && i < 10; ++i) { interp.set_variable("CMAKE_MATCH_" + std::to_string(i), captures[i]); }
+        for (size_t i = captures.size(); i < 10; ++i) { interp.set_variable("CMAKE_MATCH_" + std::to_string(i), ""); }
     } else {
         interp.set_variable("CMAKE_MATCH_COUNT", "0");
-        for (size_t i = 0; i < 10; ++i) {
-            interp.set_variable("CMAKE_MATCH_" + std::to_string(i), "");
-        }
+        for (size_t i = 0; i < 10; ++i) { interp.set_variable("CMAKE_MATCH_" + std::to_string(i), ""); }
     }
     return {result, {}};
 }
@@ -192,7 +242,7 @@ std::optional<std::string_view> try_resolve_sv(Interpreter& interp, const Argume
         if (ref.name_parts.size() != 1) return std::nullopt;
         if (!std::holds_alternative<std::string>(ref.name_parts[0])) return std::nullopt;
         auto view = interp.get_variable_view(std::get<std::string>(ref.name_parts[0]));
-        if (!view) return std::string_view{};  // undefined var → empty
+        if (!view) return std::string_view{}; // undefined var → empty
         return *view;
     }
     return std::nullopt;
@@ -219,9 +269,7 @@ std::string_view eval_operand_sv(Interpreter& interp, const Argument& arg, std::
     if (arg.quoted) return token;
 
     // Single variable reference → already expanded
-    if (arg.parts.size() == 1 && std::holds_alternative<VariableReference>(arg.parts[0])) {
-        return token;
-    }
+    if (arg.parts.size() == 1 && std::holds_alternative<VariableReference>(arg.parts[0])) { return token; }
 
     // Numeric constant → return as-is
     if (is_numeric_constant(token)) return token;
@@ -279,22 +327,26 @@ bool try_numeric_compare(std::string_view left, std::string_view right, int& cmp
 // Apply a numeric comparison operator given a three-way cmp result.
 bool apply_numeric_op(ConditionOp op, int cmp) {
     switch (op) {
-    case ConditionOp::BinaryEqual: return cmp == 0;
-    case ConditionOp::BinaryNotEqual: return cmp != 0;
-    case ConditionOp::BinaryLess: return cmp < 0;
-    case ConditionOp::BinaryGreater: return cmp > 0;
-    case ConditionOp::BinaryLessEqual: return cmp <= 0;
-    case ConditionOp::BinaryGreaterEqual: return cmp >= 0;
-    default: return false;
+    case ConditionOp::BinaryEqual:
+        return cmp == 0;
+    case ConditionOp::BinaryNotEqual:
+        return cmp != 0;
+    case ConditionOp::BinaryLess:
+        return cmp < 0;
+    case ConditionOp::BinaryGreater:
+        return cmp > 0;
+    case ConditionOp::BinaryLessEqual:
+        return cmp <= 0;
+    case ConditionOp::BinaryGreaterEqual:
+        return cmp >= 0;
+    default:
+        return false;
     }
 }
 
 // --- Filter + fallback for dynamic args that expanded to empty/semicolons ---
-std::expected<bool, InterpreterError> evaluate_condition_with_filtering(
-    Interpreter& interp,
-    const std::vector<Argument>& condition,
-    size_t row, size_t col, size_t offset, size_t length)
-{
+std::expected<bool, InterpreterError> evaluate_condition_with_filtering(Interpreter& interp, const std::vector<Argument>& condition,
+                                                                        size_t row, size_t col, size_t offset, size_t length) {
     // CMake argument elision and list expansion
     std::vector<Argument> filtered;
     for (const auto& arg : condition) {
@@ -308,7 +360,7 @@ std::expected<bool, InterpreterError> evaluate_condition_with_filtering(
 
         if (has_var_ref && !arg.quoted) {
             std::string val = interp.evaluate_argument(arg);
-            if (val.empty()) continue;  // elision
+            if (val.empty()) continue; // elision
             for (auto item : CMakeArrayIterator(val)) {
                 if (item.empty()) continue;
                 Argument new_arg;
@@ -346,19 +398,14 @@ bool is_newer_than(const std::string& lhs, const std::string& rhs) {
 //
 // right_arg is null for unary ops; binary ops without it return an internal
 // error (should never happen if the op was classified correctly).
-std::expected<bool, std::string> dispatch_op(
-    Interpreter& interp,
-    ConditionOp op,
-    const Argument& left_arg,
-    const Argument* right_arg)
-{
+std::expected<bool, std::string> dispatch_op(Interpreter& interp, ConditionOp op, const Argument& left_arg, const Argument* right_arg) {
     switch (op) {
     case ConditionOp::BoolCheck: {
         std::string buffer;
         const std::string& token = get_token_string(interp, left_arg, buffer);
         if (is_boolean_constant_ci(token)) return !Interpreter::is_falsy(token);
-        if (is_numeric_constant(token))    return !Interpreter::is_falsy(token);
-        if (left_arg.quoted)               return false;
+        if (is_numeric_constant(token)) return !Interpreter::is_falsy(token);
+        if (left_arg.quoted) return false;
         auto view = interp.get_variable_view(token);
         return view.has_value() && !Interpreter::is_falsy(*view);
     }
@@ -388,7 +435,8 @@ std::expected<bool, std::string> dispatch_op(
         auto name = eval_operand_sv(interp, left_arg, buffer);
         return interp.has_user_function(std::string(name));
     }
-    default: break;  // fall through to binary handling
+    default:
+        break; // fall through to binary handling
     }
 
     if (!right_arg) return std::unexpected(std::string("dispatch_op: binary op missing right operand"));
@@ -415,15 +463,20 @@ std::expected<bool, std::string> dispatch_op(
     case ConditionOp::BinaryGreaterEqual: {
         int cmp;
         if (try_numeric_compare(left, right, cmp)) return apply_numeric_op(op, cmp);
-        if (op == ConditionOp::BinaryEqual)    return left == right;
+        if (op == ConditionOp::BinaryEqual) return left == right;
         if (op == ConditionOp::BinaryNotEqual) return left != right;
         return false;
     }
-    case ConditionOp::BinaryStrEqual:        return left == right;
-    case ConditionOp::BinaryStrLess:         return left < right;
-    case ConditionOp::BinaryStrGreater:      return left > right;
-    case ConditionOp::BinaryStrLessEqual:    return left <= right;
-    case ConditionOp::BinaryStrGreaterEqual: return left >= right;
+    case ConditionOp::BinaryStrEqual:
+        return left == right;
+    case ConditionOp::BinaryStrLess:
+        return left < right;
+    case ConditionOp::BinaryStrGreater:
+        return left > right;
+    case ConditionOp::BinaryStrLessEqual:
+        return left <= right;
+    case ConditionOp::BinaryStrGreaterEqual:
+        return left >= right;
 
     case ConditionOp::BinaryVersionEqual:
     case ConditionOp::BinaryVersionLess:
@@ -432,12 +485,18 @@ std::expected<bool, std::string> dispatch_op(
     case ConditionOp::BinaryVersionGreaterEqual: {
         int cmp = compare_versions(std::string(left), std::string(right));
         switch (op) {
-        case ConditionOp::BinaryVersionEqual:        return cmp == 0;
-        case ConditionOp::BinaryVersionLess:         return cmp < 0;
-        case ConditionOp::BinaryVersionGreater:      return cmp > 0;
-        case ConditionOp::BinaryVersionLessEqual:    return cmp <= 0;
-        case ConditionOp::BinaryVersionGreaterEqual: return cmp >= 0;
-        default: return false;
+        case ConditionOp::BinaryVersionEqual:
+            return cmp == 0;
+        case ConditionOp::BinaryVersionLess:
+            return cmp < 0;
+        case ConditionOp::BinaryVersionGreater:
+            return cmp > 0;
+        case ConditionOp::BinaryVersionLessEqual:
+            return cmp <= 0;
+        case ConditionOp::BinaryVersionGreaterEqual:
+            return cmp >= 0;
+        default:
+            return false;
         }
     }
     case ConditionOp::BinaryMatches: {
@@ -456,12 +515,9 @@ std::expected<bool, std::string> dispatch_op(
 // ConditionParser (full recursive descent — fallback path)
 class ConditionParser {
 public:
-    ConditionParser(Interpreter& interp, const std::vector<Argument>& condition)
-        : interp_(interp), condition_(condition) {}
+    ConditionParser(Interpreter& interp, const std::vector<Argument>& condition) : interp_(interp), condition_(condition) {}
 
-    bool parse() {
-        return parse_or();
-    }
+    bool parse() { return parse_or(); }
 
     const std::string& error() const { return error_msg_; }
     size_t pos() const { return pos_; }
@@ -473,9 +529,7 @@ private:
     std::string error_msg_;
     std::string eval_buffer_;
 
-    const std::string& parser_get_token_string(const Argument& arg) {
-        return get_token_string(interp_, arg, eval_buffer_);
-    }
+    const std::string& parser_get_token_string(const Argument& arg) { return get_token_string(interp_, arg, eval_buffer_); }
 
     std::string_view peek_bare() const {
         if (pos_ >= condition_.size()) return {};
@@ -488,18 +542,11 @@ private:
     std::string evaluate_token(const Argument& arg) {
         const std::string& token = parser_get_token_string(arg);
 
-        if (arg.quoted ||
-            std::find(keywords.begin(), keywords.end(), token) != keywords.end()) {
-            return token;
-        }
+        if (arg.quoted || std::find(keywords.begin(), keywords.end(), token) != keywords.end()) { return token; }
 
-        if (is_numeric_constant(token)) {
-            return token;
-        }
+        if (is_numeric_constant(token)) { return token; }
 
-        if (arg.parts.size() == 1 && std::holds_alternative<VariableReference>(arg.parts[0])) {
-            return token;
-        }
+        if (arg.parts.size() == 1 && std::holds_alternative<VariableReference>(arg.parts[0])) { return token; }
 
         auto view = interp_.get_variable_view(token);
         return view.has_value() ? std::string(*view) : std::string(token);
@@ -553,8 +600,7 @@ private:
                 // Quoted arguments are never operators regardless of their expanded value.
                 auto next_bare = std::string_view{};
                 const auto& next_arg = condition_[pos_ + 1];
-                if (!next_arg.quoted && next_arg.parts.size() == 1 &&
-                    std::holds_alternative<std::string>(next_arg.parts[0])) {
+                if (!next_arg.quoted && next_arg.parts.size() == 1 && std::holds_alternative<std::string>(next_arg.parts[0])) {
                     next_bare = std::get<std::string>(next_arg.parts[0]);
                 }
                 if (!next_bare.empty() && is_binary_operator(next_bare)) {
@@ -589,16 +635,13 @@ private:
         size_t start_pos = pos_;
         bool unary_result = parse_unary_or_primary();
 
-        if (pos_ >= condition_.size()) {
-            return unary_result;
-        }
+        if (pos_ >= condition_.size()) { return unary_result; }
 
         // Only bare unquoted literals can be operators
         auto op_bare = peek_bare();
         std::string op(op_bare);
 
-        if (op == "EQUAL" || op == "LESS" || op == "GREATER" ||
-            op == "LESS_EQUAL" || op == "GREATER_EQUAL" || op == "NOT_EQUAL") {
+        if (op == "EQUAL" || op == "LESS" || op == "GREATER" || op == "LESS_EQUAL" || op == "GREATER_EQUAL" || op == "NOT_EQUAL") {
             pos_++;
             if (pos_ >= condition_.size()) {
                 error_msg_ = op + " operator requires a right operand";
@@ -619,9 +662,7 @@ private:
                 if (op == "NOT_EQUAL") return left != right;
                 return false;
             }
-        }
-        else if (op == "STREQUAL" || op == "STRLESS" || op == "STRGREATER" ||
-                 op == "STRLESS_EQUAL" || op == "STRGREATER_EQUAL") {
+        } else if (op == "STREQUAL" || op == "STRLESS" || op == "STRGREATER" || op == "STRLESS_EQUAL" || op == "STRGREATER_EQUAL") {
             pos_++;
             if (pos_ >= condition_.size()) {
                 error_msg_ = op + " operator requires a right operand";
@@ -634,8 +675,7 @@ private:
             if (op == "STRGREATER") return left > right;
             if (op == "STRLESS_EQUAL") return left <= right;
             if (op == "STRGREATER_EQUAL") return left >= right;
-        }
-        else if (op.starts_with("VERSION_")) {
+        } else if (op.starts_with("VERSION_")) {
             pos_++;
             if (pos_ >= condition_.size()) {
                 error_msg_ = op + " operator requires a right operand";
@@ -649,8 +689,7 @@ private:
             if (op == "VERSION_GREATER") return cmp > 0;
             if (op == "VERSION_LESS_EQUAL") return cmp <= 0;
             if (op == "VERSION_GREATER_EQUAL") return cmp >= 0;
-        }
-        else if(op == "MATCHES") {
+        } else if (op == "MATCHES") {
             pos_++;
             if (pos_ >= condition_.size()) {
                 error_msg_ = "MATCHES operator requires a right operand";
@@ -664,8 +703,7 @@ private:
                 return false;
             }
             return mr.matched;
-        }
-        else if (op == "IN_LIST") {
+        } else if (op == "IN_LIST") {
             pos_++;
             if (pos_ >= condition_.size()) {
                 error_msg_ = "IN_LIST operator requires a right operand";
@@ -674,8 +712,7 @@ private:
             std::string value = evaluate_token(condition_[start_pos]);
             std::string list_str = evaluate_token(condition_[pos_++]);
             return cmake_list_contains(list_str, value);
-        }
-        else if (op == "IS_NEWER_THAN") {
+        } else if (op == "IS_NEWER_THAN") {
             pos_++;
             if (pos_ >= condition_.size()) {
                 error_msg_ = "IS_NEWER_THAN operator requires a right operand";
@@ -712,9 +749,7 @@ private:
         if (!condition_[pos_].quoted && token == "DEFINED" && pos_ + 1 < condition_.size()) {
             pos_++;
             std::string var_name = parser_get_token_string(condition_[pos_++]);
-            if (var_name.size() > 6 &&
-                var_name.compare(0, 6, "CACHE{") == 0 &&
-                var_name.back() == '}') {
+            if (var_name.size() > 6 && var_name.compare(0, 6, "CACHE{") == 0 && var_name.back() == '}') {
                 std::string cache_var = var_name.substr(6, var_name.size() - 7);
                 return interp_.get_cache_variables().contains(cache_var);
             }
@@ -752,17 +787,11 @@ private:
         const Argument& arg = condition_[pos_++];
         std::string token_str = parser_get_token_string(arg);
 
-        if (is_boolean_constant_ci(token_str)) {
-            return !Interpreter::is_falsy(token_str);
-        }
+        if (is_boolean_constant_ci(token_str)) { return !Interpreter::is_falsy(token_str); }
 
-        if (is_numeric_constant(token_str)) {
-            return !Interpreter::is_falsy(token_str);
-        }
+        if (is_numeric_constant(token_str)) { return !Interpreter::is_falsy(token_str); }
 
-        if (arg.quoted) {
-            return false;
-        }
+        if (arg.quoted) { return false; }
 
         auto val_view = interp_.get_variable_view(token_str);
         return val_view.has_value() && !Interpreter::is_falsy(*val_view);
@@ -772,13 +801,10 @@ private:
 // Evaluate a single sub-condition from a compound AND/OR chain.
 // Returns the boolean result. For dynamic sub-conditions that expand to
 // empty or contain semicolons, returns std::nullopt to signal fallback.
-std::optional<bool> evaluate_sub_condition(
-    Interpreter& interp,
-    const std::vector<Argument>& condition,
-    const PreParsedCondition::SubCondition& sub)
-{
-    bool is_binary = (static_cast<uint8_t>(sub.op) >= static_cast<uint8_t>(ConditionOp::BinaryEqual) &&
-                      sub.op != ConditionOp::CompoundAnd && sub.op != ConditionOp::CompoundOr);
+std::optional<bool> evaluate_sub_condition(Interpreter& interp, const std::vector<Argument>& condition,
+                                           const PreParsedCondition::SubCondition& sub) {
+    bool is_binary = (static_cast<uint8_t>(sub.op) >= static_cast<uint8_t>(ConditionOp::BinaryEqual) && sub.op != ConditionOp::CompoundAnd
+                      && sub.op != ConditionOp::CompoundOr);
 
     // Dynamic args: any operand whose varref expansion is empty or contains
     // ';' triggers a full-parser fallback (CMake list elision semantics).
@@ -795,7 +821,7 @@ std::optional<bool> evaluate_sub_condition(
 
     const Argument* right = is_binary ? &condition[sub.right_idx] : nullptr;
     auto r = dispatch_op(interp, sub.op, condition[sub.left_idx], right);
-    if (!r) return std::nullopt;  // regex error → caller falls back to full parser
+    if (!r) return std::nullopt; // regex error → caller falls back to full parser
     return sub.negated() ? !*r : *r;
 }
 
@@ -823,7 +849,7 @@ PreParsedCondition classify_condition(const std::vector<Argument>& condition) {
     auto compute_dynamic_flags = [&](uint8_t& flags, std::initializer_list<size_t> indices) {
         for (size_t idx : indices) {
             if (idx < n && !condition[idx].quoted && arg_has_varref(condition[idx])) {
-                flags |= 2;  // has_dynamic_args
+                flags |= 2; // has_dynamic_args
                 return;
             }
         }
@@ -873,13 +899,13 @@ PreParsedCondition classify_condition(const std::vector<Argument>& condition) {
     }
 
     if (n == 2) {
-        if (!is_bare_literal(condition[0])) return pp;  // Fallback
+        if (!is_bare_literal(condition[0])) return pp; // Fallback
         auto kw = get_bare_literal(condition[0]);
 
         if (kw == "NOT") {
             // NOT X → BoolCheck negated
             pp.op = ConditionOp::BoolCheck;
-            pp.flags |= 1;  // negated
+            pp.flags |= 1; // negated
             pp.left_idx = 1;
             compute_dynamic_flags(pp.flags, {1});
             return pp;
@@ -894,18 +920,17 @@ PreParsedCondition classify_condition(const std::vector<Argument>& condition) {
             return pp;
         }
 
-        return pp;  // Fallback
+        return pp; // Fallback
     }
 
     if (n == 3) {
         // Check for NOT + unary-keyword + X
-        if (is_bare_literal(condition[0]) && get_bare_literal(condition[0]) == "NOT" &&
-            is_bare_literal(condition[1])) {
+        if (is_bare_literal(condition[0]) && get_bare_literal(condition[0]) == "NOT" && is_bare_literal(condition[1])) {
             auto kw = get_bare_literal(condition[1]);
             ConditionOp uop = unary_op_from_string(kw);
             if (uop != ConditionOp::Fallback) {
                 pp.op = uop;
-                pp.flags |= 1;  // negated
+                pp.flags |= 1; // negated
                 pp.left_idx = 2;
                 compute_dynamic_flags(pp.flags, {2});
                 return pp;
@@ -937,7 +962,7 @@ PreParsedCondition classify_condition(const std::vector<Argument>& condition) {
             }
         }
 
-        return pp;  // Fallback
+        return pp; // Fallback
     }
 
     if (n == 4) {
@@ -959,7 +984,7 @@ PreParsedCondition classify_condition(const std::vector<Argument>& condition) {
         if (operand_is_keyword(3)) return pp;
 
         pp.op = bop;
-        pp.flags |= 1;  // negated
+        pp.flags |= 1; // negated
         pp.left_idx = 1;
         pp.right_idx = 3;
         compute_dynamic_flags(pp.flags, {1, 3});
@@ -973,14 +998,17 @@ PreParsedCondition classify_condition(const std::vector<Argument>& condition) {
         for (size_t i = 0; i < n; ++i) {
             if (!is_bare_literal(condition[i])) continue;
             auto lit = get_bare_literal(condition[i]);
-            if (lit == "AND") has_and = true;
-            else if (lit == "OR") has_or = true;
-            else if (lit == "(" || lit == ")") has_parens = true;
+            if (lit == "AND")
+                has_and = true;
+            else if (lit == "OR")
+                has_or = true;
+            else if (lit == "(" || lit == ")")
+                has_parens = true;
         }
 
         if (has_parens) return pp;          // Parenthesized → fallback
-        if (has_and && has_or) return pp;    // Mixed AND+OR → fallback
-        if (!has_and && !has_or) return pp;  // No connectives → fallback
+        if (has_and && has_or) return pp;   // Mixed AND+OR → fallback
+        if (!has_and && !has_or) return pp; // No connectives → fallback
 
         ConditionOp compound_op = has_and ? ConditionOp::CompoundAnd : ConditionOp::CompoundOr;
         std::string_view connective = has_and ? "AND" : "OR";
@@ -1004,41 +1032,37 @@ PreParsedCondition classify_condition(const std::vector<Argument>& condition) {
                 sub.left_idx = static_cast<uint8_t>(start);
                 sub.right_idx = 0;
                 // Dynamic flag
-                if (!condition[start].quoted && arg_has_varref(condition[start]))
-                    sub.flags |= 2;
+                if (!condition[start].quoted && arg_has_varref(condition[start])) sub.flags |= 2;
             } else if (sub_n == 2) {
                 // NOT X or UNARY X
                 if (!is_bare_literal(condition[start])) return false;
                 auto kw = get_bare_literal(condition[start]);
                 if (kw == "NOT") {
                     sub.op = ConditionOp::BoolCheck;
-                    sub.flags |= 1;  // negated
+                    sub.flags |= 1; // negated
                     sub.left_idx = static_cast<uint8_t>(start + 1);
-                    if (!condition[start + 1].quoted && arg_has_varref(condition[start + 1]))
-                        sub.flags |= 2;
+                    if (!condition[start + 1].quoted && arg_has_varref(condition[start + 1])) sub.flags |= 2;
                 } else {
                     ConditionOp uop = unary_op_from_string(kw);
                     if (uop == ConditionOp::Fallback) return false;
                     sub.op = uop;
                     sub.left_idx = static_cast<uint8_t>(start + 1);
-                    if (!condition[start + 1].quoted && arg_has_varref(condition[start + 1]))
-                        sub.flags |= 2;
+                    if (!condition[start + 1].quoted && arg_has_varref(condition[start + 1])) sub.flags |= 2;
                 }
                 sub.right_idx = 0;
             } else {
                 // sub_n == 3: X binary-op Y  or  NOT UNARY X  or  NOT X (bool)
                 // Check for NOT + unary: NOT DEFINED x, NOT EXISTS x, etc.
-                if (is_bare_literal(condition[start]) && get_bare_literal(condition[start]) == "NOT" &&
-                    is_bare_literal(condition[start + 1])) {
+                if (is_bare_literal(condition[start]) && get_bare_literal(condition[start]) == "NOT"
+                    && is_bare_literal(condition[start + 1])) {
                     auto kw = get_bare_literal(condition[start + 1]);
                     ConditionOp uop = unary_op_from_string(kw);
                     if (uop != ConditionOp::Fallback) {
                         sub.op = uop;
-                        sub.flags |= 1;  // negated
+                        sub.flags |= 1; // negated
                         sub.left_idx = static_cast<uint8_t>(start + 2);
                         sub.right_idx = 0;
-                        if (!condition[start + 2].quoted && arg_has_varref(condition[start + 2]))
-                            sub.flags |= 2;
+                        if (!condition[start + 2].quoted && arg_has_varref(condition[start + 2])) sub.flags |= 2;
                         num_sub++;
                         return true;
                     }
@@ -1063,10 +1087,8 @@ PreParsedCondition classify_condition(const std::vector<Argument>& condition) {
                 sub.left_idx = static_cast<uint8_t>(start);
                 sub.right_idx = static_cast<uint8_t>(start + 2);
                 // Dynamic flags
-                if (!condition[start].quoted && arg_has_varref(condition[start]))
-                    sub.flags |= 2;
-                if (!condition[start + 2].quoted && arg_has_varref(condition[start + 2]))
-                    sub.flags |= 2;
+                if (!condition[start].quoted && arg_has_varref(condition[start])) sub.flags |= 2;
+                if (!condition[start + 2].quoted && arg_has_varref(condition[start + 2])) sub.flags |= 2;
             }
 
             num_sub++;
@@ -1075,13 +1097,15 @@ PreParsedCondition classify_condition(const std::vector<Argument>& condition) {
 
         bool ok = true;
         for (size_t i = 0; i <= n; ++i) {
-            bool is_connective = (i < n && is_bare_literal(condition[i]) &&
-                                  get_bare_literal(condition[i]) == connective);
+            bool is_connective = (i < n && is_bare_literal(condition[i]) && get_bare_literal(condition[i]) == connective);
             bool is_end = (i == n);
 
             if (is_connective || is_end) {
-                if (!classify_sub(sub_start, i)) { ok = false; break; }
-                sub_start = i + 1;  // skip the connective token
+                if (!classify_sub(sub_start, i)) {
+                    ok = false;
+                    break;
+                }
+                sub_start = i + 1; // skip the connective token
             }
         }
 
@@ -1099,19 +1123,14 @@ PreParsedCondition classify_condition(const std::vector<Argument>& condition) {
         }
     }
 
-    return pp;  // Fallback
+    return pp; // Fallback
 }
 
 // --- Full parser fallback ---
 
-std::expected<bool, InterpreterError> evaluate_condition(
-    Interpreter& interp,
-    const std::vector<Argument>& condition,
-    size_t row, size_t col, size_t offset, size_t length)
-{
-    if (condition.empty()) {
-        return false;
-    }
+std::expected<bool, InterpreterError> evaluate_condition(Interpreter& interp, const std::vector<Argument>& condition, size_t row,
+                                                         size_t col, size_t offset, size_t length) {
+    if (condition.empty()) { return false; }
 
     ConditionParser parser(interp, condition);
     bool result = parser.parse();
@@ -1125,17 +1144,14 @@ std::expected<bool, InterpreterError> evaluate_condition(
         std::string remaining;
         for (size_t i = parser.pos(); i < condition.size(); ++i) {
             if (!remaining.empty()) remaining += " ";
-            if (!condition[i].quoted && condition[i].parts.size() == 1 &&
-                std::holds_alternative<std::string>(condition[i].parts[0])) {
+            if (!condition[i].quoted && condition[i].parts.size() == 1 && std::holds_alternative<std::string>(condition[i].parts[0])) {
                 remaining += std::get<std::string>(condition[i].parts[0]);
             } else {
                 remaining += interp.evaluate_argument(condition[i]);
             }
         }
 
-        auto is_whitespace = [](char ch) {
-            return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
-        };
+        auto is_whitespace = [](char ch) { return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n'; };
         size_t start = 0;
         while (start < remaining.size() && is_whitespace(remaining[start])) ++start;
         size_t end = remaining.size();
@@ -1153,18 +1169,13 @@ std::expected<bool, InterpreterError> evaluate_condition(
 
 // --- Fast-path evaluator ---
 
-std::expected<bool, InterpreterError> evaluate_condition(
-    Interpreter& interp,
-    const std::vector<Argument>& condition,
-    const PreParsedCondition& pp,
-    size_t row, size_t col, size_t offset, size_t length)
-{
+std::expected<bool, InterpreterError> evaluate_condition(Interpreter& interp, const std::vector<Argument>& condition,
+                                                         const PreParsedCondition& pp, size_t row, size_t col, size_t offset,
+                                                         size_t length) {
     if (condition.empty()) return false;
 
     // Fallback: use full parser with filtering
-    if (pp.op == ConditionOp::Fallback) {
-        return evaluate_condition_with_filtering(interp, condition, row, col, offset, length);
-    }
+    if (pp.op == ConditionOp::Fallback) { return evaluate_condition_with_filtering(interp, condition, row, col, offset, length); }
 
     // Compound AND/OR: iterate sub-conditions with short-circuit.
     //
@@ -1182,7 +1193,7 @@ std::expected<bool, InterpreterError> evaluate_condition(
     // if we ever loosen the classifier.
     if (pp.op == ConditionOp::CompoundAnd || pp.op == ConditionOp::CompoundOr) {
         bool is_and = (pp.op == ConditionOp::CompoundAnd);
-        bool result = is_and;  // AND starts true, OR starts false
+        bool result = is_and; // AND starts true, OR starts false
 
         for (uint8_t i = 0; i < pp.num_sub; ++i) {
             auto sub_result = evaluate_sub_condition(interp, condition, pp.subs[i]);
@@ -1191,9 +1202,15 @@ std::expected<bool, InterpreterError> evaluate_condition(
                 return evaluate_condition_with_filtering(interp, condition, row, col, offset, length);
             }
             if (is_and) {
-                if (!*sub_result) { result = false; break; }
+                if (!*sub_result) {
+                    result = false;
+                    break;
+                }
             } else {
-                if (*sub_result) { result = true; break; }
+                if (*sub_result) {
+                    result = true;
+                    break;
+                }
             }
         }
 
@@ -1204,23 +1221,18 @@ std::expected<bool, InterpreterError> evaluate_condition(
     // Safety: indices are set to literal 0-3 by classify_condition (which only
     // accepts n <= 4), so uint8_t overflow is impossible. But verify bounds at
     // runtime in case the condition vector was modified after classification.
-    bool has_binary = (static_cast<uint8_t>(pp.op) >= static_cast<uint8_t>(ConditionOp::BinaryEqual) &&
-                       pp.op != ConditionOp::CompoundAnd && pp.op != ConditionOp::CompoundOr);
-    if (pp.left_idx >= condition.size() ||
-        (has_binary && pp.right_idx >= condition.size())) {
+    bool has_binary = (static_cast<uint8_t>(pp.op) >= static_cast<uint8_t>(ConditionOp::BinaryEqual) && pp.op != ConditionOp::CompoundAnd
+                       && pp.op != ConditionOp::CompoundOr);
+    if (pp.left_idx >= condition.size() || (has_binary && pp.right_idx >= condition.size())) {
         return evaluate_condition_with_filtering(interp, condition, row, col, offset, length);
     }
 
     // Fast path for unary file-test ops with a simple ${VAR} operand.
     // Resolves the variable to string_view and calls cached_is_directory /
     // cached_file_exists directly — zero string allocations on the hot path.
-    if (pp.has_dynamic_args() &&
-        (pp.op == ConditionOp::IsDirectory || pp.op == ConditionOp::Exists)) {
-        if (auto sv = try_resolve_sv(interp, condition[pp.left_idx]);
-            sv && !sv->empty() && sv->find(';') == std::string_view::npos) {
-            bool r = (pp.op == ConditionOp::IsDirectory)
-                ? interp.cached_is_directory(*sv)
-                : interp.cached_file_exists(*sv);
+    if (pp.has_dynamic_args() && (pp.op == ConditionOp::IsDirectory || pp.op == ConditionOp::Exists)) {
+        if (auto sv = try_resolve_sv(interp, condition[pp.left_idx]); sv && !sv->empty() && sv->find(';') == std::string_view::npos) {
+            bool r = (pp.op == ConditionOp::IsDirectory) ? interp.cached_is_directory(*sv) : interp.cached_file_exists(*sv);
             if (pp.negated()) r = !r;
             return r;
         }

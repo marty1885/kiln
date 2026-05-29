@@ -14,11 +14,8 @@ struct Argument;
 // variable; false means a runtime check (e.g., non-numeric variable value,
 // or out-of-range index) failed and the caller should fall back to the
 // regular dispatch path.
-bool try_execute_pre_parsed_math(Interpreter& interp,
-                                  const PreParsedMath& pp,
-                                  const std::vector<Argument>& args);
-bool try_execute_pre_parsed_substring(Interpreter& interp,
-                                       const PreParsedSubstring& pp);
+bool try_execute_pre_parsed_math(Interpreter& interp, const PreParsedMath& pp, const std::vector<Argument>& args);
+bool try_execute_pre_parsed_substring(Interpreter& interp, const PreParsedSubstring& pp);
 
 void register_message_builtins(Interpreter& interp);
 void register_variable_builtins(Interpreter& interp);

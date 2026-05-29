@@ -12,7 +12,7 @@ bool ExternalProjectTarget::is_cmake_based() const {
     // 1. No custom CONFIGURE_COMMAND (or empty)
     // 2. CMakeLists.txt exists in effective source dir
     if (!configure_command_.commands.empty() && !configure_command_.is_empty) {
-        return false;  // Has custom configure command
+        return false; // Has custom configure command
     }
 
     std::string cmake_file = get_effective_source_dir() + "/CMakeLists.txt";
@@ -21,22 +21,15 @@ bool ExternalProjectTarget::is_cmake_based() const {
 
 std::vector<std::pair<std::string, std::string>> ExternalProjectTarget::get_token_replacements() const {
     return {
-        {"<SOURCE_DIR>", ep_source_dir_},
-        {"<SOURCE_SUBDIR>", get_effective_source_dir()},
-        {"<BINARY_DIR>", ep_binary_dir_},
-        {"<INSTALL_DIR>", ep_install_dir_},
+        {"<SOURCE_DIR>", ep_source_dir_}, {"<SOURCE_SUBDIR>", get_effective_source_dir()},
+        {"<BINARY_DIR>", ep_binary_dir_}, {"<INSTALL_DIR>", ep_install_dir_},
         {"<TMP_DIR>", ep_tmp_dir_},
     };
 }
 
-std::expected<void, std::string> ExternalProjectTarget::generate_tasks(
-    GraphTransaction& txn,
-    const Toolchain&,
-    const TargetMap& all_targets,
-    const Interpreter& interp,
-    const std::vector<std::string>&,
-    const std::vector<std::string>&)
-{
+std::expected<void, std::string> ExternalProjectTarget::generate_tasks(GraphTransaction& txn, const Toolchain&,
+                                                                       const TargetMap& all_targets, const Interpreter& interp,
+                                                                       const std::vector<std::string>&, const std::vector<std::string>&) {
     // ExternalProjectTarget generates TWO tasks:
     //
     // 1. Orchestrator task (name_:orchestrate)
@@ -59,7 +52,7 @@ std::expected<void, std::string> ExternalProjectTarget::generate_tasks(
     orchestrator.id = orchestrator_id;
     orchestrator.kind = EPOrchestratorTask{name_};
     orchestrator.parent_target = this;
-    orchestrator.always_run = true;  // Must check if EP needs rebuilding
+    orchestrator.always_run = true; // Must check if EP needs rebuilding
     orchestrator.working_dir = ep_binary_dir_;
 
     // Handle DEPENDS from add_custom_target/ExternalProject_Add
@@ -89,7 +82,7 @@ std::expected<void, std::string> ExternalProjectTarget::generate_tasks(
     sentinel.id = sentinel_id;
     sentinel.kind = EPSentinelTask{name_};
     sentinel.parent_target = this;
-    sentinel.always_run = true;  // Sentinel must run every build to check if EP is dirty
+    sentinel.always_run = true; // Sentinel must run every build to check if EP is dirty
     // No commands - sentinel is just a synchronization point
 
     // Sentinel depends on orchestrator

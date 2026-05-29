@@ -30,14 +30,10 @@ inline std::string run_command(const std::string& command) {
     std::array<char, 128> buffer;
     std::string result;
 
-    std::unique_ptr<FILE, int(*)(FILE*)> pipe(popen(command.c_str(), "r"), pclose);
-    if (!pipe) {
-        return "";
-    }
+    std::unique_ptr<FILE, int (*)(FILE*)> pipe(popen(command.c_str(), "r"), pclose);
+    if (!pipe) { return ""; }
 
-    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-        result += buffer.data();
-    }
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) { result += buffer.data(); }
 
     return result;
 }
@@ -46,10 +42,8 @@ inline std::string run_command(const std::string& command) {
 
 class GnuCompiler : public Compiler {
 public:
-    explicit GnuCompiler(std::string binary, Language lang,
-                         std::string sysroot = {}, std::string compiler_target = {})
-        : binary_(std::move(binary)), lang_(lang),
-          sysroot_(std::move(sysroot)), compiler_target_(std::move(compiler_target)) {}
+    explicit GnuCompiler(std::string binary, Language lang, std::string sysroot = {}, std::string compiler_target = {})
+        : binary_(std::move(binary)), lang_(lang), sysroot_(std::move(sysroot)), compiler_target_(std::move(compiler_target)) {}
 
     const std::string& binary() const override { return binary_; }
     const std::string& sysroot() const override { return sysroot_; }
@@ -58,12 +52,8 @@ public:
     // GCC-style `-std=c++NN` / `-std=cNN`. ClangCompiler and TccCompiler
     // inherit this — same spelling for all three. MSVC overrides.
     std::string std_compile_option(Language lang, int standard) const override {
-        if (lang == Language::CXX) {
-            return "-std=c++" + std::to_string(standard);
-        }
-        if (lang == Language::C) {
-            return "-std=c" + std::to_string(standard);
-        }
+        if (lang == Language::CXX) { return "-std=c++" + std::to_string(standard); }
+        if (lang == Language::C) { return "-std=c" + std::to_string(standard); }
         return {};
     }
 
@@ -72,19 +62,14 @@ public:
     // Caller is responsible for only populating compiler_target_ when the
     // compiler honors --target= (Clang-likes); GCC errors on it.
     void inject_target_flags(std::vector<std::string>& cmd) const {
-        if (!sysroot_.empty()) {
-            cmd.push_back("--sysroot=" + sysroot_);
-        }
-        if (!compiler_target_.empty()) {
-            cmd.push_back("--target=" + compiler_target_);
-        }
+        if (!sysroot_.empty()) { cmd.push_back("--sysroot=" + sysroot_); }
+        if (!compiler_target_.empty()) { cmd.push_back("--target=" + compiler_target_); }
     }
 
     // Build a CompilerCommand from an argv and the indices of tokens that
     // were emitted purely for presentation (color, etc). The signature view
     // is the same argv with those indices erased.
-    static CompilerCommand finalize(std::vector<std::string> cmd,
-                                    const std::vector<size_t>& cosmetic_indices) {
+    static CompilerCommand finalize(std::vector<std::string> cmd, const std::vector<size_t>& cosmetic_indices) {
         std::vector<std::string> sig;
         sig.reserve(cmd.size() - cosmetic_indices.size());
         size_t next_skip = 0;
@@ -108,7 +93,7 @@ public:
             std::string std_prefix = (lang_ == Language::C ? "c" : "c++");
             // Use "gnu" prefix if extensions are enabled (gnu11 vs c11)
             if (ctx.extensions_enabled) {
-                std_prefix = "gnu" + std_prefix.substr(1);  // "c" -> "gnu", "c++" -> "gnu++"
+                std_prefix = "gnu" + std_prefix.substr(1); // "c" -> "gnu", "c++" -> "gnu++"
             }
             cmd.push_back("-std=" + std_prefix + ctx.standard);
         }
@@ -118,9 +103,7 @@ public:
         // C++20 modules support. Subclasses override emit_module_compile_flags
         // to swap in their own indirection scheme (clang reads per-task
         // response files instead of GCC's -fmodule-mapper=).
-        if (ctx.is_module_source) {
-            emit_module_compile_flags(cmd, ctx);
-        }
+        if (ctx.is_module_source) { emit_module_compile_flags(cmd, ctx); }
 
         // gcc-14 doesn't recognize .cppm/.ccm/.cxxm/.ixx/.mpp as C++ source; without
         // -x c++ it silently treats them as linker inputs, "compiles" successfully,
@@ -137,12 +120,10 @@ public:
             // Handle CMake's SHELL: prefix - strips prefix and passes arguments as-is
             if (opt.starts_with("SHELL:")) {
                 // Split the rest by whitespace and add as separate arguments
-                std::string rest = opt.substr(6);  // Skip "SHELL:"
+                std::string rest = opt.substr(6); // Skip "SHELL:"
                 std::stringstream ss(rest);
                 std::string arg;
-                while (ss >> arg) {
-                    cmd.push_back(arg);
-                }
+                while (ss >> arg) { cmd.push_back(arg); }
             } else {
                 cmd.push_back(opt);
             }
@@ -150,9 +131,7 @@ public:
         for (const auto& def : ctx.definitions) {
             // Strip -D prefix if present (some CMakeLists.txt files include it)
             std::string clean_def = def;
-            if (clean_def.starts_with("-D")) {
-                clean_def = clean_def.substr(2);
-            }
+            if (clean_def.starts_with("-D")) { clean_def = clean_def.substr(2); }
             if (clean_def.empty()) continue;
             // No shell escaping needed: commands are executed via execvp,
             // so each argv element is passed directly to the compiler.
@@ -161,8 +140,10 @@ public:
 
         emit_dependency_flags(cmd, ctx.output);
 
-        if (ctx.is_shared) cmd.push_back("-fPIC");
-        else if (ctx.is_pie) cmd.push_back("-fPIE");
+        if (ctx.is_shared)
+            cmd.push_back("-fPIC");
+        else if (ctx.is_pie)
+            cmd.push_back("-fPIE");
         if (!ctx.visibility_preset.empty()) cmd.push_back("-fvisibility=" + ctx.visibility_preset);
         if (ctx.visibility_inlines_hidden) cmd.push_back("-fvisibility-inlines-hidden");
 
@@ -170,12 +151,8 @@ public:
         cmd.push_back("-o");
         cmd.push_back(ctx.output);
 
-        for (const auto& dir : ctx.includes) {
-            cmd.push_back("-I" + dir);
-        }
-        for (const auto& dir : ctx.system_includes) {
-            cmd.push_back("-isystem" + dir);
-        }
+        for (const auto& dir : ctx.includes) { cmd.push_back("-I" + dir); }
+        for (const auto& dir : ctx.system_includes) { cmd.push_back("-isystem" + dir); }
 
         if (!ctx.pch_include.empty()) {
             cmd.push_back("-Winvalid-pch");
@@ -201,7 +178,7 @@ public:
             std::string std_prefix = (lang_ == Language::C ? "c" : "c++");
             // Use "gnu" prefix if extensions are enabled (gnu11 vs c11)
             if (ctx.extensions_enabled) {
-                std_prefix = "gnu" + std_prefix.substr(1);  // "c" -> "gnu", "c++" -> "gnu++"
+                std_prefix = "gnu" + std_prefix.substr(1); // "c" -> "gnu", "c++" -> "gnu++"
             }
             cmd.push_back("-std=" + std_prefix + ctx.standard);
         }
@@ -306,9 +283,7 @@ public:
             for (const auto& dir : ctx.build_rpath) add_rpath(dir);
         }
 
-        if (ctx.is_shared && !ctx.soname.empty()) {
-            cmd.push_back("-Wl,-soname," + ctx.soname);
-        }
+        if (ctx.is_shared && !ctx.soname.empty()) { cmd.push_back("-Wl,-soname," + ctx.soname); }
 
         if (ctx.is_shared) cmd.push_back("-shared");
         cmd.push_back("-o");
@@ -370,13 +345,11 @@ public:
     //   -Map PATH                 (bare, when invoking ld directly)
     //   -Wl,--out-implib=PATH | --out-implib=PATH | --out-implib PATH
     //                             (MinGW import library for shared DLLs)
-    std::vector<std::string> get_link_side_effect_outputs(
-        const std::vector<std::string>& argv) const override {
+    std::vector<std::string> get_link_side_effect_outputs(const std::vector<std::string>& argv) const override {
         std::vector<std::string> outputs;
 
         auto strip_quotes = [](std::string s) {
-            if (s.size() >= 2 && (s.front() == '"' || s.front() == '\'') && s.front() == s.back())
-                s = s.substr(1, s.size() - 2);
+            if (s.size() >= 2 && (s.front() == '"' || s.front() == '\'') && s.front() == s.back()) s = s.substr(1, s.size() - 2);
             return s;
         };
         auto match_value_flag = [&](std::string_view tok, std::string_view name) -> std::optional<std::string> {
@@ -401,21 +374,47 @@ public:
                 }
                 for (size_t j = 0; j < parts.size(); ++j) {
                     auto p = parts[j];
-                    if (auto v = match_value_flag(p, "-Map")) { outputs.push_back(strip_quotes(*v)); continue; }
-                    if (auto v = match_value_flag(p, "--out-implib")) { outputs.push_back(strip_quotes(*v)); continue; }
-                    if (p == "-Map" && j + 1 < parts.size()) { outputs.push_back(strip_quotes(std::string(parts[++j]))); continue; }
-                    if (p == "--out-implib" && j + 1 < parts.size()) { outputs.push_back(strip_quotes(std::string(parts[++j]))); continue; }
+                    if (auto v = match_value_flag(p, "-Map")) {
+                        outputs.push_back(strip_quotes(*v));
+                        continue;
+                    }
+                    if (auto v = match_value_flag(p, "--out-implib")) {
+                        outputs.push_back(strip_quotes(*v));
+                        continue;
+                    }
+                    if (p == "-Map" && j + 1 < parts.size()) {
+                        outputs.push_back(strip_quotes(std::string(parts[++j])));
+                        continue;
+                    }
+                    if (p == "--out-implib" && j + 1 < parts.size()) {
+                        outputs.push_back(strip_quotes(std::string(parts[++j])));
+                        continue;
+                    }
                 }
                 continue;
             }
 
-            if (auto v = match_value_flag(a, "-Map")) { outputs.push_back(strip_quotes(*v)); continue; }
-            if (auto v = match_value_flag(a, "--out-implib")) { outputs.push_back(strip_quotes(*v)); continue; }
+            if (auto v = match_value_flag(a, "-Map")) {
+                outputs.push_back(strip_quotes(*v));
+                continue;
+            }
+            if (auto v = match_value_flag(a, "--out-implib")) {
+                outputs.push_back(strip_quotes(*v));
+                continue;
+            }
 
             if (a == "-Xlinker" && i + 1 < argv.size()) {
                 std::string_view nxt(argv[i + 1]);
-                if (auto v = match_value_flag(nxt, "-Map")) { outputs.push_back(strip_quotes(*v)); ++i; continue; }
-                if (auto v = match_value_flag(nxt, "--out-implib")) { outputs.push_back(strip_quotes(*v)); ++i; continue; }
+                if (auto v = match_value_flag(nxt, "-Map")) {
+                    outputs.push_back(strip_quotes(*v));
+                    ++i;
+                    continue;
+                }
+                if (auto v = match_value_flag(nxt, "--out-implib")) {
+                    outputs.push_back(strip_quotes(*v));
+                    ++i;
+                    continue;
+                }
                 if ((nxt == "-Map" || nxt == "--out-implib") && i + 3 < argv.size() && argv[i + 2] == "-Xlinker") {
                     outputs.push_back(strip_quotes(argv[i + 3]));
                     i += 3;
@@ -485,24 +484,20 @@ public:
 
         if (ctx.color_diagnostics) emit_color_flag(cmd, cosmetic);
 
-        for (const auto& dir : ctx.includes) {
-            cmd.push_back("-I" + dir);
-        }
-        for (const auto& dir : ctx.system_includes) {
-            cmd.push_back("-isystem" + dir);
-        }
+        for (const auto& dir : ctx.includes) { cmd.push_back("-I" + dir); }
+        for (const auto& dir : ctx.system_includes) { cmd.push_back("-isystem" + dir); }
 
         for (const auto& def : ctx.definitions) {
             std::string clean_def = def;
-            if (clean_def.starts_with("-D")) {
-                clean_def = clean_def.substr(2);
-            }
+            if (clean_def.starts_with("-D")) { clean_def = clean_def.substr(2); }
             if (clean_def.empty()) continue;
             std::string escaped_def;
             escaped_def.reserve(clean_def.size() + 4);
             for (char c : clean_def) {
-                if (c == '"') escaped_def += "\\\"";
-                else          escaped_def += c;
+                if (c == '"')
+                    escaped_def += "\\\"";
+                else
+                    escaped_def += c;
             }
             cmd.push_back("-D" + escaped_def);
         }
@@ -534,9 +529,7 @@ public:
 
         cmd.push_back("-fmodules-ts");
         cmd.push_back(std::string("-fmodule-header=") + (ctx.is_system_header ? "system" : "user"));
-        if (!ctx.module_mapper_file.empty()) {
-            cmd.push_back("-fmodule-mapper=" + ctx.module_mapper_file);
-        }
+        if (!ctx.module_mapper_file.empty()) { cmd.push_back("-fmodule-mapper=" + ctx.module_mapper_file); }
 
         if (ctx.color_diagnostics) emit_color_flag(cmd, cosmetic);
 
@@ -557,12 +550,8 @@ public:
             if (clean_def.empty()) continue;
             cmd.push_back("-D" + clean_def);
         }
-        for (const auto& dir : ctx.includes) {
-            cmd.push_back("-I" + dir);
-        }
-        for (const auto& dir : ctx.system_includes) {
-            cmd.push_back("-isystem" + dir);
-        }
+        for (const auto& dir : ctx.includes) { cmd.push_back("-I" + dir); }
+        for (const auto& dir : ctx.system_includes) { cmd.push_back("-isystem" + dir); }
 
         // -c is required even though no .o is produced; the BMI travels via
         // the mapper. -o /dev/null silences the obj write.
@@ -592,15 +581,11 @@ public:
         const std::string flags = build_target_flag_string();
         const std::string lang_flag = (lang_ == Language::C || lang_ == Language::ASM) ? "c" : "c++";
 
-        auto version_future = std::async(std::launch::async, [&] {
-            return detail::run_command(binary_ + " --version 2>&1");
-        });
-        auto verbose_future = std::async(std::launch::async, [&] {
-            return detail::run_command("echo | " + binary_ + flags + " -E -v -x " + lang_flag + " - 2>&1");
-        });
-        auto search_dirs_future = std::async(std::launch::async, [&] {
-            return detail::run_command(binary_ + flags + " -print-search-dirs 2>&1");
-        });
+        auto version_future = std::async(std::launch::async, [&] { return detail::run_command(binary_ + " --version 2>&1"); });
+        auto verbose_future = std::async(
+            std::launch::async, [&] { return detail::run_command("echo | " + binary_ + flags + " -E -v -x " + lang_flag + " - 2>&1"); });
+        auto search_dirs_future =
+            std::async(std::launch::async, [&] { return detail::run_command(binary_ + flags + " -print-search-dirs 2>&1"); });
         auto macros_future = std::async(std::launch::async, [&] {
             return detail::run_command(binary_ + flags + " -dM -E -x " + lang_flag + " /dev/null 2>/dev/null");
         });
@@ -612,9 +597,8 @@ public:
         // "INFO:compiler[X]" / "INFO:version[Y]" / "INFO:arch[Z]" via
         // preprocessor macros, which we then strings-grep out of the produced
         // object. Robust against compilers that don't accept `-dM -E`.
-        auto probe_tu_future = std::async(std::launch::async, [&]() -> std::map<std::string, std::string> {
-            return run_compiler_id_probe(binary_, flags, lang_flag);
-        });
+        auto probe_tu_future = std::async(
+            std::launch::async, [&]() -> std::map<std::string, std::string> { return run_compiler_id_probe(binary_, flags, lang_flag); });
 
         // Parse predefined macros — single source of truth for compiler ID,
         // version, default standard, and (in cross builds) system info.
@@ -637,9 +621,7 @@ public:
             auto it = macros.find(name);
             return it == macros.end() ? std::string{} : it->second;
         };
-        auto has_macro = [&](const std::string& name) {
-            return macros.find(name) != macros.end();
-        };
+        auto has_macro = [&](const std::string& name) { return macros.find(name) != macros.end(); };
 
         // Compiler ID + version (priority: IntelLLVM > Clang > classic Intel
         // ICC > GNU > …). Classic ICC defines __GNUC__ for compatibility, so
@@ -652,10 +634,7 @@ public:
             std::string maj = macro("__clang_major__");
             std::string min = macro("__clang_minor__");
             std::string pat = macro("__clang_patchlevel__");
-            if (!maj.empty()) {
-                info.compiler_version = maj + "." + (min.empty() ? "0" : min)
-                                              + "." + (pat.empty() ? "0" : pat);
-            }
+            if (!maj.empty()) { info.compiler_version = maj + "." + (min.empty() ? "0" : min) + "." + (pat.empty() ? "0" : pat); }
         } else if (has_macro("__INTEL_COMPILER")) {
             info.compiler_id = "Intel";
             std::string maj = macro("__INTEL_COMPILER");
@@ -666,10 +645,7 @@ public:
             std::string maj = macro("__GNUC__");
             std::string min = macro("__GNUC_MINOR__");
             std::string pat = macro("__GNUC_PATCHLEVEL__");
-            if (!maj.empty()) {
-                info.compiler_version = maj + "." + (min.empty() ? "0" : min)
-                                              + "." + (pat.empty() ? "0" : pat);
-            }
+            if (!maj.empty()) { info.compiler_version = maj + "." + (min.empty() ? "0" : min) + "." + (pat.empty() ? "0" : pat); }
         } else if (has_macro("__TINYC__")) {
             // TCC defines __TINYC__ but neither __GNUC__ nor __clang__, so
             // this disambiguates cleanly. The macro encodes version as
@@ -680,9 +656,7 @@ public:
                 long maj = v / 10000;
                 long min = (v / 100) % 100;
                 long pat = v % 100;
-                info.compiler_version = std::to_string(maj) + "."
-                                      + std::to_string(min) + "."
-                                      + std::to_string(pat);
+                info.compiler_version = std::to_string(maj) + "." + std::to_string(min) + "." + std::to_string(pat);
             }
         } else {
             info.compiler_id = "Unknown";
@@ -699,12 +673,10 @@ public:
             return it == probe.end() ? std::string{} : it->second;
         };
         const std::string probe_compiler = get_probe("compiler");
-        const std::string probe_version  = get_probe("version");
+        const std::string probe_version = get_probe("version");
         if (info.compiler_id == "Unknown" && !probe_compiler.empty()) {
             info.compiler_id = probe_compiler;
-            if (!probe_version.empty() && probe_version != "unknown") {
-                info.compiler_version = probe_version;
-            }
+            if (!probe_version.empty() && probe_version != "unknown") { info.compiler_version = probe_version; }
         }
         if (info.compiler_version.empty() && !probe_version.empty() && probe_version != "unknown") {
             info.compiler_version = probe_version;
@@ -715,11 +687,9 @@ public:
             std::string version_output = version_future.get();
             static auto version_re = Regex::compile(R"((\d+\.\d+\.\d+))").value();
             std::vector<std::string> captures;
-            if (version_re.search(version_output, captures)) {
-                info.compiler_version = captures[1];
-            }
+            if (version_re.search(version_output, captures)) { info.compiler_version = captures[1]; }
         } else {
-            (void)version_future.get();  // drain
+            (void) version_future.get(); // drain
         }
 
         // Default standard — parse __cplusplus / __STDC_VERSION__
@@ -730,20 +700,32 @@ public:
                 long v = *v_opt;
                 int std_val = 0;
                 if (lang_ == Language::CXX) {
-                    if (v >= 202602L)      std_val = 26;
-                    else if (v >= 202302L) std_val = 23;
-                    else if (v >= 202002L) std_val = 20;
-                    else if (v >= 201703L) std_val = 17;
-                    else if (v >= 201402L) std_val = 14;
-                    else if (v >= 201103L) std_val = 11;
-                    else                   std_val = 98;
+                    if (v >= 202602L)
+                        std_val = 26;
+                    else if (v >= 202302L)
+                        std_val = 23;
+                    else if (v >= 202002L)
+                        std_val = 20;
+                    else if (v >= 201703L)
+                        std_val = 17;
+                    else if (v >= 201402L)
+                        std_val = 14;
+                    else if (v >= 201103L)
+                        std_val = 11;
+                    else
+                        std_val = 98;
                     info.default_cxx_standard = std_val;
                 } else {
-                    if (v >= 202311L)      std_val = 23;
-                    else if (v >= 201710L) std_val = 17;
-                    else if (v >= 201112L) std_val = 11;
-                    else if (v >= 199901L) std_val = 99;
-                    else                   std_val = 90;
+                    if (v >= 202311L)
+                        std_val = 23;
+                    else if (v >= 201710L)
+                        std_val = 17;
+                    else if (v >= 201112L)
+                        std_val = 11;
+                    else if (v >= 199901L)
+                        std_val = 99;
+                    else
+                        std_val = 90;
                     info.default_c_standard = std_val;
                 }
             }
@@ -754,23 +736,35 @@ public:
         const bool cross = !sysroot_.empty() || !compiler_target_.empty();
         if (cross) {
             // OS
-            if (has_macro("__linux__"))      info.system_name = "Linux";
-            else if (has_macro("__APPLE__")) info.system_name = "Darwin";
-            else if (has_macro("_WIN32"))    info.system_name = "Windows";
-            else if (has_macro("__FreeBSD__")) info.system_name = "FreeBSD";
-            else                             info.system_name = "Generic";
+            if (has_macro("__linux__"))
+                info.system_name = "Linux";
+            else if (has_macro("__APPLE__"))
+                info.system_name = "Darwin";
+            else if (has_macro("_WIN32"))
+                info.system_name = "Windows";
+            else if (has_macro("__FreeBSD__"))
+                info.system_name = "FreeBSD";
+            else
+                info.system_name = "Generic";
 
             // Processor
             if (has_macro("__riscv")) {
                 std::string xlen = macro("__riscv_xlen");
                 info.system_processor = (xlen == "64") ? "riscv64" : "riscv32";
-            } else if (has_macro("__x86_64__"))  info.system_processor = "x86_64";
-            else if (has_macro("__i386__"))      info.system_processor = "i386";
-            else if (has_macro("__aarch64__"))   info.system_processor = "aarch64";
-            else if (has_macro("__arm__"))       info.system_processor = "arm";
-            else if (has_macro("__powerpc64__")) info.system_processor = "ppc64";
-            else if (has_macro("__powerpc__"))   info.system_processor = "ppc";
-            else                                 info.system_processor = "Unknown";
+            } else if (has_macro("__x86_64__"))
+                info.system_processor = "x86_64";
+            else if (has_macro("__i386__"))
+                info.system_processor = "i386";
+            else if (has_macro("__aarch64__"))
+                info.system_processor = "aarch64";
+            else if (has_macro("__arm__"))
+                info.system_processor = "arm";
+            else if (has_macro("__powerpc64__"))
+                info.system_processor = "ppc64";
+            else if (has_macro("__powerpc__"))
+                info.system_processor = "ppc";
+            else
+                info.system_processor = "Unknown";
 
             // sizeof_void_p from __SIZEOF_POINTER__ if present (more correct than host's sizeof)
             std::string sp = macro("__SIZEOF_POINTER__");
@@ -824,12 +818,8 @@ public:
             if (in_include_section && !line.empty() && line[0] == ' ') {
                 std::string dir = line.substr(1);
                 auto paren = dir.find(" (");
-                if (paren != std::string::npos) {
-                    dir = dir.substr(0, paren);
-                }
-                if (!dir.empty()) {
-                    info.implicit_includes.push_back(dir);
-                }
+                if (paren != std::string::npos) { dir = dir.substr(0, paren); }
+                if (!dir.empty()) { info.implicit_includes.push_back(dir); }
             }
         }
 
@@ -842,9 +832,7 @@ public:
                 std::istringstream path_stream(paths);
                 std::string path;
                 while (std::getline(path_stream, path, ':')) {
-                    if (!path.empty()) {
-                        info.implicit_link_dirs.push_back(path);
-                    }
+                    if (!path.empty()) { info.implicit_link_dirs.push_back(path); }
                 }
                 break;
             }
@@ -860,8 +848,8 @@ private:
     // the resulting object for the embedded "INFO:" markers. Returns a map
     // of marker -> value (e.g. {"compiler", "GNU"}, {"version", "13.2.0"}).
     // Empty map on any failure — caller must treat that as "no signal".
-    static std::map<std::string, std::string> run_compiler_id_probe(
-            const std::string& binary, const std::string& flags, const std::string& lang_flag) {
+    static std::map<std::string, std::string> run_compiler_id_probe(const std::string& binary, const std::string& flags,
+                                                                    const std::string& lang_flag) {
         std::map<std::string, std::string> out;
 
         // Probe TU. The macro mash assembles version components into a
@@ -956,8 +944,7 @@ int kiln_compiler_id_probe_anchor = 0;
 
         // Compile (-c). Suppress warnings, no optimizations, no preprocessor
         // checks beyond compiling. Stay quiet on stdout/stderr.
-        std::string cmd = binary + flags + " -c -w -O0 -o '"
-                        + obj_path.string() + "' '" + src_path.string() + "' >/dev/null 2>&1";
+        std::string cmd = binary + flags + " -c -w -O0 -o '" + obj_path.string() + "' '" + src_path.string() + "' >/dev/null 2>&1";
         int rc = std::system(cmd.c_str());
         if (rc != 0) {
             std::filesystem::remove_all(tmp, ec);
@@ -1018,18 +1005,18 @@ int kiln_compiler_id_probe_anchor = 0;
             // dumpfullversion handles cases like "14" by printing "14.0.0".
             std::string ver = detail::run_command(binary_ + " -dumpfullversion -dumpversion 2>/dev/null");
             // Strip trailing whitespace/newline.
-            while (!ver.empty() && (ver.back() == '\n' || ver.back() == '\r' || ver.back() == ' '))
-                ver.pop_back();
+            while (!ver.empty() && (ver.back() == '\n' || ver.back() == '\r' || ver.back() == ' ')) ver.pop_back();
             std::string banner = detail::run_command(binary_ + " --version 2>/dev/null");
-            bool is_gcc = banner.find("clang") == std::string::npos &&
-                          (banner.find("g++") != std::string::npos ||
-                           banner.find("gcc") != std::string::npos ||
-                           banner.find("GCC") != std::string::npos);
+            bool is_gcc = banner.find("clang") == std::string::npos
+                          && (banner.find("g++") != std::string::npos || banner.find("gcc") != std::string::npos
+                              || banner.find("GCC") != std::string::npos);
             int major = 0;
             for (char c : ver) {
                 if (c == '.') break;
-                if (c >= '0' && c <= '9') major = major * 10 + (c - '0');
-                else break;
+                if (c >= '0' && c <= '9')
+                    major = major * 10 + (c - '0');
+                else
+                    break;
             }
             p1689_supported_ = is_gcc && major >= 14;
             gcc_major_ = is_gcc ? major : 0;
@@ -1041,9 +1028,12 @@ int kiln_compiler_id_probe_anchor = 0;
     //   1. supports_p1689() (i.e. GCC ≥14) — really we need ≥15.
     //   2. modules.json reachable via `g++ -print-file-name=`.
     bool supports_import_std() const override {
-        (void)supports_p1689();  // populates gcc_major_
+        (void) supports_p1689(); // populates gcc_major_
         std::call_once(import_std_probe_once_, [this] {
-            if (gcc_major_ < 15) { import_std_supported_ = false; return; }
+            if (gcc_major_ < 15) {
+                import_std_supported_ = false;
+                return;
+            }
             std::string path = libstdcxx_modules_json_path();
             std::error_code ec;
             import_std_supported_ = !path.empty() && std::filesystem::exists(path, ec);
@@ -1053,10 +1043,8 @@ int kiln_compiler_id_probe_anchor = 0;
 
     std::string libstdcxx_modules_json_path() const override {
         std::call_once(modules_json_probe_once_, [this] {
-            std::string out = detail::run_command(
-                binary_ + " -print-file-name=libstdc++.modules.json 2>/dev/null");
-            while (!out.empty() && (out.back() == '\n' || out.back() == '\r' || out.back() == ' '))
-                out.pop_back();
+            std::string out = detail::run_command(binary_ + " -print-file-name=libstdc++.modules.json 2>/dev/null");
+            while (!out.empty() && (out.back() == '\n' || out.back() == '\r' || out.back() == ' ')) out.pop_back();
             if (out.empty() || out == "libstdc++.modules.json") {
                 modules_json_path_.clear();
                 return;
@@ -1074,15 +1062,10 @@ protected:
     // `-fmodule-mapper=<path>` indirection (mapper is filled in late by the
     // collator). ClangCompiler overrides to emit `@<rsp-path>` instead, since
     // clang has no mapper-flag equivalent.
-    virtual void emit_module_compile_flags(std::vector<std::string>& cmd,
-                                            const CompileContext& ctx) const {
+    virtual void emit_module_compile_flags(std::vector<std::string>& cmd, const CompileContext& ctx) const {
         cmd.push_back("-fmodules-ts");
-        if (!ctx.module_mapper_file.empty()) {
-            cmd.push_back("-fmodule-mapper=" + ctx.module_mapper_file);
-        }
-        for (const auto& mf : ctx.module_files) {
-            cmd.push_back("-fmodule-file=" + mf);
-        }
+        if (!ctx.module_mapper_file.empty()) { cmd.push_back("-fmodule-mapper=" + ctx.module_mapper_file); }
+        for (const auto& mf : ctx.module_files) { cmd.push_back("-fmodule-file=" + mf); }
     }
 
     // Coerce a module-interface source (.cppm/.ccm/.cxxm/.ixx/.mpp) into
@@ -1090,10 +1073,8 @@ protected:
     // treats unknown extensions as linker inputs. Clang recognizes .cppm
     // natively and needs `-x c++-module` to mark it as a module interface
     // (plain `-x c++` would silently downgrade it to a regular TU).
-    virtual void emit_module_input_kind_flags(std::vector<std::string>& cmd,
-                                                std::string_view ext,
-                                                const CompileContext& ctx) const {
-        (void)ctx;
+    virtual void emit_module_input_kind_flags(std::vector<std::string>& cmd, std::string_view ext, const CompileContext& ctx) const {
+        (void) ctx;
         if (ext == ".cppm" || ext == ".ccm" || ext == ".cxxm" || ext == ".ixx" || ext == ".mpp") {
             cmd.push_back("-x");
             cmd.push_back("c++");
@@ -1109,8 +1090,7 @@ protected:
 
     // Color diagnostics. Cosmetic; index goes into the cosmetic vector so
     // it's elided from the cache signature.
-    virtual void emit_color_flag(std::vector<std::string>& cmd,
-                                 std::vector<size_t>& cosmetic) const {
+    virtual void emit_color_flag(std::vector<std::string>& cmd, std::vector<size_t>& cosmetic) const {
         cosmetic.push_back(cmd.size());
         cmd.push_back("-fdiagnostics-color=always");
     }
@@ -1118,8 +1098,7 @@ protected:
     // Make-style depfile emission for header up-to-date tracking. GCC
     // emits "-MMD -MF <out>.d"; TCC rejects -MMD (uses -MD) and rejects
     // -MT outright.
-    virtual void emit_dependency_flags(std::vector<std::string>& cmd,
-                                       const std::string& output) const {
+    virtual void emit_dependency_flags(std::vector<std::string>& cmd, const std::string& output) const {
         cmd.push_back("-MMD");
         cmd.push_back("-MF");
         cmd.push_back(output + ".d");
@@ -1129,12 +1108,8 @@ protected:
     // rescans for circular references. GNU ld and lld both accept
     // --start-group/--end-group; TCC's single-pass linker neither
     // accepts nor needs it.
-    virtual void emit_link_group_open(std::vector<std::string>& cmd) const {
-        cmd.push_back("-Wl,--start-group");
-    }
-    virtual void emit_link_group_close(std::vector<std::string>& cmd) const {
-        cmd.push_back("-Wl,--end-group");
-    }
+    virtual void emit_link_group_open(std::vector<std::string>& cmd) const { cmd.push_back("-Wl,--start-group"); }
+    virtual void emit_link_group_close(std::vector<std::string>& cmd) const { cmd.push_back("-Wl,--end-group"); }
 
     std::string binary_;
     Language lang_;
@@ -1166,9 +1141,7 @@ public:
     using GnuCompiler::GnuCompiler;
 
     bool supports_p1689() const override {
-        std::call_once(scan_deps_probe_once_, [this] {
-            scan_deps_path_ = locate_clang_scan_deps();
-        });
+        std::call_once(scan_deps_probe_once_, [this] { scan_deps_path_ = locate_clang_scan_deps(); });
         return !scan_deps_path_.empty();
     }
 
@@ -1180,20 +1153,18 @@ public:
     // first under `-stdlib=libc++`, then fall back to libstdc++ at the
     // driver's default search path.
     bool supports_import_std() const override {
-        (void)libstdcxx_modules_json_path();
+        (void) libstdcxx_modules_json_path();
         return !modules_json_path_.empty();
     }
 
     std::string libstdcxx_modules_json_path() const override {
         std::call_once(modules_json_probe_once_, [this] {
-            auto try_probe = [&](const std::string& stdlib_flag,
-                                 const std::string& filename) -> std::string {
+            auto try_probe = [&](const std::string& stdlib_flag, const std::string& filename) -> std::string {
                 std::string cmd = binary_;
                 if (!stdlib_flag.empty()) cmd += " " + stdlib_flag;
                 cmd += " -print-file-name=" + filename + " 2>/dev/null";
                 std::string out = detail::run_command(cmd);
-                while (!out.empty() && (out.back() == '\n' || out.back() == '\r' || out.back() == ' '))
-                    out.pop_back();
+                while (!out.empty() && (out.back() == '\n' || out.back() == '\r' || out.back() == ' ')) out.pop_back();
                 if (out.empty() || out == filename) return {};
                 std::error_code ec;
                 if (!std::filesystem::exists(out, ec)) return {};
@@ -1223,7 +1194,7 @@ public:
     // inject `-stdlib=libc++` so the std.cppm source picks up libc++
     // headers, not libstdc++'s.
     bool import_std_uses_libcxx() const {
-        (void)libstdcxx_modules_json_path();
+        (void) libstdcxx_modules_json_path();
         return std_uses_libcxx_;
     }
 
@@ -1238,9 +1209,7 @@ public:
         // Outer: clang-scan-deps invocation. Must be located before this is
         // called (supports_p1689() does the lookup); fall back to PATH name
         // if the cached probe is empty so we get a clean ENOENT later.
-        std::call_once(scan_deps_probe_once_, [this] {
-            scan_deps_path_ = locate_clang_scan_deps();
-        });
+        std::call_once(scan_deps_probe_once_, [this] { scan_deps_path_ = locate_clang_scan_deps(); });
         cmd.push_back(scan_deps_path_.empty() ? std::string("clang-scan-deps") : scan_deps_path_);
         cmd.push_back("-format=p1689");
         cmd.push_back("-o");
@@ -1289,14 +1258,9 @@ protected:
     // `-fmodule-file=name=path` (and `-fmodule-output=` for module-providing
     // TUs); we just point clang at it via `@<path>`. ctx.output is the .o
     // path, which is the stable per-task identifier the collator also uses.
-    void emit_module_compile_flags(std::vector<std::string>& cmd,
-                                    const CompileContext& ctx) const override {
-        if (!ctx.output.empty()) {
-            cmd.push_back("@" + ctx.output + ".modules.rsp");
-        }
-        for (const auto& mf : ctx.module_files) {
-            cmd.push_back("-fmodule-file=" + mf);
-        }
+    void emit_module_compile_flags(std::vector<std::string>& cmd, const CompileContext& ctx) const override {
+        if (!ctx.output.empty()) { cmd.push_back("@" + ctx.output + ".modules.rsp"); }
+        for (const auto& mf : ctx.module_files) { cmd.push_back("-fmodule-file=" + mf); }
     }
 
     // Clang needs `-x c++-module` to treat the input as a module interface;
@@ -1304,11 +1268,8 @@ protected:
     // -fmodule-output= flag becomes a no-op. We trigger on either a module-
     // interface extension OR `bmi_output` being set (libstdc++ ships its std
     // module as a plain `bits/std.cc`, which has no special extension).
-    void emit_module_input_kind_flags(std::vector<std::string>& cmd,
-                                        std::string_view ext,
-                                        const CompileContext& ctx) const override {
-        const bool is_module_ext = (ext == ".cppm" || ext == ".ccm" ||
-                                    ext == ".cxxm" || ext == ".ixx" || ext == ".mpp");
+    void emit_module_input_kind_flags(std::vector<std::string>& cmd, std::string_view ext, const CompileContext& ctx) const override {
+        const bool is_module_ext = (ext == ".cppm" || ext == ".ccm" || ext == ".cxxm" || ext == ".ixx" || ext == ".mpp");
         const bool provides_module = !ctx.bmi_output.empty();
         if (ctx.is_module_source && (is_module_ext || provides_module)) {
             cmd.push_back("-x");
@@ -1333,7 +1294,7 @@ private:
         std::string suffix;
         auto dash = name.find('-');
         if (dash != std::string::npos) {
-            suffix = name.substr(dash);  // includes leading "-"
+            suffix = name.substr(dash); // includes leading "-"
         }
 
         auto exists = [](const std::string& path) {
@@ -1384,8 +1345,7 @@ public:
     bool supports_import_std() const override { return false; }
     std::string libstdcxx_modules_json_path() const override { return {}; }
 
-    std::vector<std::string> get_archive_command(
-        const std::string& output, const std::vector<std::string>& objs) const override {
+    std::vector<std::string> get_archive_command(const std::string& output, const std::vector<std::string>& objs) const override {
         std::vector<std::string> cmd;
         cmd.push_back(binary_);
         cmd.push_back("-ar");
@@ -1396,13 +1356,12 @@ public:
     }
 
 protected:
-    void emit_color_flag(std::vector<std::string>& cmd,
-                         std::vector<size_t>& cosmetic) const override {
-        (void)cmd; (void)cosmetic;  // TCC rejects -fdiagnostics-color=*
+    void emit_color_flag(std::vector<std::string>& cmd, std::vector<size_t>& cosmetic) const override {
+        (void) cmd;
+        (void) cosmetic; // TCC rejects -fdiagnostics-color=*
     }
 
-    void emit_dependency_flags(std::vector<std::string>& cmd,
-                               const std::string& output) const override {
+    void emit_dependency_flags(std::vector<std::string>& cmd, const std::string& output) const override {
         // TCC supports -MD (Make-style depfile) and -MF, but rejects -MMD
         // (a GCC extension) and errors hard on -MT.
         cmd.push_back("-MD");
@@ -1411,11 +1370,9 @@ protected:
     }
 
     void emit_link_group_open(std::vector<std::string>& cmd) const override {
-        (void)cmd;  // TCC's single-pass linker doesn't accept --start-group
+        (void) cmd; // TCC's single-pass linker doesn't accept --start-group
     }
-    void emit_link_group_close(std::vector<std::string>& cmd) const override {
-        (void)cmd;
-    }
+    void emit_link_group_close(std::vector<std::string>& cmd) const override { (void) cmd; }
 };
 
 // Intel classic ICC / ICPC. Mostly GCC-compatible for flags we emit, but
@@ -1425,10 +1382,9 @@ public:
     using GnuCompiler::GnuCompiler;
 
 protected:
-    void emit_color_flag(std::vector<std::string>& cmd,
-                         std::vector<size_t>& cosmetic) const override {
-        (void)cmd;
-        (void)cosmetic;
+    void emit_color_flag(std::vector<std::string>& cmd, std::vector<size_t>& cosmetic) const override {
+        (void) cmd;
+        (void) cosmetic;
     }
 };
 
@@ -1437,8 +1393,7 @@ protected:
 // decide whether `CMAKE_<LANG>_COMPILER_TARGET` should be threaded into
 // the Compiler constructor or dropped on the floor.
 inline bool compiler_honors_target_flag(std::string_view id) {
-    return id == "Clang" || id == "AppleClang"
-        || id == "IntelLLVM" || id == "ARMClang";
+    return id == "Clang" || id == "AppleClang" || id == "IntelLLVM" || id == "ARMClang";
 }
 
 // Construct a Compiler driver for a detected compiler id. Dispatch:
@@ -1447,24 +1402,18 @@ inline bool compiler_honors_target_flag(std::string_view id) {
 //   - Intel / ICC (classic)               -> IccCompiler
 //   - GNU/Unknown/everything else         -> GnuCompiler
 // Future: MSVC will branch off to its own non-gnu-derived class.
-inline std::unique_ptr<Compiler> make_compiler(
-    const std::string& compiler_id, std::string binary, Language lang,
-    std::string sysroot = {}, std::string compiler_target = {}) {
-    if (compiler_id == "Clang" || compiler_id == "AppleClang"
-        || compiler_id == "IntelLLVM" || compiler_id == "ARMClang") {
-        return std::make_unique<ClangCompiler>(
-            std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
+inline std::unique_ptr<Compiler> make_compiler(const std::string& compiler_id, std::string binary, Language lang, std::string sysroot = {},
+                                               std::string compiler_target = {}) {
+    if (compiler_id == "Clang" || compiler_id == "AppleClang" || compiler_id == "IntelLLVM" || compiler_id == "ARMClang") {
+        return std::make_unique<ClangCompiler>(std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
     }
     if (compiler_id == "TCC") {
-        return std::make_unique<TccCompiler>(
-            std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
+        return std::make_unique<TccCompiler>(std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
     }
     if (compiler_id == "Intel" || compiler_id == "ICC") {
-        return std::make_unique<IccCompiler>(
-            std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
+        return std::make_unique<IccCompiler>(std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
     }
-    return std::make_unique<GnuCompiler>(
-        std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
+    return std::make_unique<GnuCompiler>(std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
 }
 
 } // namespace kiln

@@ -40,10 +40,10 @@ namespace fs = std::filesystem;
 // moc outputs from headers with the same basename in different directories.
 // Uses a simple FNV-1a hash — just needs to be deterministic and unlikely to collide.
 static std::string dir_checksum(const std::string& dir) {
-    uint64_t hash = 14695981039346656037ULL;  // FNV offset basis
+    uint64_t hash = 14695981039346656037ULL; // FNV offset basis
     for (char c : dir) {
         hash ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
-        hash *= 1099511628211ULL;  // FNV prime
+        hash *= 1099511628211ULL; // FNV prime
     }
     char buf[17];
     snprintf(buf, sizeof(buf), "%012llx", static_cast<unsigned long long>(hash & 0xFFFFFFFFFFFFULL));
@@ -61,8 +61,7 @@ static bool contains_word(const std::string& haystack, const std::string& needle
     size_t pos = 0;
     while ((pos = haystack.find(needle, pos)) != std::string::npos) {
         bool left_ok = (pos == 0) || is_word_boundary(haystack[pos - 1]);
-        bool right_ok = (pos + needle.size() >= haystack.size()) ||
-                        is_word_boundary(haystack[pos + needle.size()]);
+        bool right_ok = (pos + needle.size() >= haystack.size()) || is_word_boundary(haystack[pos + needle.size()]);
         if (left_ok && right_ok) return true;
         pos += needle.size();
     }
@@ -75,12 +74,8 @@ static bool contains_word(const std::string& haystack, const std::string& needle
 //   2. Imported targets (Qt6::moc, Qt5::moc)
 //   3. Variables (QT_MOC_EXECUTABLE, Qt6Core_MOC_EXECUTABLE, etc.)
 //   4. Error if not found
-static std::string find_qt_tool(
-    const Target& target,
-    const Interpreter& interp,
-    const TargetMap& all_targets,
-    GenexEvaluator& evaluator,
-    const std::string& tool_name)  // "moc", "uic", or "rcc"
+static std::string find_qt_tool(const Target& target, const Interpreter& interp, const TargetMap& all_targets, GenexEvaluator& evaluator,
+                                const std::string& tool_name) // "moc", "uic", or "rcc"
 {
     // Map tool name to property/variable names
     std::string upper_tool = tool_name;
@@ -124,16 +119,14 @@ static std::string find_qt_tool(
 // Returns: has_macro, list of #include "*.moc" patterns, list of JSON plugin metadata files
 struct MocScanResult {
     bool has_macro = false;
-    std::vector<std::string> moc_includes;       // e.g. "foo.moc", "moc_bar.cpp"
-    std::vector<std::string> json_files;          // from Q_PLUGIN_METADATA
+    std::vector<std::string> moc_includes; // e.g. "foo.moc", "moc_bar.cpp"
+    std::vector<std::string> json_files;   // from Q_PLUGIN_METADATA
 };
 
 static MocScanResult scan_file_for_moc(const std::string& path, const std::vector<std::string>& macro_names) {
     MocScanResult result;
     std::ifstream file(path);
-    if (!file) {
-        return result;
-    }
+    if (!file) { return result; }
 
     bool in_block_comment = false;
     std::string line;
@@ -168,9 +161,7 @@ static MocScanResult scan_file_for_moc(const std::string& path, const std::vecto
         // Skip line comments
         {
             auto pos = line.find("//");
-            if (pos != std::string::npos) {
-                line = line.substr(0, pos);
-            }
+            if (pos != std::string::npos) { line = line.substr(0, pos); }
         }
 
         if (line.empty()) continue;
@@ -192,9 +183,7 @@ static MocScanResult scan_file_for_moc(const std::string& path, const std::vecto
             size_t pos = std::string::npos;
             if (hash_pos != std::string::npos) {
                 auto after_hash = line.find_first_not_of(" \t", hash_pos + 1);
-                if (after_hash != std::string::npos && line.compare(after_hash, 7, "include") == 0) {
-                    pos = after_hash + 7;
-                }
+                if (after_hash != std::string::npos && line.compare(after_hash, 7, "include") == 0) { pos = after_hash + 7; }
             }
             if (pos != std::string::npos) {
                 // Match both #include "moc_foo.cpp" and #include <moc_foo.cpp>
@@ -208,9 +197,7 @@ static MocScanResult scan_file_for_moc(const std::string& path, const std::vecto
                     auto a2 = line.find('>', a1 + 1);
                     if (a2 != std::string::npos) inc = line.substr(a1 + 1, a2 - a1 - 1);
                 }
-                if (!inc.empty() && (inc.ends_with(".moc") || inc.starts_with("moc_"))) {
-                    result.moc_includes.push_back(inc);
-                }
+                if (!inc.empty() && (inc.ends_with(".moc") || inc.starts_with("moc_"))) { result.moc_includes.push_back(inc); }
             }
         }
 
@@ -223,9 +210,7 @@ static MocScanResult scan_file_for_moc(const std::string& path, const std::vecto
                     auto q1 = line.find('"', file_pos + 4);
                     if (q1 != std::string::npos) {
                         auto q2 = line.find('"', q1 + 1);
-                        if (q2 != std::string::npos) {
-                            result.json_files.push_back(line.substr(q1 + 1, q2 - q1 - 1));
-                        }
+                        if (q2 != std::string::npos) { result.json_files.push_back(line.substr(q1 + 1, q2 - q1 - 1)); }
                     }
                 }
             }
@@ -237,8 +222,8 @@ static MocScanResult scan_file_for_moc(const std::string& path, const std::vecto
 
 // Scan a source file for #include "ui_*.h" patterns
 struct UicInclude {
-    std::string ui_basename;    // "foo" from "ui_foo.h"
-    std::string include_path;   // "" or "subdir/" if #include "subdir/ui_foo.h"
+    std::string ui_basename;  // "foo" from "ui_foo.h"
+    std::string include_path; // "" or "subdir/" if #include "subdir/ui_foo.h"
 };
 
 static std::vector<UicInclude> scan_file_for_uic(const std::string& path) {
@@ -271,13 +256,11 @@ static std::vector<UicInclude> scan_file_for_uic(const std::string& path) {
             UicInclude ui;
             // Strip "ui_" prefix and extension to get basename
             std::string stem = inc_path.stem().string();
-            ui.ui_basename = stem.substr(3);  // remove "ui_"
+            ui.ui_basename = stem.substr(3); // remove "ui_"
             // Get subdirectory path if present
             if (inc_path.has_parent_path()) {
                 ui.include_path = inc_path.parent_path().string();
-                if (!ui.include_path.empty() && !ui.include_path.ends_with("/")) {
-                    ui.include_path += "/";
-                }
+                if (!ui.include_path.empty() && !ui.include_path.ends_with("/")) { ui.include_path += "/"; }
             }
             result.push_back(std::move(ui));
         }
@@ -313,8 +296,7 @@ static bool file_exists_or_generated(const std::string& path, const CCRuleMap& c
 }
 
 // Find adjacent headers for a source file
-static std::vector<std::string> find_adjacent_headers(const std::string& source_path,
-                                                       const CCRuleMap& cc_rules) {
+static std::vector<std::string> find_adjacent_headers(const std::string& source_path, const CCRuleMap& cc_rules) {
     std::vector<std::string> headers;
     fs::path src(source_path);
     fs::path dir = src.parent_path();
@@ -337,14 +319,10 @@ static std::vector<std::string> find_adjacent_headers(const std::string& source_
 }
 
 // Build the moc command line
-static std::vector<std::string> build_moc_command(
-    const std::string& moc_path,
-    const std::string& input_file,
-    const std::string& output_file,
-    const std::vector<std::string>& includes,
-    const std::vector<std::string>& definitions,
-    const std::vector<std::string>& moc_options)
-{
+static std::vector<std::string> build_moc_command(const std::string& moc_path, const std::string& input_file,
+                                                  const std::string& output_file, const std::vector<std::string>& includes,
+                                                  const std::vector<std::string>& definitions,
+                                                  const std::vector<std::string>& moc_options) {
     std::vector<std::string> cmd;
     cmd.push_back(moc_path);
 
@@ -373,14 +351,9 @@ static std::vector<std::string> build_moc_command(
 
 // --- Main entry point ---
 
-std::expected<void, std::string> generate_autogen_tasks(
-    Target& target,
-    GraphTransaction& txn,
-    Interpreter& interp,
-    const TargetMap& all_targets,
-    const std::string& pre_build_task_id,
-    const std::vector<std::string>& manual_dep_ids)
-{
+std::expected<void, std::string> generate_autogen_tasks(Target& target, GraphTransaction& txn, Interpreter& interp,
+                                                        const TargetMap& all_targets, const std::string& pre_build_task_id,
+                                                        const std::vector<std::string>& manual_dep_ids) {
     bool do_moc = !Interpreter::is_falsy(target.get_property("AUTOMOC"));
     bool do_uic = !Interpreter::is_falsy(target.get_property("AUTOUIC"));
     bool do_rcc = !Interpreter::is_falsy(target.get_property("AUTORCC"));
@@ -397,8 +370,8 @@ std::expected<void, std::string> generate_autogen_tasks(
         moc_path = find_qt_tool(target, interp, all_targets, evaluator, "moc");
         if (moc_path.empty()) {
             kiln::print_message(std::cerr, "WARNING",
-                "AUTOMOC enabled for target '" + target.get_name() +
-                "' but moc not found. Did you find_package(Qt6 COMPONENTS Core)?");
+                                "AUTOMOC enabled for target '" + target.get_name()
+                                    + "' but moc not found. Did you find_package(Qt6 COMPONENTS Core)?");
             do_moc = false;
         }
     }
@@ -406,8 +379,8 @@ std::expected<void, std::string> generate_autogen_tasks(
         uic_path = find_qt_tool(target, interp, all_targets, evaluator, "uic");
         if (uic_path.empty()) {
             kiln::print_message(std::cerr, "WARNING",
-                "AUTOUIC enabled for target '" + target.get_name() +
-                "' but uic not found. Did you find_package(Qt6 COMPONENTS Widgets)?");
+                                "AUTOUIC enabled for target '" + target.get_name()
+                                    + "' but uic not found. Did you find_package(Qt6 COMPONENTS Widgets)?");
             do_uic = false;
         }
     }
@@ -415,8 +388,8 @@ std::expected<void, std::string> generate_autogen_tasks(
         rcc_path = find_qt_tool(target, interp, all_targets, evaluator, "rcc");
         if (rcc_path.empty()) {
             kiln::print_message(std::cerr, "WARNING",
-                "AUTORCC enabled for target '" + target.get_name() +
-                "' but rcc not found. Did you find_package(Qt6 COMPONENTS Core)?");
+                                "AUTORCC enabled for target '" + target.get_name()
+                                    + "' but rcc not found. Did you find_package(Qt6 COMPONENTS Core)?");
             do_rcc = false;
         }
     }
@@ -439,17 +412,13 @@ std::expected<void, std::string> generate_autogen_tasks(
     std::vector<std::string> moc_macro_names;
     {
         std::string custom_macros = target.get_property("AUTOMOC_MACRO_NAMES");
-        if (custom_macros.empty()) {
-            custom_macros = interp.get_variable("CMAKE_AUTOMOC_MACRO_NAMES");
-        }
+        if (custom_macros.empty()) { custom_macros = interp.get_variable("CMAKE_AUTOMOC_MACRO_NAMES"); }
         if (!custom_macros.empty()) {
             for (auto sv : CMakeArrayIterator(custom_macros)) {
                 if (!sv.empty()) moc_macro_names.emplace_back(sv);
             }
         }
-        if (moc_macro_names.empty()) {
-            moc_macro_names = {"Q_OBJECT", "Q_GADGET", "Q_NAMESPACE", "Q_NAMESPACE_EXPORT"};
-        }
+        if (moc_macro_names.empty()) { moc_macro_names = {"Q_OBJECT", "Q_GADGET", "Q_NAMESPACE", "Q_NAMESPACE_EXPORT"}; }
     }
 
     // Helper: read a property (with genex evaluation) and split into list
@@ -457,9 +426,7 @@ std::expected<void, std::string> generate_autogen_tasks(
         std::vector<std::string> result;
         std::string val = evaluator.evaluate_target_property(target, prop);
         if (val.empty()) return result;
-        for (auto sv : CMakeArrayIterator(val)) {
-            result.emplace_back(sv);
-        }
+        for (auto sv : CMakeArrayIterator(val)) { result.emplace_back(sv); }
         return result;
     };
 
@@ -496,17 +463,15 @@ std::expected<void, std::string> generate_autogen_tasks(
 
     // Collect target's resolved includes and definitions for moc flags.
     // moc consumes C++ tokens, so evaluate $<COMPILE_LANGUAGE:...> as CXX.
-    auto resolved_includes = target.get_resolved_property_for_language(
-        "INCLUDE_DIRECTORIES", Language::CXX, interp, all_targets);
-    auto resolved_definitions = target.get_resolved_property_for_language(
-        "COMPILE_DEFINITIONS", Language::CXX, interp, all_targets);
+    auto resolved_includes = target.get_resolved_property_for_language("INCLUDE_DIRECTORIES", Language::CXX, interp, all_targets);
+    auto resolved_definitions = target.get_resolved_property_for_language("COMPILE_DEFINITIONS", Language::CXX, interp, all_targets);
 
     // Collect all sources and headers from the target
     auto own_sources = target.get_property_list("SOURCES", TargetPropertyScope::BUILD);
 
     // Evaluate genex in sources (evaluator created earlier for tool discovery)
     auto eval_result = evaluator.evaluate_property_list(own_sources);
-    if (!eval_result) return {};  // silently fail on genex error
+    if (!eval_result) return {}; // silently fail on genex error
 
     const auto& source_props = interp.get_source_properties();
 
@@ -514,7 +479,7 @@ std::expected<void, std::string> generate_autogen_tasks(
     std::vector<std::string> cpp_sources;
     std::vector<std::string> explicit_headers;
     std::vector<std::string> qrc_files;
-    std::set<std::string> all_headers_set;  // for dedup
+    std::set<std::string> all_headers_set; // for dedup
 
     for (const auto& src : *eval_result) {
         if (src.empty()) continue;
@@ -542,7 +507,7 @@ std::expected<void, std::string> generate_autogen_tasks(
 
         if (ext == ".qrc") {
             if (!check_skip("SKIP_AUTORCC")) {
-                qrc_files.push_back(abs);  // existence checked later in AUTORCC section
+                qrc_files.push_back(abs); // existence checked later in AUTORCC section
             }
         } else if (ext == ".h" || ext == ".hpp" || ext == ".hxx" || ext == ".hh") {
             if (!check_skip("SKIP_AUTOMOC") && file_exists_or_generated(abs, interp.get_custom_command_rules())) {
@@ -558,9 +523,7 @@ std::expected<void, std::string> generate_autogen_tasks(
     std::vector<std::string> discovered_headers;
     for (const auto& src : cpp_sources) {
         for (const auto& hdr : find_adjacent_headers(src, interp.get_custom_command_rules())) {
-            if (all_headers_set.insert(hdr).second) {
-                discovered_headers.push_back(hdr);
-            }
+            if (all_headers_set.insert(hdr).second) { discovered_headers.push_back(hdr); }
         }
     }
 
@@ -574,9 +537,9 @@ std::expected<void, std::string> generate_autogen_tasks(
     struct MocEntry {
         std::string input_file;
         std::string output_file;
-        std::vector<std::string> extra_inputs;  // JSON files
-        bool is_source_moc;  // true = source .moc, false = header moc_*.cpp
-        bool is_generated = false;  // input is a custom command output (not yet on disk)
+        std::vector<std::string> extra_inputs; // JSON files
+        bool is_source_moc;                    // true = source .moc, false = header moc_*.cpp
+        bool is_generated = false;             // input is a custom command output (not yet on disk)
     };
     std::vector<MocEntry> moc_entries;
 
@@ -588,7 +551,7 @@ std::expected<void, std::string> generate_autogen_tasks(
         // This tells us which moc outputs should go to include_dir.
         // We always scan for moc includes (even with SKIP_AUTOMOC) so that
         // explicitly-included moc outputs go to include_dir instead of mocs_compilation.
-        std::map<std::string, std::vector<std::string>> source_moc_includes;  // source -> moc includes
+        std::map<std::string, std::vector<std::string>> source_moc_includes; // source -> moc includes
         for (const auto& src : cpp_sources) {
             auto sp_it = source_props.find(src);
             bool skip_moc = false;
@@ -606,9 +569,7 @@ std::expected<void, std::string> generate_autogen_tasks(
             // Always record moc includes regardless of SKIP_AUTOMOC
             if (!scan.moc_includes.empty()) {
                 source_moc_includes[src] = scan.moc_includes;
-                for (const auto& inc : scan.moc_includes) {
-                    explicitly_included_mocs.insert(inc);
-                }
+                for (const auto& inc : scan.moc_includes) { explicitly_included_mocs.insert(inc); }
             }
 
             if (skip_moc) continue;
@@ -690,31 +651,18 @@ std::expected<void, std::string> generate_autogen_tasks(
             task.id = entry.output_file;
             task.kind = MocTask{entry.input_file};
             task.parent_target = &target;
-            task.commands.push_back(build_moc_command(
-                moc_path, entry.input_file, entry.output_file,
-                resolved_includes, resolved_definitions, moc_options));
+            task.commands.push_back(
+                build_moc_command(moc_path, entry.input_file, entry.output_file, resolved_includes, resolved_definitions, moc_options));
             task.inputs.push_back(entry.input_file);
-            for (const auto& json : entry.extra_inputs) {
-                task.inputs.push_back(json);
-            }
+            for (const auto& json : entry.extra_inputs) { task.inputs.push_back(json); }
             task.outputs.push_back(entry.output_file);
-            if (moc_output_json) {
-                task.outputs.push_back(entry.output_file + ".json");
-            }
+            if (moc_output_json) { task.outputs.push_back(entry.output_file + ".json"); }
 
-            if (!pre_build_task_id.empty()) {
-                task.explicit_deps.push_back(pre_build_task_id);
-            }
-            for (const auto& dep : autogen_target_deps) {
-                task.explicit_deps.push_back(dep);
-            }
-            for (const auto& dep : manual_dep_ids) {
-                task.explicit_deps.push_back(dep);
-            }
+            if (!pre_build_task_id.empty()) { task.explicit_deps.push_back(pre_build_task_id); }
+            for (const auto& dep : autogen_target_deps) { task.explicit_deps.push_back(dep); }
+            for (const auto& dep : manual_dep_ids) { task.explicit_deps.push_back(dep); }
             // Generated headers: MOC must wait for the custom command that creates the input
-            if (entry.is_generated) {
-                task.explicit_deps.push_back(entry.input_file);
-            }
+            if (entry.is_generated) { task.explicit_deps.push_back(entry.input_file); }
 
             if (auto r = txn.add(std::move(task)); !r) return std::unexpected(r.error());
 
@@ -741,9 +689,7 @@ std::expected<void, std::string> generate_autogen_tasks(
                 std::string basename = fs::path(entry.input_file).stem().string();
                 std::string moc_filename = "moc_" + basename + ".cpp";
                 if (explicitly_included_mocs.count(moc_filename) == 0) {
-                    if (moc_output_seen.insert(entry.output_file).second) {
-                        mocs_for_compilation.push_back(entry.output_file);
-                    }
+                    if (moc_output_seen.insert(entry.output_file).second) { mocs_for_compilation.push_back(entry.output_file); }
                 }
             }
         }
@@ -754,17 +700,14 @@ std::expected<void, std::string> generate_autogen_tasks(
             // Build content
             std::ostringstream oss;
             oss << "// This file is autogenerated by kiln. Do not edit.\n";
-            for (const auto& moc_file : mocs_for_compilation) {
-                oss << "#include \"" << moc_file << "\"\n";
-            }
+            for (const auto& moc_file : mocs_for_compilation) { oss << "#include \"" << moc_file << "\"\n"; }
             std::string content = oss.str();
 
             // Only write if changed
             bool needs_write = true;
             if (fs::exists(mocs_comp_path)) {
                 std::ifstream existing(mocs_comp_path);
-                std::string existing_content((std::istreambuf_iterator<char>(existing)),
-                                              std::istreambuf_iterator<char>());
+                std::string existing_content((std::istreambuf_iterator<char>(existing)), std::istreambuf_iterator<char>());
                 if (existing_content == content) needs_write = false;
             }
             if (needs_write) {
@@ -792,8 +735,8 @@ std::expected<void, std::string> generate_autogen_tasks(
         // Generate AutogenInfo.json for Qt's cmake_automoc_parser.
         // Qt's metatype extraction uses this file to locate moc JSON output.
         {
-            std::string autogen_info_dir = (fs::path(target.get_binary_dir()) /
-                "CMakeFiles" / (target.get_name() + "_autogen.dir")).string();
+            std::string autogen_info_dir =
+                (fs::path(target.get_binary_dir()) / "CMakeFiles" / (target.get_name() + "_autogen.dir")).string();
             fs::create_directories(autogen_info_dir);
             std::string info_path = (fs::path(autogen_info_dir) / "AutogenInfo.json").string();
 
@@ -808,23 +751,20 @@ std::expected<void, std::string> generate_autogen_tasks(
                 info.HEADERS.push_back({entry.input_file, "Mu", rel, nullptr});
             }
 
-            for (const auto& src : cpp_sources) {
-                info.SOURCES.push_back({src, "Mu", nullptr});
-            }
+            for (const auto& src : cpp_sources) { info.SOURCES.push_back({src, "Mu", nullptr}); }
 
             std::string content;
             if (auto ec = glz::write<glz::opts{.prettify = true}>(info, content); ec) {
                 kiln::print_message(std::cerr, "FATAL_ERROR",
-                    "Failed to serialize AutogenInfo.json for target '" +
-                    target.get_name() + "': " + glz::format_error(ec));
+                                    "Failed to serialize AutogenInfo.json for target '" + target.get_name()
+                                        + "': " + glz::format_error(ec));
                 return {};
             }
 
             bool needs_write = true;
             if (fs::exists(info_path)) {
                 std::ifstream existing(info_path);
-                std::string old_content((std::istreambuf_iterator<char>(existing)),
-                                         std::istreambuf_iterator<char>());
+                std::string old_content((std::istreambuf_iterator<char>(existing)), std::istreambuf_iterator<char>());
                 if (old_content == content) needs_write = false;
             }
             if (needs_write) {
@@ -835,9 +775,7 @@ std::expected<void, std::string> generate_autogen_tasks(
             // Create empty ParseCache.txt — cmake_automoc_parser expects it.
             // kiln handles moc directly, so there's no CMake automoc parse cache.
             std::string parse_cache_path = (fs::path(autogen_info_dir) / "ParseCache.txt").string();
-            if (!fs::exists(parse_cache_path)) {
-                std::ofstream pc(parse_cache_path);
-            }
+            if (!fs::exists(parse_cache_path)) { std::ofstream pc(parse_cache_path); }
         }
     }
 
@@ -901,14 +839,13 @@ std::expected<void, std::string> generate_autogen_tasks(
 
                 if (ui_file.empty()) {
                     kiln::print_message(std::cerr, "WARNING",
-                        "AUTOUIC: Cannot find " + ui_filename + " for target '" + target.get_name() +
-                        "' (included from " + fs::path(src).filename().string() + ")");
+                                        "AUTOUIC: Cannot find " + ui_filename + " for target '" + target.get_name() + "' (included from "
+                                            + fs::path(src).filename().string() + ")");
                     continue;
                 }
 
                 // Generate output header
-                std::string output_header = (fs::path(include_dir) /
-                    (ui_inc.include_path + "ui_" + ui_inc.ui_basename + ".h")).string();
+                std::string output_header = (fs::path(include_dir) / (ui_inc.include_path + "ui_" + ui_inc.ui_basename + ".h")).string();
 
                 // Skip if already generated (same .ui might be included from multiple sources)
                 if (!generated_uic_outputs.insert(output_header).second) continue;
@@ -920,18 +857,14 @@ std::expected<void, std::string> generate_autogen_tasks(
                     auto opts_it = ui_sp_it->second.find("AUTOUIC_OPTIONS");
                     if (opts_it != ui_sp_it->second.end()) {
                         uic_options.clear();
-                        for (auto sv : CMakeArrayIterator(opts_it->second)) {
-                            uic_options.emplace_back(sv);
-                        }
+                        for (auto sv : CMakeArrayIterator(opts_it->second)) { uic_options.emplace_back(sv); }
                     }
                 }
 
                 // Build uic command
                 std::vector<std::string> cmd;
                 cmd.push_back(uic_path);
-                for (const auto& opt : uic_options) {
-                    cmd.push_back(opt);
-                }
+                for (const auto& opt : uic_options) { cmd.push_back(opt); }
                 cmd.push_back(ui_file);
                 cmd.push_back("-o");
                 cmd.push_back(output_header);
@@ -944,15 +877,9 @@ std::expected<void, std::string> generate_autogen_tasks(
                 task.inputs.push_back(ui_file);
                 task.outputs.push_back(output_header);
 
-                if (!pre_build_task_id.empty()) {
-                    task.explicit_deps.push_back(pre_build_task_id);
-                }
-                for (const auto& dep : autogen_target_deps) {
-                    task.explicit_deps.push_back(dep);
-                }
-                for (const auto& dep : manual_dep_ids) {
-                    task.explicit_deps.push_back(dep);
-                }
+                if (!pre_build_task_id.empty()) { task.explicit_deps.push_back(pre_build_task_id); }
+                for (const auto& dep : autogen_target_deps) { task.explicit_deps.push_back(dep); }
+                for (const auto& dep : manual_dep_ids) { task.explicit_deps.push_back(dep); }
 
                 if (auto r = txn.add(std::move(task)); !r) return std::unexpected(r.error());
 
@@ -973,13 +900,12 @@ std::expected<void, std::string> generate_autogen_tasks(
 
     // ========== AUTORCC ==========
     if (do_rcc) {
-        std::set<std::string> rcc_output_names;  // track used output names to disambiguate
+        std::set<std::string> rcc_output_names; // track used output names to disambiguate
         for (const auto& qrc_file : qrc_files) {
             // Skip non-existent .qrc files with a warning
             if (!fs::exists(qrc_file)) {
                 kiln::print_message(std::cerr, "WARNING",
-                    "AUTORCC: .qrc file does not exist: " + qrc_file +
-                    " (target '" + target.get_name() + "')");
+                                    "AUTORCC: .qrc file does not exist: " + qrc_file + " (target '" + target.get_name() + "')");
                 target.remove_source(qrc_file);
                 continue;
             }
@@ -1006,9 +932,7 @@ std::expected<void, std::string> generate_autogen_tasks(
                 const auto& rules = interp.get_custom_command_rules();
                 for (const auto& res : resource_files) {
                     auto it = rules.find(res);
-                    if (it != rules.end()) {
-                        generated_resource_deps.push_back(res);
-                    }
+                    if (it != rules.end()) { generated_resource_deps.push_back(res); }
                 }
             }
 
@@ -1019,18 +943,14 @@ std::expected<void, std::string> generate_autogen_tasks(
                 auto opts_it = sp_it->second.find("AUTORCC_OPTIONS");
                 if (opts_it != sp_it->second.end()) {
                     rcc_options.clear();
-                    for (auto sv : CMakeArrayIterator(opts_it->second)) {
-                        rcc_options.emplace_back(sv);
-                    }
+                    for (auto sv : CMakeArrayIterator(opts_it->second)) { rcc_options.emplace_back(sv); }
                 }
             }
 
             // Build rcc command
             std::vector<std::string> cmd;
             cmd.push_back(rcc_path);
-            for (const auto& opt : rcc_options) {
-                cmd.push_back(opt);
-            }
+            for (const auto& opt : rcc_options) { cmd.push_back(opt); }
             cmd.push_back("--name");
             cmd.push_back(qrc_name);
             cmd.push_back(qrc_file);
@@ -1043,23 +963,13 @@ std::expected<void, std::string> generate_autogen_tasks(
             task.parent_target = &target;
             task.commands.push_back(std::move(cmd));
             task.inputs.push_back(qrc_file);
-            for (const auto& res : resource_files) {
-                task.inputs.push_back(res);
-            }
+            for (const auto& res : resource_files) { task.inputs.push_back(res); }
             task.outputs.push_back(rcc_output);
 
-            if (!pre_build_task_id.empty()) {
-                task.explicit_deps.push_back(pre_build_task_id);
-            }
-            for (const auto& dep : autogen_target_deps) {
-                task.explicit_deps.push_back(dep);
-            }
-            for (const auto& dep : manual_dep_ids) {
-                task.explicit_deps.push_back(dep);
-            }
-            for (const auto& dep : generated_resource_deps) {
-                task.explicit_deps.push_back(dep);
-            }
+            if (!pre_build_task_id.empty()) { task.explicit_deps.push_back(pre_build_task_id); }
+            for (const auto& dep : autogen_target_deps) { task.explicit_deps.push_back(dep); }
+            for (const auto& dep : manual_dep_ids) { task.explicit_deps.push_back(dep); }
+            for (const auto& dep : generated_resource_deps) { task.explicit_deps.push_back(dep); }
 
             if (auto r = txn.add(std::move(task)); !r) return std::unexpected(r.error());
 
@@ -1067,9 +977,7 @@ std::expected<void, std::string> generate_autogen_tasks(
             auto rule = std::make_shared<CustomCommandRule>();
             rule->outputs.push_back(rcc_output);
             rule->depends.push_back(qrc_file);
-            for (const auto& res : resource_files) {
-                rule->depends.push_back(res);
-            }
+            for (const auto& res : resource_files) { rule->depends.push_back(res); }
             rule->source_dir = target.get_source_dir();
             rule->binary_dir = target.get_binary_dir();
             interp.get_custom_command_rules()[rcc_output] = rule;

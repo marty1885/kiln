@@ -51,9 +51,7 @@ public:
         return it == defaults_.end() ? nullptr : it->second;
     }
 
-    const Compiler* get_compiler_ptr(Language lang) const {
-        return get_compiler(lang);
-    }
+    const Compiler* get_compiler_ptr(Language lang) const { return get_compiler(lang); }
 
     // Look up or register a compiler for this exact (lang, binary, sysroot,
     // target) combination. Returns a stable pointer owned by the registry.
@@ -67,10 +65,7 @@ public:
     // const because target generation is invoked through const Toolchain&
     // and may need to lazily resolve a captured (binary, sysroot, target)
     // tuple. Internal state is mutex-protected.
-    const Compiler* get_or_register(Language lang,
-                                    const std::string& compiler_id,
-                                    const std::string& binary,
-                                    const std::string& sysroot,
+    const Compiler* get_or_register(Language lang, const std::string& compiler_id, const std::string& binary, const std::string& sysroot,
                                     const std::string& compiler_target) const {
         Key key{lang, binary, sysroot, compiler_target};
         {

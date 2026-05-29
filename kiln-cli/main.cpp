@@ -51,26 +51,29 @@ struct GlobalOptions {
     std::vector<std::string> definitions;
     std::string config = "debug";
     std::string script_path;
-    std::string source_dir_str;  // -S flag for ExternalProject recursive invocation
-    std::string project_dir_str = ".";  // -C flag for project directory
+    std::string source_dir_str;        // -S flag for ExternalProject recursive invocation
+    std::string project_dir_str = "."; // -C flag for project directory
     bool profile = false;
     bool trace = false;
     bool trace_expand = false;
     bool debugger = false;
-    bool config_only = false;  // Debug: interpret + save cache, then exit (no build)
-    bool no_sys_init = false;   // Skip compiler detection (for benchmarking)
-    bool fresh = false;         // Skip loading persistent cache (fresh configure)
-    bool fast_setup = false;    // Use kiln's hardcoded compiler-vars subset
-                                // instead of including CMake's Compiler/<id>-<lang>.cmake
+    bool config_only = false; // Debug: interpret + save cache, then exit (no build)
+    bool no_sys_init = false; // Skip compiler detection (for benchmarking)
+    bool fresh = false;       // Skip loading persistent cache (fresh configure)
+    bool fast_setup = false;  // Use kiln's hardcoded compiler-vars subset
+                              // instead of including CMake's Compiler/<id>-<lang>.cmake
     std::string break_on_message;
-    std::string log_level;       // --log-level (sets CMAKE_MESSAGE_LOG_LEVEL)
-    std::string preset;          // --preset name (CMakePresets.json)
+    std::string log_level; // --log-level (sets CMAKE_MESSAGE_LOG_LEVEL)
+    std::string preset;    // --preset name (CMakePresets.json)
     bool list_presets = false;
-    bool literal_build_dir = false;  // Set by --preset: use -B as-is (no /<config> suffix)
+    bool literal_build_dir = false; // Set by --preset: use -B as-is (no /<config> suffix)
 };
 
-void print_error_context(const std::string& file_path, size_t row, size_t col, size_t offset, size_t length, const std::string& message, const std::vector<kiln::CallLocation>& backtrace = {}, const std::optional<std::string>& source_content = std::nullopt) {
-    kiln::print_diagnostic(std::cerr, kiln::DiagnosticSeverity::Error, message, file_path, row, col, offset, length, backtrace, source_content);
+void print_error_context(const std::string& file_path, size_t row, size_t col, size_t offset, size_t length, const std::string& message,
+                         const std::vector<kiln::CallLocation>& backtrace = {},
+                         const std::optional<std::string>& source_content = std::nullopt) {
+    kiln::print_diagnostic(std::cerr, kiln::DiagnosticSeverity::Error, message, file_path, row, col, offset, length, backtrace,
+                           source_content);
 }
 
 void print_error_context(const kiln::InterpreterError& error) {
@@ -95,9 +98,7 @@ void apply_definitions(kiln::Interpreter& interpreter, const std::vector<std::st
 
             // Strip type annotation if present (e.g., VAR:STRING=value -> VAR=value)
             size_t colon = var_name.find(':');
-            if (colon != std::string::npos) {
-                var_name = var_name.substr(0, colon);
-            }
+            if (colon != std::string::npos) { var_name = var_name.substr(0, colon); }
 
             // CMake's -D sets a cache variable. Some scripts check
             // `if(NOT DEFINED CACHE{VAR})` to decide whether they were given
@@ -109,68 +110,58 @@ void apply_definitions(kiln::Interpreter& interpreter, const std::vector<std::st
             // Handle -DVAR or -DVAR:BOOL (no value)
             std::string var_name = def;
             size_t colon = var_name.find(':');
-            if (colon != std::string::npos) {
-                var_name = var_name.substr(0, colon);
-            }
+            if (colon != std::string::npos) { var_name = var_name.substr(0, colon); }
             interpreter.set_cache_variable(var_name, "ON");
             interpreter.set_variable(var_name, "ON");
         }
     }
 }
 
-void set_default_flags(kiln::Interpreter& interpreter, const std::vector<std::string>& definitions, const std::string& var, const std::string& flags) {
+void set_default_flags(kiln::Interpreter& interpreter, const std::vector<std::string>& definitions, const std::string& var,
+                       const std::string& flags) {
     bool already_set = false;
     for (const auto& def : definitions) {
         // Check for VAR=value or VAR:TYPE=value or VAR or VAR:TYPE
         std::string def_var = def;
         size_t eq = def_var.find('=');
-        if (eq != std::string::npos) {
-            def_var = def_var.substr(0, eq);
-        }
+        if (eq != std::string::npos) { def_var = def_var.substr(0, eq); }
         size_t colon = def_var.find(':');
-        if (colon != std::string::npos) {
-            def_var = def_var.substr(0, colon);
-        }
+        if (colon != std::string::npos) { def_var = def_var.substr(0, colon); }
 
         if (def_var == var) {
             already_set = true;
             break;
         }
     }
-    if (!already_set && interpreter.get_variable(var).empty()) {
-        interpreter.set_variable(var, flags);
-    }
+    if (!already_set && interpreter.get_variable(var).empty()) { interpreter.set_variable(var, flags); }
 }
 
-std::expected<std::unique_ptr<kiln::Interpreter>, std::string> run_build_action(const GlobalOptions& opt, kiln::DebugController& debug_controller, const std::string& project_dir, const std::vector<std::string>& targets, bool is_test_mode = false) {
+std::expected<std::unique_ptr<kiln::Interpreter>, std::string>
+run_build_action(const GlobalOptions& opt, kiln::DebugController& debug_controller, const std::string& project_dir,
+                 const std::vector<std::string>& targets, bool is_test_mode = false) {
     try {
         std::filesystem::path project_path = std::filesystem::canonical(project_dir);
         std::filesystem::path cmake_lists = project_path / "CMakeLists.txt";
 
-        if (!std::filesystem::exists(cmake_lists)) {
-            return std::unexpected("CMakeLists.txt not found in " + project_path.string());
-        }
+        if (!std::filesystem::exists(cmake_lists)) { return std::unexpected("CMakeLists.txt not found in " + project_path.string()); }
 
         std::filesystem::path build_path;
-        std::filesystem::path build_root_path;  // For KILN_BUILD_ROOT
+        std::filesystem::path build_root_path; // For KILN_BUILD_ROOT
 
         if (!opt.source_dir_str.empty() || opt.literal_build_dir) {
             // -S mode (or --preset binaryDir): use -B as-is (no config
             // appended). Used for ExternalProject recursive builds and for
             // CMakePresets.json which already encode the full build path.
-            if (opt.build_dir_str.empty()) {
-                return std::unexpected("-S/--preset requires a build directory");
-            }
+            if (opt.build_dir_str.empty()) { return std::unexpected("-S/--preset requires a build directory"); }
             build_path = std::filesystem::absolute(opt.build_dir_str).lexically_normal();
             build_root_path = build_path.parent_path();
         } else {
-            build_root_path = opt.build_dir_str.empty() ? (project_path / "build") : std::filesystem::absolute(opt.build_dir_str).lexically_normal();
+            build_root_path =
+                opt.build_dir_str.empty() ? (project_path / "build") : std::filesystem::absolute(opt.build_dir_str).lexically_normal();
             build_path = build_root_path / opt.config;
         }
 
-        if (build_path == project_path) {
-            return std::unexpected("Build directory cannot be source directory");
-        }
+        if (build_path == project_path) { return std::unexpected("Build directory cannot be source directory"); }
 
         std::ifstream file(cmake_lists);
         std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -202,13 +193,9 @@ std::expected<std::unique_ptr<kiln::Interpreter>, std::string> run_build_action(
                 char next = def[name.size()];
                 return next == '=' || next == ':';
             };
-            if (starts_with_var("CMAKE_TOOLCHAIN_FILE") ||
-                starts_with_var("CMAKE_C_COMPILER") ||
-                starts_with_var("CMAKE_CXX_COMPILER") ||
-                starts_with_var("CMAKE_ASM_COMPILER") ||
-                starts_with_var("CMAKE_SYSROOT") ||
-                starts_with_var("CMAKE_C_COMPILER_TARGET") ||
-                starts_with_var("CMAKE_CXX_COMPILER_TARGET")) {
+            if (starts_with_var("CMAKE_TOOLCHAIN_FILE") || starts_with_var("CMAKE_C_COMPILER") || starts_with_var("CMAKE_CXX_COMPILER")
+                || starts_with_var("CMAKE_ASM_COMPILER") || starts_with_var("CMAKE_SYSROOT") || starts_with_var("CMAKE_C_COMPILER_TARGET")
+                || starts_with_var("CMAKE_CXX_COMPILER_TARGET")) {
                 skip_host_detect = true;
                 break;
             }
@@ -216,13 +203,15 @@ std::expected<std::unique_ptr<kiln::Interpreter>, std::string> run_build_action(
         // Env-supplied compiler overrides have the same effect as -D: host
         // detection would target the wrong compiler.
         if (!skip_host_detect) {
-            auto env_set = [](const char* n) { const char* v = std::getenv(n); return v && *v; };
-            if (env_set("CC") || env_set("CXX") || env_set("ASM")) {
-                skip_host_detect = true;
-            }
+            auto env_set = [](const char* n) {
+                const char* v = std::getenv(n);
+                return v && *v;
+            };
+            if (env_set("CC") || env_set("CXX") || env_set("ASM")) { skip_host_detect = true; }
         }
 
-        auto interpreter = std::make_unique<kiln::Interpreter>(project_path.string(), &std::cout, &std::cerr, build_path.string(), opt.no_sys_init, opt.fresh, skip_host_detect);
+        auto interpreter = std::make_unique<kiln::Interpreter>(project_path.string(), &std::cout, &std::cerr, build_path.string(),
+                                                               opt.no_sys_init, opt.fresh, skip_host_detect);
         interpreter->set_current_file(cmake_lists.string());
         debug_controller.attach(*interpreter);
 
@@ -247,25 +236,22 @@ std::expected<std::unique_ptr<kiln::Interpreter>, std::string> run_build_action(
         // for $CC, $CXX, $ASM, $CFLAGS, $CXXFLAGS, $LDFLAGS. -D applied below
         // overrides on the (user-error) case where both are supplied.
         auto seed_env = [&](const char* env_name, const char* var) {
-            if (const char* v = std::getenv(env_name); v && *v)
-                interpreter->set_cache_variable(var, v);
+            if (const char* v = std::getenv(env_name); v && *v) interpreter->set_cache_variable(var, v);
         };
-        seed_env("CC",       "CMAKE_C_COMPILER");
-        seed_env("CXX",      "CMAKE_CXX_COMPILER");
-        seed_env("ASM",      "CMAKE_ASM_COMPILER");
-        seed_env("CFLAGS",   "CMAKE_C_FLAGS");
+        seed_env("CC", "CMAKE_C_COMPILER");
+        seed_env("CXX", "CMAKE_CXX_COMPILER");
+        seed_env("ASM", "CMAKE_ASM_COMPILER");
+        seed_env("CFLAGS", "CMAKE_C_FLAGS");
         seed_env("CXXFLAGS", "CMAKE_CXX_FLAGS");
         if (const char* ld = std::getenv("LDFLAGS"); ld && *ld) {
-            interpreter->set_cache_variable("CMAKE_EXE_LINKER_FLAGS",    ld);
+            interpreter->set_cache_variable("CMAKE_EXE_LINKER_FLAGS", ld);
             interpreter->set_cache_variable("CMAKE_SHARED_LINKER_FLAGS", ld);
             interpreter->set_cache_variable("CMAKE_MODULE_LINKER_FLAGS", ld);
         }
 
         apply_definitions(*interpreter, opt.definitions);
 
-        if (!opt.log_level.empty()) {
-            interpreter->set_variable("CMAKE_MESSAGE_LOG_LEVEL", opt.log_level);
-        }
+        if (!opt.log_level.empty()) { interpreter->set_variable("CMAKE_MESSAGE_LOG_LEVEL", opt.log_level); }
 
         if (interpreter->get_variable("CMAKE_BUILD_TYPE").empty()) {
             interpreter->set_variable("CMAKE_BUILD_TYPE", to_cmake_case(opt.config));
@@ -284,7 +270,8 @@ std::expected<std::unique_ptr<kiln::Interpreter>, std::string> run_build_action(
         auto save_cache = [&]() {
             auto cache_save_result = interpreter->get_cache_store().save();
             if (!cache_save_result) {
-                std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_YELLOW) << "warning:" << kiln::c(std::cerr, kiln::colors::RESET) << " Failed to save cache: " << cache_save_result.error() << std::endl;
+                std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_YELLOW) << "warning:" << kiln::c(std::cerr, kiln::colors::RESET)
+                          << " Failed to save cache: " << cache_save_result.error() << std::endl;
             }
         };
 
@@ -324,7 +311,8 @@ std::expected<std::unique_ptr<kiln::Interpreter>, std::string> run_build_action(
             if (kiln::g_profiling_enabled.load(std::memory_order_relaxed)) {
                 auto profile_path = (build_path / "profile.json").string();
                 kiln::Profiler::instance().write(profile_path);
-                std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_CYAN) << "Profile" << kiln::c(std::cerr, kiln::colors::RESET) << " written to " << profile_path << std::endl;
+                std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_CYAN) << "Profile" << kiln::c(std::cerr, kiln::colors::RESET)
+                          << " written to " << profile_path << std::endl;
             }
             return interpreter;
         }
@@ -337,7 +325,8 @@ std::expected<std::unique_ptr<kiln::Interpreter>, std::string> run_build_action(
         auto build_result = interpreter->run_build(opt.jobs, targets);
         if (!build_result) {
             if (!kiln::g_interrupted.load(std::memory_order_relaxed)) {
-                std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_RED) << "error:" << kiln::c(std::cerr, kiln::colors::RESET) << " " << build_result.error().message << std::endl;
+                std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_RED) << "error:" << kiln::c(std::cerr, kiln::colors::RESET) << " "
+                          << build_result.error().message << std::endl;
             }
             save_cache();
             return std::unexpected(kiln::g_interrupted.load(std::memory_order_relaxed) ? "Interrupted" : "Build failed");
@@ -352,10 +341,8 @@ std::expected<std::unique_ptr<kiln::Interpreter>, std::string> run_build_action(
         {
             std::string default_prefix = interpreter->get_variable("CMAKE_INSTALL_PREFIX");
             if (default_prefix.empty()) default_prefix = "/usr/local";
-            auto plan_or = kiln::build_install_plan(interpreter.get(),
-                                                   interpreter->get_install_rules(),
-                                                   default_prefix,
-                                                   to_cmake_case(opt.config));
+            auto plan_or =
+                kiln::build_install_plan(interpreter.get(), interpreter->get_install_rules(), default_prefix, to_cmake_case(opt.config));
             if (!plan_or) {
                 std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_YELLOW) << "warning:" << kiln::c(std::cerr, kiln::colors::RESET)
                           << " failed to build install plan: " << plan_or.error() << std::endl;
@@ -373,13 +360,12 @@ std::expected<std::unique_ptr<kiln::Interpreter>, std::string> run_build_action(
         if (kiln::g_profiling_enabled.load(std::memory_order_relaxed)) {
             auto profile_path = (build_path / "profile.json").string();
             kiln::Profiler::instance().write(profile_path);
-            std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_CYAN) << "Profile" << kiln::c(std::cerr, kiln::colors::RESET) << " written to " << profile_path << std::endl;
+            std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_CYAN) << "Profile" << kiln::c(std::cerr, kiln::colors::RESET)
+                      << " written to " << profile_path << std::endl;
         }
 
         return interpreter;
-    } catch (const std::exception& e) {
-        return std::unexpected(std::string("Exception: ") + e.what());
-    }
+    } catch (const std::exception& e) { return std::unexpected(std::string("Exception: ") + e.what()); }
 }
 
 // Must insure build is up to date before running tests
@@ -388,13 +374,11 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
     for (const auto& [dir, ctx] : interpreter->get_all_directory_contexts()) {
         auto it = ctx.properties.find("TEST_INCLUDE_FILES");
         if (it == ctx.properties.end()) continue;
-        for (auto file_it = kiln::CMakeArrayIterator::iterator(it->second);
-             file_it != kiln::CMakeArrayIterator::sentinel{}; ++file_it) {
+        for (auto file_it = kiln::CMakeArrayIterator::iterator(it->second); file_it != kiln::CMakeArrayIterator::sentinel{}; ++file_it) {
             std::string include_path(*file_it);
             if (include_path.empty()) continue;
             if (!std::filesystem::exists(include_path)) {
-                std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_YELLOW)
-                          << "Warning: " << kiln::c(std::cerr, kiln::colors::RESET)
+                std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_YELLOW) << "Warning: " << kiln::c(std::cerr, kiln::colors::RESET)
                           << "TEST_INCLUDE_FILES entry not found: " << include_path << std::endl;
                 continue;
             }
@@ -427,30 +411,22 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
     auto genex_ctx = kiln::Target::make_genex_context(nullptr, *interpreter, targets_map, std::nullopt, false);
 
     for (auto& test : tests) {
-        if (has_filter && !filter->search(test.name)) {
-            continue;
-        }
+        if (has_filter && !filter->search(test.name)) { continue; }
 
         // Evaluate genex in test command and arguments
         auto eval = [&](std::string& s) {
             if (kiln::GenexParser::contains_genex(s)) {
                 kiln::GenexEvaluator evaluator(genex_ctx);
                 auto result = evaluator.evaluate(s);
-                if (result) {
-                    s = std::move(*result);
-                }
+                if (result) { s = std::move(*result); }
             }
         };
         eval(test.command);
-        for (auto& arg : test.args) {
-            eval(arg);
-        }
+        for (auto& arg : test.args) { eval(arg); }
         eval(test.working_dir);
 
         selected_tests.push_back(&test);
-        if (targets_map.count(test.command)) {
-            targets_to_build.insert(test.command);
-        }
+        if (targets_map.count(test.command)) { targets_to_build.insert(test.command); }
     }
 
     if (selected_tests.empty()) {
@@ -460,7 +436,8 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
 
     std::vector<std::string> target_list(targets_to_build.begin(), targets_to_build.end());
 
-    std::cout << kiln::c(std::cout, kiln::colors::BOLD_BLUE) << "Running " << selected_tests.size() << " tests..." << kiln::c(std::cout, kiln::colors::RESET) << std::endl;
+    std::cout << kiln::c(std::cout, kiln::colors::BOLD_BLUE) << "Running " << selected_tests.size() << " tests..."
+              << kiln::c(std::cout, kiln::colors::RESET) << std::endl;
 
     struct TestResult {
         std::string name;
@@ -475,9 +452,7 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
 
     // Build dependency map and validate DEPENDS references
     std::set<std::string> selected_names;
-    for (auto* test : selected_tests) {
-        selected_names.insert(test->name);
-    }
+    for (auto* test : selected_tests) { selected_names.insert(test->name); }
 
     // Parse DEPENDS for each test, warn on unknown deps (supported for compat, but wrong)
     std::map<std::string, std::vector<std::string>> deps_map;
@@ -487,14 +462,11 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
         auto it = test->properties.find("DEPENDS");
         if (it != test->properties.end()) {
             auto& deps = deps_map[test->name];
-            for (auto dep_it = kiln::CMakeArrayIterator::iterator(it->second);
-                 dep_it != kiln::CMakeArrayIterator::sentinel{}; ++dep_it) {
+            for (auto dep_it = kiln::CMakeArrayIterator::iterator(it->second); dep_it != kiln::CMakeArrayIterator::sentinel{}; ++dep_it) {
                 std::string dep(*dep_it);
                 if (selected_names.find(dep) == selected_names.end()) {
-                    std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_YELLOW)
-                              << "Warning: " << kiln::c(std::cerr, kiln::colors::RESET)
-                              << "Test '" << test->name << "' DEPENDS on unknown test '" << dep
-                              << "' (ignored)" << std::endl;
+                    std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_YELLOW) << "Warning: " << kiln::c(std::cerr, kiln::colors::RESET)
+                              << "Test '" << test->name << "' DEPENDS on unknown test '" << dep << "' (ignored)" << std::endl;
                 } else {
                     deps.push_back(dep);
                 }
@@ -504,8 +476,7 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
         auto lock_it = test->properties.find("RESOURCE_LOCK");
         if (lock_it != test->properties.end()) {
             auto& locks = resource_locks_map[test->name];
-            for (auto l_it = kiln::CMakeArrayIterator::iterator(lock_it->second);
-                 l_it != kiln::CMakeArrayIterator::sentinel{}; ++l_it) {
+            for (auto l_it = kiln::CMakeArrayIterator::iterator(lock_it->second); l_it != kiln::CMakeArrayIterator::sentinel{}; ++l_it) {
                 std::string lock(*l_it);
                 if (!lock.empty()) locks.push_back(lock);
             }
@@ -523,15 +494,11 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
         auto start = std::chrono::high_resolution_clock::now();
 
         std::string cmd = test->command;
-        if (targets_map.count(cmd)) {
-            cmd = targets_map[cmd]->get_output_path();
-        }
+        if (targets_map.count(cmd)) { cmd = targets_map[cmd]->get_output_path(); }
 
         std::vector<std::string> command_vec;
         command_vec.push_back(cmd);
-        for (const auto& arg : test->args) {
-            command_vec.push_back(arg);
-        }
+        for (const auto& arg : test->args) { command_vec.push_back(arg); }
 
         // Check for TIMEOUT property
         double timeout = 0.0;
@@ -562,14 +529,11 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
         // WORKING_DIRECTORY property overrides the add_test() working directory
         std::string working_dir = test->working_dir;
         auto wd_it = test->properties.find("WORKING_DIRECTORY");
-        if (wd_it != test->properties.end() && !wd_it->second.empty()) {
-            working_dir = wd_it->second;
-        }
+        if (wd_it != test->properties.end() && !wd_it->second.empty()) { working_dir = wd_it->second; }
 
         // Execute the command with timeout handling
-        std::future<kiln::CommandResult> cmd_future = std::async(std::launch::async, [&]() {
-            return kiln::run_command(command_vec, working_dir);
-        });
+        std::future<kiln::CommandResult> cmd_future =
+            std::async(std::launch::async, [&]() { return kiln::run_command(command_vec, working_dir); });
 
         kiln::CommandResult result;
         if (timeout > 0.0) {
@@ -592,8 +556,8 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
         // Check SKIP_REGULAR_EXPRESSION — skip if output matches any pattern
         auto skip_re_it = test->properties.find("SKIP_REGULAR_EXPRESSION");
         if (skip_re_it != test->properties.end()) {
-            for (auto pat_it = kiln::CMakeArrayIterator::iterator(skip_re_it->second);
-                 pat_it != kiln::CMakeArrayIterator::sentinel{}; ++pat_it) {
+            for (auto pat_it = kiln::CMakeArrayIterator::iterator(skip_re_it->second); pat_it != kiln::CMakeArrayIterator::sentinel{};
+                 ++pat_it) {
                 std::string pat(*pat_it);
                 if (pat.empty()) continue;
                 auto re = kiln::Regex::compile(pat);
@@ -628,17 +592,14 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
 
     // Track which tests are pending vs in-flight
     std::set<size_t> pending;
-    for (size_t i = 0; i < selected_tests.size(); ++i) {
-        pending.insert(i);
-    }
+    for (size_t i = 0; i < selected_tests.size(); ++i) { pending.insert(i); }
 
     int passed_count = 0;
     int skipped_count = 0;
     int failed_count = 0;
 
     auto print_result = [&](const TestResult& res) {
-        std::cout << "[" << results.size() << "/" << selected_tests.size() << "] "
-                  << std::left << std::setw(40) << res.name << " ";
+        std::cout << "[" << results.size() << "/" << selected_tests.size() << "] " << std::left << std::setw(40) << res.name << " ";
 
         if (res.skipped) {
             std::cout << kiln::c(std::cout, kiln::colors::BOLD_YELLOW) << "SKIPPED" << kiln::c(std::cout, kiln::colors::RESET);
@@ -718,9 +679,7 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
             // Re-check lock conflict — a prior test in this wave may have claimed it
             if (has_lock_conflict(idx)) continue;
             pending.erase(idx);
-            for (const auto& lock : get_locks(idx)) {
-                held_locks.insert(lock);
-            }
+            for (const auto& lock : get_locks(idx)) { held_locks.insert(lock); }
             in_flight.emplace_back(idx, std::async(std::launch::async, run_one_test, selected_tests[idx]));
         }
 
@@ -728,9 +687,7 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
         for (auto& [idx, fut] : in_flight) {
             auto res = fut.get();
             // Release resource locks
-            for (const auto& lock : get_locks(idx)) {
-                held_locks.erase(lock);
-            }
+            for (const auto& lock : get_locks(idx)) { held_locks.erase(lock); }
             completed.insert(res.name);
             results.push_back(res);
             print_result(res);
@@ -741,11 +698,8 @@ int run_test_action(const GlobalOptions& opt, kiln::Interpreter* interpreter, co
     double total_duration = std::chrono::duration<double>(end_all - start_all).count();
 
     std::cout << "\nTest Summary: " << passed_count << "/" << selected_tests.size() << " passed";
-    if (skipped_count > 0) {
-        std::cout << " (" << skipped_count << " skipped)";
-    }
-    std::cout << " ("
-              << std::fixed << std::setprecision(2) << total_duration << "s)" << std::endl;
+    if (skipped_count > 0) { std::cout << " (" << skipped_count << " skipped)"; }
+    std::cout << " (" << std::fixed << std::setprecision(2) << total_duration << "s)" << std::endl;
 
     return (passed_count == static_cast<int>(selected_tests.size())) ? 0 : 1;
 }
@@ -770,14 +724,10 @@ int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         std::string_view a(argv[i]);
         if (a == "-P" && i + 1 < argc) {
-            int script_end = i + 2;  // keep -P and the script path
+            int script_end = i + 2; // keep -P and the script path
             int args_start = script_end;
-            if (args_start < argc && std::string_view(argv[args_start]) == "--") {
-                ++args_start;
-            }
-            for (int j = args_start; j < argc; ++j) {
-                script_extra_args.emplace_back(argv[j]);
-            }
+            if (args_start < argc && std::string_view(argv[args_start]) == "--") { ++args_start; }
+            for (int j = args_start; j < argc; ++j) { script_extra_args.emplace_back(argv[j]); }
             argc = script_end;
 
             // Rewrite argv: insert "script" at position 1, drop the "-P" token.
@@ -785,7 +735,7 @@ int main(int argc, char* argv[]) {
             rewritten_argv.push_back(argv[0]);
             rewritten_argv.push_back(script_cmd_literal);
             for (int j = 1; j < argc; ++j) {
-                if (j == i) continue;  // skip "-P"
+                if (j == i) continue; // skip "-P"
                 rewritten_argv.push_back(argv[j]);
             }
             argc = static_cast<int>(rewritten_argv.size());
@@ -795,21 +745,17 @@ int main(int argc, char* argv[]) {
     }
 
     CLI::App app{"kiln - A modern C++ build system with CMake compatibility.\n"
-                  "  Use 'kiln <subcommand> --help' for subcommand-specific options."};
-    app.set_version_flag("-v,--version",
-                         std::string(kiln::version()) + " (" + std::string(kiln::version_full()) + ")");
+                 "  Use 'kiln <subcommand> --help' for subcommand-specific options."};
+    app.set_version_flag("-v,--version", std::string(kiln::version()) + " (" + std::string(kiln::version_full()) + ")");
     GlobalOptions opt;
     std::string ignored_generator;
 
     // Helper to add global options to app or subcommand
     auto add_global_options = [&](CLI::App* target) {
         target->add_option("-C,--project", opt.project_dir_str, "Project directory (default: current directory)");
-        target->add_option("-j,--parallel", opt.jobs, "Number of parallel jobs (0 = all cores)")
-           ->default_val(0);
+        target->add_option("-j,--parallel", opt.jobs, "Number of parallel jobs (0 = all cores)")->default_val(0);
         target->add_option("-B", opt.build_dir_str, "Build directory (default: <project>/build/<config>)");
-        target->add_option("-D", opt.definitions, "Define a CMake variable (-DVAR=VALUE or -DVAR)")
-           ->type_size(1)
-           ->allow_extra_args(false);
+        target->add_option("-D", opt.definitions, "Define a CMake variable (-DVAR=VALUE or -DVAR)")->type_size(1)->allow_extra_args(false);
         target->add_option("-G", ignored_generator, "Generator (ignored, CMake compatibility)");
         target->add_flag("--profile", opt.profile, "Generate build profile (Chrome trace event format)");
         target->add_flag("--trace", opt.trace, "Print each command as it is executed (raw arguments)");
@@ -819,20 +765,20 @@ int main(int argc, char* argv[]) {
         target->add_flag("--config-only", opt.config_only, "[debug] Interpret CMakeLists.txt and save cache, then exit without building");
         target->add_flag("--no-sys-init", opt.no_sys_init, "[benchmark] Skip compiler detection and system init");
         target->add_flag("--fast-setup", opt.fast_setup,
-            "Skip loading CMake's Compiler/<id>-<lang>.cmake during enable_language; "
-            "use kiln's built-in subset of compiler vars. Faster but covers fewer flags.");
+                         "Skip loading CMake's Compiler/<id>-<lang>.cmake during enable_language; "
+                         "use kiln's built-in subset of compiler vars. Faster but covers fewer flags.");
         target->add_flag("--fresh", opt.fresh, "Skip loading persistent cache (fresh configure)");
         target->add_option("--log-level", opt.log_level, "Set message log level (ERROR, WARNING, NOTICE, STATUS, VERBOSE, DEBUG, TRACE)");
         target->add_option("--preset", opt.preset, "Use a configure preset from CMakePresets.json");
         target->add_option("-c,--config", opt.config, "Build configuration: debug, release, relwithdebinfo, minsizerel")
-           ->default_val("debug")
-           ->transform([](const std::string& value) -> std::string {
-               auto copy = kiln::to_lower(value);
-               if (copy == "debug" || copy == "release" || copy == "relwithdebinfo" || copy == "minsizerel") {
-                   return copy;
-               }
-               throw CLI::ValidationError("Invalid configuration");
-           }, "", "lowercase");
+            ->default_val("debug")
+            ->transform(
+                [](const std::string& value) -> std::string {
+                    auto copy = kiln::to_lower(value);
+                    if (copy == "debug" || copy == "release" || copy == "relwithdebinfo" || copy == "minsizerel") { return copy; }
+                    throw CLI::ValidationError("Invalid configuration");
+                },
+                "", "lowercase");
     };
 
     // Special modes (only on main app)
@@ -883,23 +829,21 @@ Examples:
     install_cmd->add_option("-C,--project", opt.project_dir_str, "Project directory (default: current directory)");
     install_cmd->add_option("-B", opt.build_dir_str, "Build directory (default: <project>/build/<config>)");
     install_cmd->add_option("-c,--config", opt.config, "Build configuration: debug, release, relwithdebinfo, minsizerel")
-       ->default_val("debug")
-       ->transform([](const std::string& value) -> std::string {
-           auto copy = kiln::to_lower(value);
-           if (copy == "debug" || copy == "release" || copy == "relwithdebinfo" || copy == "minsizerel") {
-               return copy;
-           }
-           throw CLI::ValidationError("Invalid configuration");
-       }, "", "lowercase");
+        ->default_val("debug")
+        ->transform(
+            [](const std::string& value) -> std::string {
+                auto copy = kiln::to_lower(value);
+                if (copy == "debug" || copy == "release" || copy == "relwithdebinfo" || copy == "minsizerel") { return copy; }
+                throw CLI::ValidationError("Invalid configuration");
+            },
+            "", "lowercase");
 
     // `script` subcommand: internal target of the `-P <file>` rewrite above.
     // CMake-script mode needs -D and friends but does not run the build path,
     // so it lives in its own subcommand.
     auto* script_cmd = app.add_subcommand("script", "Run a CMake script (internal — invoked via -P)");
     script_cmd->add_option("path", opt.script_path, "Script path")->required();
-    script_cmd->add_option("-D", opt.definitions, "Define a CMake variable (-DVAR=VALUE or -DVAR)")
-       ->type_size(1)
-       ->allow_extra_args(false);
+    script_cmd->add_option("-D", opt.definitions, "Define a CMake variable (-DVAR=VALUE or -DVAR)")->type_size(1)->allow_extra_args(false);
     script_cmd->add_option("--log-level", opt.log_level, "Set message log level");
     script_cmd->add_flag("--no-sys-init", opt.no_sys_init, "Skip compiler detection and system init");
 
@@ -965,9 +909,7 @@ Examples:
 
     CLI11_PARSE(app, argc, argv);
 
-    if (opt.profile) {
-        kiln::Profiler::instance().enable();
-    }
+    if (opt.profile) { kiln::Profiler::instance().enable(); }
 
     // --list-presets: print and exit before doing any other work.
     if (opt.list_presets) {
@@ -989,8 +931,8 @@ Examples:
         std::filesystem::path proj = std::filesystem::absolute(opt.project_dir_str).lexically_normal();
         auto preset = kiln::load_configure_preset(proj, opt.preset);
         if (!preset) {
-            std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_RED) << "error:" << kiln::c(std::cerr, kiln::colors::RESET)
-                      << " preset '" << opt.preset << "': " << preset.error() << std::endl;
+            std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_RED) << "error:" << kiln::c(std::cerr, kiln::colors::RESET) << " preset '"
+                      << opt.preset << "': " << preset.error() << std::endl;
             return 1;
         }
 
@@ -1007,9 +949,7 @@ Examples:
         // in order; later set_cache_variable calls overwrite earlier ones).
         std::vector<std::string> preset_defs;
         preset_defs.reserve(preset->cache_variables.size());
-        for (const auto& [k, v] : preset->cache_variables) {
-            preset_defs.push_back(k + "=" + v);
-        }
+        for (const auto& [k, v] : preset->cache_variables) { preset_defs.push_back(k + "=" + v); }
         for (auto& d : opt.definitions) preset_defs.push_back(std::move(d));
         opt.definitions = std::move(preset_defs);
 
@@ -1033,16 +973,12 @@ Examples:
     if (debug_opts.any_enabled()) {
         // Set up linenoise-based input for interactive debugger
         static const char* dbg_commands[] = {
-            "break", "break-on-message", "continue", "step", "next", "print",
-            "backtrace", "list", "frame", "up", "down", "info variables",
-            "info breakpoints", "watch", "delete", "quit", "help", nullptr
-        };
+            "break", "break-on-message", "continue",         "step",  "next",   "print", "backtrace", "list", "frame", "up",
+            "down",  "info variables",   "info breakpoints", "watch", "delete", "quit",  "help",      nullptr};
         linenoiseSetCompletionCallback([](const char* buf, linenoiseCompletions* lc) {
             std::string_view prefix(buf);
             for (const char** cmd = dbg_commands; *cmd; ++cmd) {
-                if (std::string_view(*cmd).starts_with(prefix)) {
-                    linenoiseAddCompletion(lc, *cmd);
-                }
+                if (std::string_view(*cmd).starts_with(prefix)) { linenoiseAddCompletion(lc, *cmd); }
             }
         });
         linenoiseHistorySetMaxLen(100);
@@ -1051,7 +987,7 @@ Examples:
             key_type = 0;
             char* raw = linenoise(prompt);
             if (!raw) {
-                key_type = linenoiseKeyType();  // 1=Ctrl+C, 2=Ctrl+D
+                key_type = linenoiseKeyType(); // 1=Ctrl+C, 2=Ctrl+D
                 return std::nullopt;
             }
             std::string line(raw);
@@ -1061,9 +997,7 @@ Examples:
         });
     }
 
-    if (e_cmd->parsed()) {
-        return tool_exit_code;
-    }
+    if (e_cmd->parsed()) { return tool_exit_code; }
 
     if (!opt.script_path.empty()) {
         try {
@@ -1092,7 +1026,8 @@ Examples:
             kiln::Parser parser(content, script_name);
             auto ast_or_error = parser.parse();
             if (!ast_or_error) {
-                print_error_context(script_name, ast_or_error.error().row, ast_or_error.error().col, ast_or_error.error().offset, ast_or_error.error().length, ast_or_error.error().reason);
+                print_error_context(script_name, ast_or_error.error().row, ast_or_error.error().col, ast_or_error.error().offset,
+                                    ast_or_error.error().length, ast_or_error.error().reason);
                 return 1;
             }
 
@@ -1116,14 +1051,10 @@ Examples:
             cmake_argv.push_back(script_name);
             for (auto& a : script_extra_args) cmake_argv.push_back(std::move(a));
             interpreter.set_variable("CMAKE_ARGC", std::to_string(cmake_argv.size()));
-            for (size_t i = 0; i < cmake_argv.size(); ++i) {
-                interpreter.set_variable("CMAKE_ARGV" + std::to_string(i), cmake_argv[i]);
-            }
+            for (size_t i = 0; i < cmake_argv.size(); ++i) { interpreter.set_variable("CMAKE_ARGV" + std::to_string(i), cmake_argv[i]); }
             debug_controller.attach(interpreter);
             apply_definitions(interpreter, opt.definitions);
-            if (!opt.log_level.empty()) {
-                interpreter.set_variable("CMAKE_MESSAGE_LOG_LEVEL", opt.log_level);
-            }
+            if (!opt.log_level.empty()) { interpreter.set_variable("CMAKE_MESSAGE_LOG_LEVEL", opt.log_level); }
 
             auto result = interpreter.interpret(ast_or_error.value());
             if (!result) {
@@ -1136,9 +1067,7 @@ Examples:
                 print_error_context(*err);
                 return 1;
             }
-            if (interpreter.has_accumulated_errors()) {
-                return 1;
-            }
+            if (interpreter.has_accumulated_errors()) { return 1; }
             return 0;
         } catch (const std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
@@ -1148,11 +1077,13 @@ Examples:
 
     if (clean_cmd->parsed()) {
         std::filesystem::path project_path = std::filesystem::absolute(opt.project_dir_str);
-        std::filesystem::path build_root = opt.build_dir_str.empty() ? (project_path / "build") : std::filesystem::absolute(opt.build_dir_str).lexically_normal();
+        std::filesystem::path build_root =
+            opt.build_dir_str.empty() ? (project_path / "build") : std::filesystem::absolute(opt.build_dir_str).lexically_normal();
         std::filesystem::path build_path = build_root / opt.config;
         if (std::filesystem::exists(build_path)) {
             std::uintmax_t total_bytes = 0;
-            for (auto const& entry : std::filesystem::recursive_directory_iterator(build_path, std::filesystem::directory_options::skip_permission_denied)) {
+            for (auto const& entry :
+                 std::filesystem::recursive_directory_iterator(build_path, std::filesystem::directory_options::skip_permission_denied)) {
                 if (entry.is_regular_file()) {
                     std::error_code ec;
                     auto sz = entry.file_size(ec);
@@ -1163,12 +1094,16 @@ Examples:
             std::filesystem::remove_all(build_path);
             // Format freed size
             auto format_bytes = [](std::uintmax_t bytes) -> std::string {
-                constexpr double KB = 1024, MB = 1024*1024, GB = 1024*1024*1024;
+                constexpr double KB = 1024, MB = 1024 * 1024, GB = 1024 * 1024 * 1024;
                 char buf[32];
-                if (bytes >= GB)      std::snprintf(buf, sizeof(buf), "%.2f GB", bytes / GB);
-                else if (bytes >= MB) std::snprintf(buf, sizeof(buf), "%.2f MB", bytes / MB);
-                else if (bytes >= KB) std::snprintf(buf, sizeof(buf), "%.2f KB", bytes / KB);
-                else                  std::snprintf(buf, sizeof(buf), "%llu B", (unsigned long long)bytes);
+                if (bytes >= GB)
+                    std::snprintf(buf, sizeof(buf), "%.2f GB", bytes / GB);
+                else if (bytes >= MB)
+                    std::snprintf(buf, sizeof(buf), "%.2f MB", bytes / MB);
+                else if (bytes >= KB)
+                    std::snprintf(buf, sizeof(buf), "%.2f KB", bytes / KB);
+                else
+                    std::snprintf(buf, sizeof(buf), "%llu B", (unsigned long long) bytes);
                 return buf;
             };
             std::cout << "Freed " << format_bytes(total_bytes) << std::endl;
@@ -1195,39 +1130,36 @@ Examples:
             }
             build_path = std::filesystem::absolute(opt.build_dir_str).lexically_normal();
         } else {
-            std::filesystem::path build_root = opt.build_dir_str.empty()
-                ? (project_path / "build")
-                : std::filesystem::absolute(opt.build_dir_str).lexically_normal();
+            std::filesystem::path build_root =
+                opt.build_dir_str.empty() ? (project_path / "build") : std::filesystem::absolute(opt.build_dir_str).lexically_normal();
             build_path = build_root / opt.config;
         }
 
         auto plan_or = kiln::load_install_plan(build_path / "install_plan.json");
         if (!plan_or) {
-            std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_RED) << "error:" << kiln::c(std::cerr, kiln::colors::RESET)
-                      << " " << plan_or.error() << std::endl;
+            std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_RED) << "error:" << kiln::c(std::cerr, kiln::colors::RESET) << " "
+                      << plan_or.error() << std::endl;
             return 1;
         }
         auto& plan = plan_or.value();
 
-        std::string prefix = !install_prefix.empty() ? install_prefix
-                           : (!plan.default_prefix.empty() ? plan.default_prefix : "/usr/local");
+        std::string prefix = !install_prefix.empty() ? install_prefix : (!plan.default_prefix.empty() ? plan.default_prefix : "/usr/local");
 
         // DESTDIR support: prepend if set (standard packaging idiom).
-        if (const char* destdir = std::getenv("DESTDIR"); destdir && *destdir) {
-            prefix = std::string(destdir) + prefix;
-        }
+        if (const char* destdir = std::getenv("DESTDIR"); destdir && *destdir) { prefix = std::string(destdir) + prefix; }
 
-        std::cout << kiln::c(std::cout, kiln::colors::BOLD_BLUE) << "Installing to:"
-                  << kiln::c(std::cout, kiln::colors::RESET) << " " << prefix << std::endl;
+        std::cout << kiln::c(std::cout, kiln::colors::BOLD_BLUE) << "Installing to:" << kiln::c(std::cout, kiln::colors::RESET) << " "
+                  << prefix << std::endl;
 
         auto result = kiln::execute_install_plan(plan, prefix, plan.config, install_component);
         if (!result) {
-            std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_RED) << "error:" << kiln::c(std::cerr, kiln::colors::RESET)
-                      << " " << result.error() << std::endl;
+            std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_RED) << "error:" << kiln::c(std::cerr, kiln::colors::RESET) << " "
+                      << result.error() << std::endl;
             return 1;
         }
 
-        std::cout << kiln::c(std::cout, kiln::colors::BOLD_GREEN) << "Installation complete." << kiln::c(std::cout, kiln::colors::RESET) << std::endl;
+        std::cout << kiln::c(std::cout, kiln::colors::BOLD_GREEN) << "Installation complete." << kiln::c(std::cout, kiln::colors::RESET)
+                  << std::endl;
         return 0;
     }
 
@@ -1283,12 +1215,11 @@ Examples:
 
         std::vector<char*> argv_exec;
         argv_exec.push_back(const_cast<char*>(exec_path.c_str()));
-        for (const auto& arg : run_args) {
-            argv_exec.push_back(const_cast<char*>(arg.c_str()));
-        }
+        for (const auto& arg : run_args) { argv_exec.push_back(const_cast<char*>(arg.c_str())); }
         argv_exec.push_back(nullptr);
 
-        std::cout << kiln::c(std::cout, kiln::colors::BOLD_GREEN) << "Running" << kiln::c(std::cout, kiln::colors::RESET) << " " << exec_path << "..." << std::endl;
+        std::cout << kiln::c(std::cout, kiln::colors::BOLD_GREEN) << "Running" << kiln::c(std::cout, kiln::colors::RESET) << " "
+                  << exec_path << "..." << std::endl;
         execvp(argv_exec[0], argv_exec.data());
 
         std::cerr << "Error: Failed to execute " << exec_path << ": " << strerror(errno) << std::endl;
@@ -1323,9 +1254,8 @@ Examples:
     for (const auto& target : targets) {
         std::filesystem::path target_path(target);
         if (std::filesystem::exists(target_path / "CMakeLists.txt")) {
-            std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_YELLOW) << "hint:"
-                      << kiln::c(std::cerr, kiln::colors::RESET)
-                      << " '" << target << "' looks like a project directory. "
+            std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_YELLOW) << "hint:" << kiln::c(std::cerr, kiln::colors::RESET) << " '"
+                      << target << "' looks like a project directory. "
                       << "Use 'kiln -C " << target << "' to build it." << std::endl;
         }
     }

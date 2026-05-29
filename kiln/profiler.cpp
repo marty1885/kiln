@@ -44,13 +44,11 @@ int64_t Profiler::get_tid() {
     return id;
 }
 
-void Profiler::add_complete(std::string name, std::string cat,
-                            int64_t start_us, int64_t duration_us, Profiler::Args args) {
+void Profiler::add_complete(std::string name, std::string cat, int64_t start_us, int64_t duration_us, Profiler::Args args) {
     add_complete(std::move(name), std::move(cat), start_us, duration_us, get_tid(), std::move(args));
 }
 
-void Profiler::add_complete(std::string name, std::string cat,
-                            int64_t start_us, int64_t duration_us, int64_t tid, Profiler::Args args) {
+void Profiler::add_complete(std::string name, std::string cat, int64_t start_us, int64_t duration_us, int64_t tid, Profiler::Args args) {
     std::lock_guard<std::mutex> lock(mutex_);
     events_.push_back({std::move(name), std::move(cat), start_us, duration_us, tid, std::move(args)});
 }
@@ -62,16 +60,8 @@ void Profiler::write(const std::string& path) {
     trace.traceEvents.reserve(events_.size());
 
     for (const auto& e : events_) {
-        trace.traceEvents.push_back({
-            .name = e.name,
-            .cat = e.cat,
-            .ph = "X",
-            .ts = e.ts,
-            .dur = e.dur,
-            .pid = 1,
-            .tid = e.tid,
-            .args = e.args
-        });
+        trace.traceEvents.push_back(
+            {.name = e.name, .cat = e.cat, .ph = "X", .ts = e.ts, .dur = e.dur, .pid = 1, .tid = e.tid, .args = e.args});
     }
 
     std::string json;
@@ -82,15 +72,12 @@ void Profiler::write(const std::string& path) {
     std::filesystem::create_directories(std::filesystem::path(path).parent_path(), fs_ec);
 
     std::ofstream file(path);
-    if (file) {
-        file << json;
-    }
+    if (file) { file << json; }
 }
 
 // ProfileScope implementation
 
-ProfileScope::ProfileScope(std::string_view name, std::string_view cat)
-    : active_(g_profiling_enabled.load(std::memory_order_acquire)) {
+ProfileScope::ProfileScope(std::string_view name, std::string_view cat) : active_(g_profiling_enabled.load(std::memory_order_acquire)) {
     if (active_) {
         name_ = name;
         cat_ = cat;

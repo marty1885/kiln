@@ -11,13 +11,11 @@ namespace kiln {
 // Value is move-only friendly. Factory returns expected<Value, std::string>.
 //
 // Not thread-safe — each call site spawns its own instance.
-template <typename Key, typename Value>
-class ClockCache {
+template <typename Key, typename Value> class ClockCache {
 public:
     using Factory = std::function<std::expected<Value, std::string>(const Key&)>;
 
-    explicit ClockCache(size_t capacity, Factory factory)
-        : capacity_(capacity), factory_(std::move(factory)) {
+    explicit ClockCache(size_t capacity, Factory factory) : capacity_(capacity), factory_(std::move(factory)) {
         entries_.reserve(capacity);
     }
 

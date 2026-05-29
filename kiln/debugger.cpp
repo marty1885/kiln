@@ -24,7 +24,7 @@ static std::optional<std::string> default_input(const char* prompt, int& key_typ
     std::cerr << prompt;
     std::string line;
     if (!std::getline(std::cin, line)) {
-        key_type = 2;  // EOF
+        key_type = 2; // EOF
         return std::nullopt;
     }
     return line;
@@ -33,9 +33,7 @@ static std::optional<std::string> default_input(const char* prompt, int& key_typ
 // Helper to serialize a VariableReference back to ${...} syntax
 std::string serialize_variable_reference(const VariableReference& ref) {
     std::string result = "$";
-    if (!ref.namespace_prefix.empty()) {
-        result += ref.namespace_prefix;
-    }
+    if (!ref.namespace_prefix.empty()) { result += ref.namespace_prefix; }
     result += "{";
     for (const auto& part : ref.name_parts) {
         if (std::holds_alternative<std::string>(part)) {
@@ -63,8 +61,7 @@ std::string serialize_argument(const Argument& arg) {
     return result;
 }
 
-Debugger::Debugger(Interpreter& interp)
-    : interp_(interp), input_fn_(default_input) {
+Debugger::Debugger(Interpreter& interp) : interp_(interp), input_fn_(default_input) {
     // Install SIGINT handler so Ctrl+C drops to debugger instead of killing
     struct sigaction sa{};
     sa.sa_handler = sigint_handler;
@@ -78,10 +75,8 @@ Debugger::~Debugger() {
     sigaction(SIGINT, &old_sigint_action_, nullptr);
 }
 
-void Debugger::on_command(const std::string& file, size_t row, size_t col,
-                          const std::string& identifier,
-                          const std::vector<std::string>& expanded_args,
-                          const std::vector<Argument>& raw_args) {
+void Debugger::on_command(const std::string& file, size_t row, size_t col, const std::string& identifier,
+                          const std::vector<std::string>& expanded_args, const std::vector<Argument>& raw_args) {
     // Save current command context so on_message/on_variable_access/on_fatal_error
     // can break at the right location (the command that caused the event, not the next one).
     current_file_ = file;
@@ -90,9 +85,7 @@ void Debugger::on_command(const std::string& file, size_t row, size_t col,
     current_raw_args_ = &raw_args;
 
     // Always print trace if trace mode is on
-    if (g_trace_enabled) {
-        print_trace(file, row, identifier, expanded_args, raw_args);
-    }
+    if (g_trace_enabled) { print_trace(file, row, identifier, expanded_args, raw_args); }
 
     // Check for Ctrl+C → drop to debugger
     if (g_sigint_received.exchange(false, std::memory_order_relaxed)) {
@@ -105,47 +98,39 @@ void Debugger::on_command(const std::string& file, size_t row, size_t col,
         bool should_stop = false;
 
         switch (action_) {
-            case Action::STEP:
-                should_stop = true;
-                break;
-            case Action::NEXT:
-                should_stop = (call_depth_ <= next_depth_);
-                break;
-            case Action::CONTINUE:
-                should_stop = should_break(file, row, identifier);
-                break;
+        case Action::STEP:
+            should_stop = true;
+            break;
+        case Action::NEXT:
+            should_stop = (call_depth_ <= next_depth_);
+            break;
+        case Action::CONTINUE:
+            should_stop = should_break(file, row, identifier);
+            break;
         }
 
-        if (should_stop) {
-            interactive_loop(file, row, identifier, raw_args);
-        }
+        if (should_stop) { interactive_loop(file, row, identifier, raw_args); }
     }
 }
 
 void Debugger::on_message(const std::string& content) {
     if (break_on_message_ && g_debug_enabled && current_raw_args_) {
         if (content.find(*break_on_message_) != std::string::npos) {
-            std::cerr << "(kiln) Break on message matching \"" << *break_on_message_
-                      << "\": " << content << "\n";
+            std::cerr << "(kiln) Break on message matching \"" << *break_on_message_ << "\": " << content << "\n";
             interactive_loop(current_file_, current_row_, current_cmd_, *current_raw_args_);
         }
     }
 }
 
-void Debugger::on_variable_access(const std::string& var_name,
-                                   const std::string& access_type,
-                                   const std::string& value,
-                                   const std::string& current_file) {
+void Debugger::on_variable_access(const std::string& var_name, const std::string& access_type, const std::string& value,
+                                  const std::string& current_file) {
     if (!g_debug_enabled || !current_raw_args_) return;
 
     // Check if any breakpoints match this variable
     for (const auto& bp : breakpoints_) {
         if (bp.enabled && bp.type == Breakpoint::Type::VARIABLE && bp.variable == var_name) {
-            std::cerr << "(kiln) Variable breakpoint " << bp.id << " hit: "
-                      << var_name << " " << access_type;
-            if (!value.empty()) {
-                std::cerr << ", value=\"" << value << "\"";
-            }
+            std::cerr << "(kiln) Variable breakpoint " << bp.id << " hit: " << var_name << " " << access_type;
+            if (!value.empty()) { std::cerr << ", value=\"" << value << "\""; }
             std::cerr << " in " << current_file << "\n";
             interactive_loop(current_file_, current_row_, current_cmd_, *current_raw_args_);
             break;
@@ -160,8 +145,12 @@ void Debugger::on_fatal_error(const std::string& message) {
     interactive_loop(current_file_, current_row_, current_cmd_, *current_raw_args_);
 }
 
-void Debugger::push_call_depth() { ++call_depth_; }
-void Debugger::pop_call_depth() { --call_depth_; }
+void Debugger::push_call_depth() {
+    ++call_depth_;
+}
+void Debugger::pop_call_depth() {
+    --call_depth_;
+}
 
 int Debugger::add_location_breakpoint(const std::string& file, size_t line) {
     Breakpoint bp;
@@ -192,16 +181,12 @@ int Debugger::add_variable_breakpoint(const std::string& variable) {
 }
 
 void Debugger::delete_breakpoint(int id) {
-    breakpoints_.erase(
-        std::remove_if(breakpoints_.begin(), breakpoints_.end(),
-                        [id](const Breakpoint& bp) { return bp.id == id; }),
-        breakpoints_.end());
+    breakpoints_.erase(std::remove_if(breakpoints_.begin(), breakpoints_.end(), [id](const Breakpoint& bp) { return bp.id == id; }),
+                       breakpoints_.end());
 }
 
-void Debugger::print_trace(const std::string& file, size_t row,
-                           const std::string& identifier,
-                           const std::vector<std::string>& expanded_args,
-                           const std::vector<Argument>& raw_args) {
+void Debugger::print_trace(const std::string& file, size_t row, const std::string& identifier,
+                           const std::vector<std::string>& expanded_args, const std::vector<Argument>& raw_args) {
     // Format: file(line): command(args)
     std::cerr << file << "(" << row << "): " << identifier << "(";
 
@@ -222,9 +207,7 @@ void Debugger::print_trace(const std::string& file, size_t row,
     std::cerr << ")\n";
 }
 
-void Debugger::interactive_loop(const std::string& file, size_t row,
-                                const std::string& identifier,
-                                const std::vector<Argument>& raw_args) {
+void Debugger::interactive_loop(const std::string& file, size_t row, const std::string& identifier, const std::vector<Argument>& raw_args) {
     // Context (current_file_, current_row_, current_cmd_) is set by on_command()
     // or by on_fatal_error() before entering this loop.
     selected_frame_ = 0;
@@ -259,7 +242,7 @@ void Debugger::interactive_loop(const std::string& file, size_t row,
         if (input.empty()) continue;
 
         if (execute_debugger_command(input)) {
-            break;  // Command wants to resume execution
+            break; // Command wants to resume execution
         }
     }
 }
@@ -281,9 +264,7 @@ bool Debugger::execute_debugger_command(const std::string& input) {
     };
 
     // Parse an integer argument strictly (rejects "3abc", trailing garbage, etc.)
-    auto parse_int = [](const std::string& s) -> std::optional<int> {
-        return parse_number<int>(s);
-    };
+    auto parse_int = [](const std::string& s) -> std::optional<int> { return parse_number<int>(s); };
 
     if (cmd == "continue" || cmd == "c") {
         if (!expect_no_more_args("continue")) return false;
@@ -304,9 +285,7 @@ bool Debugger::execute_debugger_command(const std::string& input) {
         return true;
     }
 
-    if (cmd == "quit" || cmd == "q") {
-        std::exit(0);
-    }
+    if (cmd == "quit" || cmd == "q") { std::exit(0); }
 
     if (cmd == "print" || cmd == "p") {
         std::string var_name;
@@ -352,9 +331,7 @@ bool Debugger::execute_debugger_command(const std::string& input) {
             return false;
         }
         if (!expect_no_more_args("frame [N]")) return false;
-        if (!select_frame(*n)) {
-            std::cerr << "No frame " << *n << ".\n";
-        }
+        if (!select_frame(*n)) { std::cerr << "No frame " << *n << ".\n"; }
         return false;
     }
 
@@ -434,9 +411,7 @@ bool Debugger::execute_debugger_command(const std::string& input) {
             size_t line = parse_number<size_t>(arg).value_or(0);
             warn_if_non_executable(current_file_, line);
             int id = add_location_breakpoint(current_file_, line);
-            std::cerr << "Breakpoint " << id << " at "
-                      << std::filesystem::path(current_file_).filename().string()
-                      << ":" << line << "\n";
+            std::cerr << "Breakpoint " << id << " at " << std::filesystem::path(current_file_).filename().string() << ":" << line << "\n";
             return false;
         }
 
@@ -516,27 +491,26 @@ bool Debugger::execute_debugger_command(const std::string& input) {
     }
 
     if (cmd == "help" || cmd == "h") {
-        std::cerr <<
-            "Commands:\n"
-            "  break <line>         (b) Set breakpoint at line in current file\n"
-            "  break <file>:<line>  (b) Set location breakpoint\n"
-            "  break <command>      (b) Break on command name\n"
-            "  continue             (c) Run until next breakpoint\n"
-            "  step                 (s) Step to next command\n"
-            "  next                 (n) Step over (stay at current call depth)\n"
-            "  print <var>          (p) Print variable value\n"
-            "  backtrace            (bt) Show call stack\n"
-            "  list                 (l) Show source around current line/frame\n"
-            "  frame [N]            (f) Select stack frame N (show current if no arg)\n"
-            "  up [N]                   Move up N stack frames (default: 1)\n"
-            "  down [N]                 Move down N stack frames (default: 1)\n"
-            "  info variables           List all visible variables\n"
-            "  info breakpoints         List all breakpoints\n"
-            "  break-on-message <p> (bm) Break when message matches pattern\n"
-            "  watch <var>          (w) Break when variable changes\n"
-            "  delete <n>           (d) Delete breakpoint by ID\n"
-            "  quit                 (q) Exit kiln\n"
-            "  help                 (h) Show this help\n";
+        std::cerr << "Commands:\n"
+                     "  break <line>         (b) Set breakpoint at line in current file\n"
+                     "  break <file>:<line>  (b) Set location breakpoint\n"
+                     "  break <command>      (b) Break on command name\n"
+                     "  continue             (c) Run until next breakpoint\n"
+                     "  step                 (s) Step to next command\n"
+                     "  next                 (n) Step over (stay at current call depth)\n"
+                     "  print <var>          (p) Print variable value\n"
+                     "  backtrace            (bt) Show call stack\n"
+                     "  list                 (l) Show source around current line/frame\n"
+                     "  frame [N]            (f) Select stack frame N (show current if no arg)\n"
+                     "  up [N]                   Move up N stack frames (default: 1)\n"
+                     "  down [N]                 Move down N stack frames (default: 1)\n"
+                     "  info variables           List all visible variables\n"
+                     "  info breakpoints         List all breakpoints\n"
+                     "  break-on-message <p> (bm) Break when message matches pattern\n"
+                     "  watch <var>          (w) Break when variable changes\n"
+                     "  delete <n>           (d) Delete breakpoint by ID\n"
+                     "  quit                 (q) Exit kiln\n"
+                     "  help                 (h) Show this help\n";
         return false;
     }
 
@@ -544,28 +518,23 @@ bool Debugger::execute_debugger_command(const std::string& input) {
     return false;
 }
 
-bool Debugger::should_break(const std::string& file, size_t row,
-                            const std::string& identifier) const {
+bool Debugger::should_break(const std::string& file, size_t row, const std::string& identifier) const {
     std::string lower_id = kiln::to_lower(identifier);
 
     for (const auto& bp : breakpoints_) {
         if (!bp.enabled) continue;
 
         switch (bp.type) {
-            case Breakpoint::Type::LOCATION:
-                // Substring match on file, exact match on line (row is 1-based from parser)
-                if (row == bp.line && file.find(bp.file) != std::string::npos) {
-                    return true;
-                }
-                break;
-            case Breakpoint::Type::COMMAND:
-                if (lower_id == bp.command) {
-                    return true;
-                }
-                break;
-            case Breakpoint::Type::VARIABLE:
-                // Variable breakpoints are handled in on_variable_access
-                break;
+        case Breakpoint::Type::LOCATION:
+            // Substring match on file, exact match on line (row is 1-based from parser)
+            if (row == bp.line && file.find(bp.file) != std::string::npos) { return true; }
+            break;
+        case Breakpoint::Type::COMMAND:
+            if (lower_id == bp.command) { return true; }
+            break;
+        case Breakpoint::Type::VARIABLE:
+            // Variable breakpoints are handled in on_variable_access
+            break;
         }
     }
     return false;
@@ -574,17 +543,13 @@ bool Debugger::should_break(const std::string& file, size_t row,
 std::pair<std::string, size_t> Debugger::selected_file_row() const {
     auto& stack = interp_.get_trace_stack();
     int idx = static_cast<int>(stack.size()) - 1 - selected_frame_;
-    if (idx < 0 || idx >= static_cast<int>(stack.size())) {
-        return {current_file_, current_row_};
-    }
+    if (idx < 0 || idx >= static_cast<int>(stack.size())) { return {current_file_, current_row_}; }
     return {stack[idx].file ? *stack[idx].file : std::string(), stack[idx].row};
 }
 
 bool Debugger::select_frame(int n) {
     auto& stack = interp_.get_trace_stack();
-    if (n < 0 || n >= static_cast<int>(stack.size())) {
-        return false;
-    }
+    if (n < 0 || n >= static_cast<int>(stack.size())) { return false; }
     selected_frame_ = n;
     show_selected_frame();
     return true;
@@ -594,8 +559,7 @@ void Debugger::show_selected_frame() {
     auto& stack = interp_.get_trace_stack();
     int idx = static_cast<int>(stack.size()) - 1 - selected_frame_;
     auto [file, row] = selected_file_row();
-    std::cerr << "#" << selected_frame_ << "  "
-              << file << ":" << row << "  " << stack[idx].command << "\n";
+    std::cerr << "#" << selected_frame_ << "  " << file << ":" << row << "  " << stack[idx].command << "\n";
     show_source_context(file, row);
 }
 
@@ -630,12 +594,10 @@ void Debugger::show_source_context(const std::string& file, size_t row) {
 
     std::vector<std::string> lines;
     std::string line;
-    while (std::getline(in, line)) {
-        lines.push_back(line);
-    }
+    while (std::getline(in, line)) { lines.push_back(line); }
 
     // Show +-5 lines around current position (row is 1-based from parser)
-    int center = static_cast<int>(row) - 1;  // Convert to 0-based index
+    int center = static_cast<int>(row) - 1; // Convert to 0-based index
     int start = std::max(0, center - 5);
     int end_idx = std::min(static_cast<int>(lines.size()), center + 6);
 
@@ -652,9 +614,8 @@ void Debugger::show_backtrace() {
         int frame_num = static_cast<int>(stack.size()) - 1 - i;
         const auto& frame = stack[i];
         char marker = (frame_num == selected_frame_) ? '>' : ' ';
-        std::cerr << marker << " #" << frame_num << "  "
-                  << (frame.file ? *frame.file : std::string()) << ":" << frame.row
-                  << "  " << frame.command << "\n";
+        std::cerr << marker << " #" << frame_num << "  " << (frame.file ? *frame.file : std::string()) << ":" << frame.row << "  "
+                  << frame.command << "\n";
     }
 }
 
@@ -670,9 +631,7 @@ void Debugger::show_variables() {
     std::vector<std::pair<std::string, std::string>> sorted(all.begin(), all.end());
     std::sort(sorted.begin(), sorted.end());
 
-    for (const auto& [name, value] : sorted) {
-        std::cerr << name << " = \"" << value << "\"\n";
-    }
+    for (const auto& [name, value] : sorted) { std::cerr << name << " = \"" << value << "\"\n"; }
 }
 
 void Debugger::show_breakpoints() {
@@ -684,15 +643,15 @@ void Debugger::show_breakpoints() {
     for (const auto& bp : breakpoints_) {
         std::cerr << bp.id << ": ";
         switch (bp.type) {
-            case Breakpoint::Type::LOCATION:
-                std::cerr << "break at " << bp.file << ":" << bp.line;
-                break;
-            case Breakpoint::Type::COMMAND:
-                std::cerr << "break on command \"" << bp.command << "\"";
-                break;
-            case Breakpoint::Type::VARIABLE:
-                std::cerr << "watch on variable \"" << bp.variable << "\"";
-                break;
+        case Breakpoint::Type::LOCATION:
+            std::cerr << "break at " << bp.file << ":" << bp.line;
+            break;
+        case Breakpoint::Type::COMMAND:
+            std::cerr << "break on command \"" << bp.command << "\"";
+            break;
+        case Breakpoint::Type::VARIABLE:
+            std::cerr << "watch on variable \"" << bp.variable << "\"";
+            break;
         }
         if (!bp.enabled) std::cerr << " [disabled]";
         std::cerr << "\n";
@@ -707,9 +666,7 @@ DebugController::DebugController(const DebugOptions& opts) : opts_(opts) {
         g_trace_enabled = true;
         g_trace_expand = opts_.trace_expand;
     }
-    if (opts_.debugger || !opts_.break_on_message.empty()) {
-        g_debug_enabled = true;
-    }
+    if (opts_.debugger || !opts_.break_on_message.empty()) { g_debug_enabled = true; }
 }
 
 void DebugController::attach(Interpreter& interp) {
@@ -717,12 +674,8 @@ void DebugController::attach(Interpreter& interp) {
 
     auto dbg = std::make_unique<Debugger>(interp);
     if (opts_.debugger) dbg->set_step_mode();
-    if (!opts_.break_on_message.empty()) {
-        dbg->set_break_on_message(opts_.break_on_message);
-    }
-    if (input_fn_) {
-        dbg->set_input_function(input_fn_);
-    }
+    if (!opts_.break_on_message.empty()) { dbg->set_break_on_message(opts_.break_on_message); }
+    if (input_fn_) { dbg->set_input_function(input_fn_); }
     interp.set_debugger(std::move(dbg));
 }
 

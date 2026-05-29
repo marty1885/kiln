@@ -25,38 +25,38 @@ struct InstallOp {
     std::string kind;
 
     // Common to all ops
-    std::string dest;                          // path relative to install prefix
-    std::string component;                     // empty == "Unspecified"
-    std::vector<std::string> configurations;   // empty == all configs
+    std::string dest;                        // path relative to install prefix
+    std::string component;                   // empty == "Unspecified"
+    std::vector<std::string> configurations; // empty == all configs
     bool exclude_from_all = false;
     bool optional = false;
 
     // copy_file, copy_directory
-    std::string src;                           // absolute source path
+    std::string src; // absolute source path
 
     // copy_file, write_content
-    std::string perms;                         // rwxr-xr-x style, empty == default
+    std::string perms; // rwxr-xr-x style, empty == default
 
     // write_content
     std::string content;
 
     // symlink
-    std::string symlink_target;                // the link target (not relative to prefix)
+    std::string symlink_target; // the link target (not relative to prefix)
 
     // copy_directory
     std::vector<std::string> patterns;
     std::vector<std::string> excludes;
     bool use_source_permissions = false;
-    bool preserve_dir_name = false;            // false: install contents; true: install dir itself
-    std::string file_perms;                    // rwx string, empty == default
-    std::string dir_perms;                     // rwx string, empty == default
+    bool preserve_dir_name = false; // false: install contents; true: install dir itself
+    std::string file_perms;         // rwx string, empty == default
+    std::string dir_perms;          // rwx string, empty == default
 };
 
 struct InstallPlan {
     uint32_t version = INSTALL_PLAN_VERSION;
-    std::string kiln_version;                  // for diagnostics
-    std::string config;                        // build config the plan was made for
-    std::string default_prefix;                // CMAKE_INSTALL_PREFIX at build time
+    std::string kiln_version;   // for diagnostics
+    std::string config;         // build config the plan was made for
+    std::string default_prefix; // CMAKE_INSTALL_PREFIX at build time
     std::vector<InstallOp> ops;
 };
 

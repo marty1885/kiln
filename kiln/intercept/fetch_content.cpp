@@ -18,18 +18,14 @@ namespace fs = std::filesystem;
 // Sets <name>_POPULATED, <name>_SOURCE_DIR, <name>_BINARY_DIR in the interpreter.
 static void do_populate(Interpreter& interp, const std::string& name) {
     std::string lower_name = name;
-    std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), [](unsigned char c) { return std::tolower(c); });
     std::string upper_name = name;
-    std::transform(upper_name.begin(), upper_name.end(), upper_name.begin(),
-                   [](unsigned char c) { return std::toupper(c); });
+    std::transform(upper_name.begin(), upper_name.end(), upper_name.begin(), [](unsigned char c) { return std::toupper(c); });
 
     // Check if already populated
     auto& global_props = interp.get_global_properties();
     std::string populated_key = "_FetchContent_" + lower_name + "_populated";
-    if (global_props.count(populated_key)) {
-        return;
-    }
+    if (global_props.count(populated_key)) { return; }
 
     // Read stored declaration details
     std::string details_key = "_FetchContent_" + lower_name + "_savedDetails";
@@ -45,24 +41,59 @@ static void do_populate(Interpreter& interp, const std::string& name) {
     // assume strict key-value pairs. Instead, collect values per keyword
     // until the next known keyword.
     static const std::unordered_set<std::string> known_keywords = {
-        "URL", "URL_HASH", "URL_MD5",
-        "GIT_REPOSITORY", "GIT_TAG", "GIT_SHALLOW", "GIT_CONFIG",
-        "GIT_REMOTE_NAME", "GIT_SUBMODULES", "GIT_SUBMODULES_RECURSE", "GIT_PROGRESS",
-        "SOURCE_DIR", "BINARY_DIR", "SOURCE_SUBDIR",
-        "PATCH_COMMAND", "UPDATE_COMMAND", "CONFIGURE_COMMAND",
-        "BUILD_COMMAND", "INSTALL_COMMAND", "TEST_COMMAND", "DOWNLOAD_COMMAND",
-        "CMAKE_ARGS", "CMAKE_CACHE_ARGS",
-        "DOWNLOAD_NO_EXTRACT", "DOWNLOAD_EXTRACT_TIMESTAMP",
-        "FIND_PACKAGE_ARGS", "OVERRIDE_FIND_PACKAGE",
-        "HTTPHEADER", "HTTP_HEADER", "TIMEOUT",
-        "PREFIX", "TMP_DIR", "STAMP_DIR", "DOWNLOAD_DIR",
-        "LOG_DOWNLOAD", "LOG_CONFIGURE", "LOG_BUILD", "LOG_INSTALL",
-        "LOG_UPDATE", "LOG_PATCH", "LOG_TEST",
-        "LOG_MERGED_STDOUTERR", "LOG_OUTPUT_ON_FAILURE",
-        "USES_TERMINAL_DOWNLOAD", "USES_TERMINAL_CONFIGURE",
-        "USES_TERMINAL_BUILD", "USES_TERMINAL_INSTALL",
-        "BUILD_IN_SOURCE", "EXCLUDE_FROM_ALL", "BUILD_ALWAYS",
-        "DEPENDS", "BUILD_BYPRODUCTS", "LIST_SEPARATOR",
+        "URL",
+        "URL_HASH",
+        "URL_MD5",
+        "GIT_REPOSITORY",
+        "GIT_TAG",
+        "GIT_SHALLOW",
+        "GIT_CONFIG",
+        "GIT_REMOTE_NAME",
+        "GIT_SUBMODULES",
+        "GIT_SUBMODULES_RECURSE",
+        "GIT_PROGRESS",
+        "SOURCE_DIR",
+        "BINARY_DIR",
+        "SOURCE_SUBDIR",
+        "PATCH_COMMAND",
+        "UPDATE_COMMAND",
+        "CONFIGURE_COMMAND",
+        "BUILD_COMMAND",
+        "INSTALL_COMMAND",
+        "TEST_COMMAND",
+        "DOWNLOAD_COMMAND",
+        "CMAKE_ARGS",
+        "CMAKE_CACHE_ARGS",
+        "DOWNLOAD_NO_EXTRACT",
+        "DOWNLOAD_EXTRACT_TIMESTAMP",
+        "FIND_PACKAGE_ARGS",
+        "OVERRIDE_FIND_PACKAGE",
+        "HTTPHEADER",
+        "HTTP_HEADER",
+        "TIMEOUT",
+        "PREFIX",
+        "TMP_DIR",
+        "STAMP_DIR",
+        "DOWNLOAD_DIR",
+        "LOG_DOWNLOAD",
+        "LOG_CONFIGURE",
+        "LOG_BUILD",
+        "LOG_INSTALL",
+        "LOG_UPDATE",
+        "LOG_PATCH",
+        "LOG_TEST",
+        "LOG_MERGED_STDOUTERR",
+        "LOG_OUTPUT_ON_FAILURE",
+        "USES_TERMINAL_DOWNLOAD",
+        "USES_TERMINAL_CONFIGURE",
+        "USES_TERMINAL_BUILD",
+        "USES_TERMINAL_INSTALL",
+        "BUILD_IN_SOURCE",
+        "EXCLUDE_FROM_ALL",
+        "BUILD_ALWAYS",
+        "DEPENDS",
+        "BUILD_BYPRODUCTS",
+        "LIST_SEPARATOR",
     };
 
     std::vector<std::string> detail_parts;
@@ -83,9 +114,7 @@ static void do_populate(Interpreter& interp, const std::string& name) {
     for (const auto& part : detail_parts) {
         if (known_keywords.count(part)) {
             current_key = part;
-            if (!detail_map.count(current_key)) {
-                detail_map[current_key] = {};
-            }
+            if (!detail_map.count(current_key)) { detail_map[current_key] = {}; }
         } else if (!current_key.empty()) {
             detail_map[current_key].push_back(part);
         }
@@ -93,22 +122,16 @@ static void do_populate(Interpreter& interp, const std::string& name) {
 
     auto get_detail = [&](const std::string& key) -> std::string {
         auto map_it = detail_map.find(key);
-        if (map_it != detail_map.end() && !map_it->second.empty()) {
-            return map_it->second[0];
-        }
+        if (map_it != detail_map.end() && !map_it->second.empty()) { return map_it->second[0]; }
         return "";
     };
 
-    auto get_detail_flag = [&](const std::string& key) -> bool {
-        return detail_map.count(key) > 0;
-    };
+    auto get_detail_flag = [&](const std::string& key) -> bool { return detail_map.count(key) > 0; };
 
     // Get all values for a keyword, joined with spaces (for shell commands)
     auto get_detail_command = [&](const std::string& key) -> std::string {
         auto map_it = detail_map.find(key);
-        if (map_it == detail_map.end() || map_it->second.empty()) {
-            return "";
-        }
+        if (map_it == detail_map.end() || map_it->second.empty()) { return ""; }
         std::string result;
         for (const auto& v : map_it->second) {
             if (!result.empty()) result += ' ';
@@ -134,24 +157,22 @@ static void do_populate(Interpreter& interp, const std::string& name) {
     } else {
         // Use shared source dir under build root
         if (build_root.empty()) {
-            build_root = binary_base;  // Fallback
+            build_root = binary_base; // Fallback
         }
     }
 
     std::string source_dir = get_detail("SOURCE_DIR");
     if (source_dir.empty()) {
         // If FETCHCONTENT_BASE_DIR is set, it already points to the _deps directory
-        fs::path src_path = use_base_dir_directly
-            ? fs::path(build_root) / (lower_name + "-src")
-            : fs::path(build_root) / "_deps" / (lower_name + "-src");
+        fs::path src_path =
+            use_base_dir_directly ? fs::path(build_root) / (lower_name + "-src") : fs::path(build_root) / "_deps" / (lower_name + "-src");
         source_dir = src_path.string();
     }
 
     std::string binary_dir = get_detail("BINARY_DIR");
     if (binary_dir.empty()) {
-        fs::path bin_path = use_base_dir_directly
-            ? fs::path(binary_base) / (lower_name + "-build")
-            : fs::path(binary_base) / "_deps" / (lower_name + "-build");
+        fs::path bin_path = use_base_dir_directly ? fs::path(binary_base) / (lower_name + "-build")
+                                                  : fs::path(binary_base) / "_deps" / (lower_name + "-build");
         binary_dir = bin_path.string();
     }
 
@@ -177,8 +198,7 @@ static void do_populate(Interpreter& interp, const std::string& name) {
                 if (eq_pos != std::string::npos) {
                     hash_algo = url_hash.substr(0, eq_pos);
                     hash_value = url_hash.substr(eq_pos + 1);
-                    std::transform(hash_algo.begin(), hash_algo.end(), hash_algo.begin(),
-                                   [](unsigned char c) { return std::toupper(c); });
+                    std::transform(hash_algo.begin(), hash_algo.end(), hash_algo.begin(), [](unsigned char c) { return std::toupper(c); });
                 }
             } else if (!url_md5.empty()) {
                 hash_algo = "MD5";
@@ -222,9 +242,7 @@ static void do_populate(Interpreter& interp, const std::string& name) {
 
             // Handle single top-level directory (common for tarballs)
             std::vector<std::filesystem::directory_entry> entries;
-            for (const auto& e : std::filesystem::directory_iterator(source_dir)) {
-                entries.push_back(e);
-            }
+            for (const auto& e : std::filesystem::directory_iterator(source_dir)) { entries.push_back(e); }
             if (entries.size() == 1 && entries[0].is_directory()) {
                 std::string top_dir = entries[0].path().string();
                 std::string temp_dir = source_dir + ".__tmp_move";
@@ -268,9 +286,7 @@ static void do_populate(Interpreter& interp, const std::string& name) {
                         current_cmd += token;
                     }
                 }
-                if (!current_cmd.empty()) {
-                    commands.push_back(std::move(current_cmd));
-                }
+                if (!current_cmd.empty()) { commands.push_back(std::move(current_cmd)); }
 
                 for (const auto& cmd : commands) {
                     auto result = run_command(cmd, source_dir);
@@ -304,7 +320,7 @@ static void add_subdirectory_for_dep(Interpreter& interp, const std::string& sou
     std::filesystem::path cmake_file = std::filesystem::path(source_dir) / "CMakeLists.txt";
 
     if (!std::filesystem::exists(cmake_file)) {
-        return;  // No CMakeLists.txt, nothing to add
+        return; // No CMakeLists.txt, nothing to add
     }
 
     std::ifstream file(cmake_file);
@@ -347,8 +363,7 @@ static void add_subdirectory_for_dep(Interpreter& interp, const std::string& sou
             }
         } else {
             interp.set_fatal_error(InterpreterError{
-                cmake_file.string(), ast.error().row, ast.error().col,
-                ast.error().offset, ast.error().length, ast.error().reason, {}});
+                cmake_file.string(), ast.error().row, ast.error().col, ast.error().offset, ast.error().length, ast.error().reason, {}});
         }
     }
 
@@ -369,25 +384,18 @@ void register_fetch_content_builtins(Interpreter& interp) {
         // This must happen before args are processed since they may reference this variable
         if (interp.get_variable("FETCHCONTENT_BASE_DIR").empty()) {
             std::string build_root = interp.get_variable("KILN_BUILD_ROOT");
-            if (build_root.empty()) {
-                build_root = interp.get_variable("CMAKE_BINARY_DIR");
-            }
-            if (!build_root.empty()) {
-                interp.set_cache_variable("FETCHCONTENT_BASE_DIR", build_root + "/_deps");
-            }
+            if (build_root.empty()) { build_root = interp.get_variable("CMAKE_BINARY_DIR"); }
+            if (!build_root.empty()) { interp.set_cache_variable("FETCHCONTENT_BASE_DIR", build_root + "/_deps"); }
         }
 
         std::string name = args[0];
         std::string lower_name = name;
-        std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+        std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), [](unsigned char c) { return std::tolower(c); });
 
         // First-to-declare wins
         std::string details_key = "_FetchContent_" + lower_name + "_savedDetails";
         auto& global_props = interp.get_global_properties();
-        if (global_props.count(details_key)) {
-            return;
-        }
+        if (global_props.count(details_key)) { return; }
 
         // Store all remaining args as semicolon-separated pairs
         // We store them as: KEY1;VALUE1;KEY2;VALUE2;...
@@ -474,9 +482,7 @@ void register_fetch_content_builtins(Interpreter& interp) {
                     size_t start = pos + 14; // length of "SOURCE_SUBDIR;"
                     size_t end = details.find(';', start);
                     std::string subdir(details.substr(start, end == std::string_view::npos ? std::string_view::npos : end - start));
-                    if (!subdir.empty()) {
-                        source_dir = (fs::path(source_dir) / subdir).string();
-                    }
+                    if (!subdir.empty()) { source_dir = (fs::path(source_dir) / subdir).string(); }
                 }
             }
 
@@ -493,17 +499,19 @@ void register_fetch_content_builtins(Interpreter& interp) {
 
         std::string name = args[0];
         std::string lower_name = name;
-        std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+        std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), [](unsigned char c) { return std::tolower(c); });
 
         auto& global_props = interp.get_global_properties();
 
         // Parse optional keyword arguments
         std::string populated_var, source_dir_var, binary_dir_var;
         for (size_t i = 1; i + 1 < args.size(); i += 2) {
-            if (args[i] == "POPULATED") populated_var = args[i + 1];
-            else if (args[i] == "SOURCE_DIR") source_dir_var = args[i + 1];
-            else if (args[i] == "BINARY_DIR") binary_dir_var = args[i + 1];
+            if (args[i] == "POPULATED")
+                populated_var = args[i + 1];
+            else if (args[i] == "SOURCE_DIR")
+                source_dir_var = args[i + 1];
+            else if (args[i] == "BINARY_DIR")
+                binary_dir_var = args[i + 1];
         }
 
         // If no keyword args, use default variable names
@@ -516,10 +524,8 @@ void register_fetch_content_builtins(Interpreter& interp) {
             if (is_populated) {
                 auto src_it = global_props.find("_FetchContent_" + lower_name + "_sourceDir");
                 auto bin_it = global_props.find("_FetchContent_" + lower_name + "_binaryDir");
-                if (src_it != global_props.end())
-                    interp.set_variable(lower_name + "_SOURCE_DIR", src_it->second);
-                if (bin_it != global_props.end())
-                    interp.set_variable(lower_name + "_BINARY_DIR", bin_it->second);
+                if (src_it != global_props.end()) interp.set_variable(lower_name + "_SOURCE_DIR", src_it->second);
+                if (bin_it != global_props.end()) interp.set_variable(lower_name + "_BINARY_DIR", bin_it->second);
             }
         } else {
             if (!populated_var.empty()) {
@@ -547,8 +553,7 @@ void register_fetch_content_builtins(Interpreter& interp) {
 
         std::string name = args[0];
         std::string lower_name = name;
-        std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+        std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), [](unsigned char c) { return std::tolower(c); });
 
         auto& global_props = interp.get_global_properties();
         global_props["_FetchContent_" + lower_name + "_populated"] = "TRUE";

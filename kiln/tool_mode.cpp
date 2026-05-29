@@ -55,9 +55,7 @@ int exec_command(const std::vector<std::string>& cmd, const std::string& working
         signal(SIGTERM, SIG_DFL);
         signal(SIGHUP, SIG_DFL);
         if (!working_dir.empty()) {
-            if (chdir(working_dir.c_str()) != 0) {
-                _exit(127);
-            }
+            if (chdir(working_dir.c_str()) != 0) { _exit(127); }
         }
         std::vector<char*> argv;
         for (auto& s : cmd) argv.push_back(const_cast<char*>(s.c_str()));
@@ -77,9 +75,7 @@ int exec_command(const std::vector<std::string>& cmd, const std::string& working
 bool copy_file_impl(const fs::path& src, const fs::path& dst) {
     std::error_code ec;
     auto actual_dst = dst;
-    if (fs::is_directory(dst)) {
-        actual_dst = dst / src.filename();
-    }
+    if (fs::is_directory(dst)) { actual_dst = dst / src.filename(); }
     fs::copy_file(src, actual_dst, fs::copy_options::overwrite_existing, ec);
     if (ec) {
         std::cerr << "Error: Failed to copy " << src << " to " << actual_dst << ": " << ec.message() << std::endl;
@@ -124,9 +120,7 @@ int cmd_remove_directory(Args args) {
     for (auto& a : args) {
         std::error_code ec;
         fs::remove_all(a, ec);
-        if (ec) {
-            std::cerr << "Error: Failed to remove directory " << a << ": " << ec.message() << std::endl;
-        }
+        if (ec) { std::cerr << "Error: Failed to remove directory " << a << ": " << ec.message() << std::endl; }
     }
     return 0;
 }
@@ -212,8 +206,8 @@ int cmd_copy_if_different(Args args) {
         if (fs::exists(dst_path) && fs::file_size(src_path) == fs::file_size(dst_path)) {
             std::ifstream f1(src_path, std::ios::binary);
             std::ifstream f2(dst_path, std::ios::binary);
-            if (std::equal(std::istreambuf_iterator<char>(f1), std::istreambuf_iterator<char>(),
-                           std::istreambuf_iterator<char>(f2), std::istreambuf_iterator<char>())) {
+            if (std::equal(std::istreambuf_iterator<char>(f1), std::istreambuf_iterator<char>(), std::istreambuf_iterator<char>(f2),
+                           std::istreambuf_iterator<char>())) {
                 continue;
             }
         }
@@ -282,8 +276,14 @@ int cmd_cat(Args args) {
 int cmd_compare_files(bool ignore_eol, const std::string& f1_path, const std::string& f2_path) {
     std::ifstream f1(f1_path, std::ios::binary);
     std::ifstream f2(f2_path, std::ios::binary);
-    if (!f1) { std::cerr << "Error: Cannot open " << f1_path << std::endl; return 1; }
-    if (!f2) { std::cerr << "Error: Cannot open " << f2_path << std::endl; return 1; }
+    if (!f1) {
+        std::cerr << "Error: Cannot open " << f1_path << std::endl;
+        return 1;
+    }
+    if (!f2) {
+        std::cerr << "Error: Cannot open " << f2_path << std::endl;
+        return 1;
+    }
 
     if (ignore_eol) {
         std::string line1, line2;
@@ -298,8 +298,8 @@ int cmd_compare_files(bool ignore_eol, const std::string& f1_path, const std::st
         }
     }
 
-    if (std::equal(std::istreambuf_iterator<char>(f1), std::istreambuf_iterator<char>(),
-                   std::istreambuf_iterator<char>(f2), std::istreambuf_iterator<char>())) {
+    if (std::equal(std::istreambuf_iterator<char>(f1), std::istreambuf_iterator<char>(), std::istreambuf_iterator<char>(f2),
+                   std::istreambuf_iterator<char>())) {
         return 0;
     }
     return 1;
@@ -319,7 +319,10 @@ int cmd_env(const std::vector<std::string>& unsets, Args rest) {
     std::vector<std::pair<std::string, std::string>> sets;
     size_t i = 0;
     for (; i < rest.size(); ++i) {
-        if (rest[i] == "--") { ++i; break; }
+        if (rest[i] == "--") {
+            ++i;
+            break;
+        }
         auto eq = rest[i].find('=');
         if (eq != std::string::npos && eq > 0) {
             sets.emplace_back(rest[i].substr(0, eq), rest[i].substr(eq + 1));
@@ -347,8 +350,7 @@ int cmd_env(const std::vector<std::string>& unsets, Args rest) {
         for (auto& name : unsets) unsetenv(name.c_str());
         for (auto& [name, val] : sets) setenv(name.c_str(), val.c_str(), 1);
         std::vector<char*> argv;
-        for (size_t j = i; j < rest.size(); ++j)
-            argv.push_back(const_cast<char*>(rest[j].c_str()));
+        for (size_t j = i; j < rest.size(); ++j) argv.push_back(const_cast<char*>(rest[j].c_str()));
         argv.push_back(nullptr);
         execvp(argv[0], argv.data());
         _exit(127);
@@ -363,9 +365,7 @@ int cmd_env(const std::vector<std::string>& unsets, Args rest) {
 }
 
 int cmd_environment() {
-    for (char** env = get_environ_ptr(); *env; ++env) {
-        std::cout << *env << '\n';
-    }
+    for (char** env = get_environ_ptr(); *env; ++env) { std::cout << *env << '\n'; }
     return 0;
 }
 
@@ -379,9 +379,7 @@ int cmd_sleep(Args args) {
         }
         total += *v;
     }
-    if (total > 0) {
-        std::this_thread::sleep_for(std::chrono::duration<double>(total));
-    }
+    if (total > 0) { std::this_thread::sleep_for(std::chrono::duration<double>(total)); }
     return 0;
 }
 
@@ -431,15 +429,15 @@ int cmd_rm(bool recursive, bool force, Args paths) {
 }
 
 int cmd_tar(const std::string& flags, const std::string& archive_path, Args files) {
-    bool create  = flags.find('c') != std::string::npos;
+    bool create = flags.find('c') != std::string::npos;
     bool extract = flags.find('x') != std::string::npos;
-    bool list    = flags.find('t') != std::string::npos;
+    bool list = flags.find('t') != std::string::npos;
     bool verbose = flags.find('v') != std::string::npos;
-    bool gzip    = flags.find('z') != std::string::npos;
-    bool bzip2   = flags.find('j') != std::string::npos;
-    bool xz      = flags.find('J') != std::string::npos;
+    bool gzip = flags.find('z') != std::string::npos;
+    bool bzip2 = flags.find('j') != std::string::npos;
+    bool xz = flags.find('J') != std::string::npos;
 
-    int mode_count = (int)create + (int)extract + (int)list;
+    int mode_count = (int) create + (int) extract + (int) list;
     if (mode_count != 1) {
         std::cerr << "Error: tar requires exactly one of c, x, or t in the flag string" << std::endl;
         return 1;
@@ -465,9 +463,7 @@ int cmd_tar(const std::string& flags, const std::string& archive_path, Args file
 
         struct archive_entry* entry;
         while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
-            if (verbose || list) {
-                std::cout << archive_entry_pathname(entry) << std::endl;
-            }
+            if (verbose || list) { std::cout << archive_entry_pathname(entry) << std::endl; }
             if (extract) {
                 int r = archive_write_header(ext, entry);
                 if (r != ARCHIVE_OK) {
@@ -497,10 +493,14 @@ int cmd_tar(const std::string& flags, const std::string& archive_path, Args file
 
     // create mode
     struct archive* a = archive_write_new();
-    if (gzip) archive_write_add_filter_gzip(a);
-    else if (bzip2) archive_write_add_filter_bzip2(a);
-    else if (xz) archive_write_add_filter_xz(a);
-    else archive_write_add_filter_none(a);
+    if (gzip)
+        archive_write_add_filter_gzip(a);
+    else if (bzip2)
+        archive_write_add_filter_bzip2(a);
+    else if (xz)
+        archive_write_add_filter_xz(a);
+    else
+        archive_write_add_filter_none(a);
     archive_write_set_format_pax_restricted(a);
 
     if (archive_write_open_filename(a, archive_path.c_str()) != ARCHIVE_OK) {
@@ -517,17 +517,13 @@ int cmd_tar(const std::string& flags, const std::string& archive_path, Args file
         struct archive_entry* entry;
         while (archive_read_next_header2(disk, entry = archive_entry_new()) == ARCHIVE_OK) {
             archive_read_disk_descend(disk);
-            if (verbose) {
-                std::cout << archive_entry_pathname(entry) << std::endl;
-            }
+            if (verbose) { std::cout << archive_entry_pathname(entry) << std::endl; }
             archive_write_header(a, entry);
             int fd = open(archive_entry_sourcepath(entry), O_RDONLY);
             if (fd >= 0) {
                 char buff[16384];
                 ssize_t len;
-                while ((len = read(fd, buff, sizeof(buff))) > 0) {
-                    archive_write_data(a, buff, len);
-                }
+                while ((len = read(fd, buff, sizeof(buff))) > 0) { archive_write_data(a, buff, len); }
                 close(fd);
             }
             archive_entry_free(entry);
@@ -583,94 +579,88 @@ struct ToolOpts {
 void register_tool_subcommands(CLI::App* tool, int& rc) {
     static ToolOpts o;
 
-    auto add = [&](const char* name, const char* desc) {
-        return tool->add_subcommand(name, desc);
-    };
+    auto add = [&](const char* name, const char* desc) { return tool->add_subcommand(name, desc); };
 
     CLI::App* c = nullptr;
 
     c = add("echo", "Display arguments as text, separated by spaces, with a trailing newline");
     c->add_option("strings", o.echo_args, "Strings to print");
-    c->callback([&]{ rc = cmd_echo(o.echo_args, /*newline=*/true); });
+    c->callback([&] { rc = cmd_echo(o.echo_args, /*newline=*/true); });
 
     c = add("echo_append", "Display arguments as text without a trailing newline");
     c->add_option("strings", o.echo_append_args, "Strings to print");
-    c->callback([&]{ rc = cmd_echo(o.echo_append_args, /*newline=*/false); });
+    c->callback([&] { rc = cmd_echo(o.echo_append_args, /*newline=*/false); });
 
     c = add("touch", "Create files if missing and update their modification time");
     c->add_option("files", o.touch_files, "Files to touch")->required();
-    c->callback([&]{ rc = cmd_touch(o.touch_files, /*nocreate=*/false); });
+    c->callback([&] { rc = cmd_touch(o.touch_files, /*nocreate=*/false); });
 
     c = add("touch_nocreate", "Update modification time of existing files; do not create");
     c->add_option("files", o.touch_nocreate_files, "Files to touch if they exist")->required();
-    c->callback([&]{ rc = cmd_touch(o.touch_nocreate_files, /*nocreate=*/true); });
+    c->callback([&] { rc = cmd_touch(o.touch_nocreate_files, /*nocreate=*/true); });
 
     c = add("remove", "Remove the given files (deprecated: use rm)");
     c->add_flag("-f", o.remove_force, "Continue and exit 0 even if files do not exist");
     c->add_option("files", o.remove_files, "Files to remove")->required();
-    c->callback([&]{ rc = cmd_remove_paths(o.remove_files, o.remove_force); });
+    c->callback([&] { rc = cmd_remove_paths(o.remove_files, o.remove_force); });
 
     c = add("remove_directory", "Remove directories and their contents (deprecated: use rm -r)");
     c->add_option("dirs", o.remove_directory_dirs, "Directories to remove")->required();
-    c->callback([&]{ rc = cmd_remove_directory(o.remove_directory_dirs); });
+    c->callback([&] { rc = cmd_remove_directory(o.remove_directory_dirs); });
 
     c = add("make_directory", "Create directories, including parents as needed");
     c->add_option("dirs", o.make_directory_dirs, "Directories to create")->required();
-    c->callback([&]{ rc = cmd_make_directory(o.make_directory_dirs); });
+    c->callback([&] { rc = cmd_make_directory(o.make_directory_dirs); });
 
     c = add("create_symlink", "Create a symbolic link new -> old");
     c->add_option("old", o.symlink_old, "Existing target path the link points at")->required();
     c->add_option("new", o.symlink_new, "Path of the new symlink to create")->required();
-    c->callback([&]{ rc = cmd_create_symlink(o.symlink_old, o.symlink_new); });
+    c->callback([&] { rc = cmd_create_symlink(o.symlink_old, o.symlink_new); });
 
     c = add("create_hardlink", "Create a hard link new -> old");
     c->add_option("old", o.hardlink_old, "Existing file to link to")->required();
     c->add_option("new", o.hardlink_new, "Path of the new hard link to create")->required();
-    c->callback([&]{ rc = cmd_create_hardlink(o.hardlink_old, o.hardlink_new); });
+    c->callback([&] { rc = cmd_create_hardlink(o.hardlink_old, o.hardlink_new); });
 
     c = add("rename", "Rename a file or directory on a single volume");
     c->add_option("oldname", o.rename_old, "Existing path")->required();
     c->add_option("newname", o.rename_new, "New path")->required();
-    c->callback([&]{ rc = cmd_rename(o.rename_old, o.rename_new); });
+    c->callback([&] { rc = cmd_rename(o.rename_old, o.rename_new); });
 
     // copy family. Each takes a single variadic positional list where the
     // last element is the destination — same convention CMake uses. Accepting
     // it as one vector keeps the parser simple; the cmd_* body splits it.
-    auto add_copy = [&](const char* name, const char* desc,
-                        std::vector<std::string>& store, int (*fn)(Args)) {
+    auto add_copy = [&](const char* name, const char* desc, std::vector<std::string>& store, int (*fn)(Args)) {
         c = add(name, desc);
         c->add_option("paths", store, "<source>... <destination>")->required();
-        c->callback([&store, fn, &rc]{ rc = fn(store); });
+        c->callback([&store, fn, &rc] { rc = fn(store); });
     };
-    add_copy("copy", "Copy files to a destination (file or directory)",
-             o.copy_args, cmd_copy);
-    add_copy("copy_if_different", "Copy files only if their contents differ from destination",
-             o.copy_if_different_args, cmd_copy_if_different);
-    add_copy("copy_if_newer", "Copy files only if the source is newer than destination",
-             o.copy_if_newer_args, cmd_copy_if_newer);
-    add_copy("copy_directory", "Recursively copy directory contents into destination",
-             o.copy_directory_args, cmd_copy_directory);
-    add_copy("copy_directory_if_different", "Recursively copy directory contents (changed files only)",
-             o.copy_directory_if_different_args, cmd_copy_directory);
-    add_copy("copy_directory_if_newer", "Recursively copy directory contents (newer files only)",
-             o.copy_directory_if_newer_args, cmd_copy_directory);
+    add_copy("copy", "Copy files to a destination (file or directory)", o.copy_args, cmd_copy);
+    add_copy("copy_if_different", "Copy files only if their contents differ from destination", o.copy_if_different_args,
+             cmd_copy_if_different);
+    add_copy("copy_if_newer", "Copy files only if the source is newer than destination", o.copy_if_newer_args, cmd_copy_if_newer);
+    add_copy("copy_directory", "Recursively copy directory contents into destination", o.copy_directory_args, cmd_copy_directory);
+    add_copy("copy_directory_if_different", "Recursively copy directory contents (changed files only)", o.copy_directory_if_different_args,
+             cmd_copy_directory);
+    add_copy("copy_directory_if_newer", "Recursively copy directory contents (newer files only)", o.copy_directory_if_newer_args,
+             cmd_copy_directory);
 
     c = add("cat", "Concatenate files and print to standard output");
     c->add_option("files", o.cat_files, "Files to concatenate")->required();
-    c->callback([&]{ rc = cmd_cat(o.cat_files); });
+    c->callback([&] { rc = cmd_cat(o.cat_files); });
 
     c = add("compare_files", "Check whether two files have identical contents (exit 0 if equal)");
     c->add_flag("--ignore-eol", o.compare_ignore_eol, "Compare line-by-line, ignoring line-ending differences");
     c->add_option("file1", o.compare_f1, "First file")->required();
     c->add_option("file2", o.compare_f2, "Second file")->required();
-    c->callback([&]{ rc = cmd_compare_files(o.compare_ignore_eol, o.compare_f1, o.compare_f2); });
+    c->callback([&] { rc = cmd_compare_files(o.compare_ignore_eol, o.compare_f1, o.compare_f2); });
 
     // chdir / env / time use prefix_command so the trailing argv is forwarded
     // verbatim to exec. Each captures its own subcommand pointer by value so
     // later reassignment of `c` doesn't disturb the lambda.
     c = add("chdir", "Run a command in a given working directory");
     c->prefix_command();
-    c->callback([&, sub = c]{
+    c->callback([&, sub = c] {
         auto rest = sub->remaining();
         if (rest.empty()) {
             std::cerr << "Error: chdir requires a directory and command" << std::endl;
@@ -687,21 +677,21 @@ void register_tool_subcommands(CLI::App* tool, int& rc) {
     c = add("env", "Run a command with a modified environment");
     c->prefix_command();
     c->add_option("--unset", o.env_unsets, "Environment variable to unset (repeatable)");
-    c->callback([&, sub = c]{
+    c->callback([&, sub = c] {
         auto rest = sub->remaining();
         rc = cmd_env(o.env_unsets, rest);
     });
 
     c = add("environment", "Print the current environment, one variable per line");
-    c->callback([&]{ rc = cmd_environment(); });
+    c->callback([&] { rc = cmd_environment(); });
 
     c = add("sleep", "Sleep for the given number of seconds (sum of all arguments)");
     c->add_option("seconds", o.sleep_durations, "Durations to sleep, summed")->required();
-    c->callback([&]{ rc = cmd_sleep(o.sleep_durations); });
+    c->callback([&] { rc = cmd_sleep(o.sleep_durations); });
 
     c = add("time", "Run a command and report elapsed wall-clock time");
     c->prefix_command();
-    c->callback([&, sub = c]{
+    c->callback([&, sub = c] {
         auto rest = sub->remaining();
         rc = cmd_time(rest);
     });
@@ -710,7 +700,7 @@ void register_tool_subcommands(CLI::App* tool, int& rc) {
     c->add_flag("-r,-R", o.rm_recursive, "Recurse into directories");
     c->add_flag("-f", o.rm_force, "Ignore missing files; never error");
     c->add_option("paths", o.rm_paths, "Files or directories to remove");
-    c->callback([&]{ rc = cmd_rm(o.rm_recursive, o.rm_force, o.rm_paths); });
+    c->callback([&] { rc = cmd_rm(o.rm_recursive, o.rm_force, o.rm_paths); });
 
     // tar — the [cxt][vf][zjJ] flag glob isn't a normal option set, so it
     // stays a positional that we parse character-by-character ourselves.
@@ -718,19 +708,19 @@ void register_tool_subcommands(CLI::App* tool, int& rc) {
     c->add_option("flags", o.tar_flags, "Mode flags: c=create, x=extract, t=list; v=verbose; z=gzip, j=bzip2, J=xz")->required();
     c->add_option("archive", o.tar_archive, "Archive file path")->required();
     c->add_option("files", o.tar_files, "Files or directories (for create mode)");
-    c->callback([&]{ rc = cmd_tar(o.tar_flags, o.tar_archive, o.tar_files); });
+    c->callback([&] { rc = cmd_tar(o.tar_flags, o.tar_archive, o.tar_files); });
 
     c = add("capabilities", "Report cmake-compatible capabilities as JSON");
-    c->callback([&]{
+    c->callback([&] {
         std::cout << "{}" << std::endl;
         rc = 0;
     });
 
     c = add("true", "Do nothing and exit with status 0");
-    c->callback([&]{ rc = 0; });
+    c->callback([&] { rc = 0; });
 
     c = add("false", "Do nothing and exit with status 1");
-    c->callback([&]{ rc = 1; });
+    c->callback([&] { rc = 1; });
 }
 
 } // namespace kiln

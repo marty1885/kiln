@@ -27,9 +27,7 @@ static std::optional<PropertyScope> parse_property_scope(const std::string& scop
 // Helper to get target by name (used in multiple places)
 static Target* get_target_from_name(Interpreter& interp, const std::string& name, const std::string& cmd_name) {
     auto* target = interp.find_target(name);
-    if (!target) {
-        interp.set_fatal_error(cmd_name + "() called on unknown target '" + name + "'");
-    }
+    if (!target) { interp.set_fatal_error(cmd_name + "() called on unknown target '" + name + "'"); }
     return target;
 }
 
@@ -37,22 +35,17 @@ static Target* get_target_from_name(Interpreter& interp, const std::string& name
 static TestDefinition* get_test_from_name(Interpreter& interp, const std::string& name) {
     auto& tests = interp.get_tests();
     for (auto& test : tests) {
-        if (test.name == name) {
-            return &test;
-        }
+        if (test.name == name) { return &test; }
     }
     return nullptr;
 }
 
 // Helper to resolve source file path to absolute
-static std::string resolve_source_path(Interpreter& interp, const std::string& source,
-                                       const std::string* opt_directory,
+static std::string resolve_source_path(Interpreter& interp, const std::string& source, const std::string* opt_directory,
                                        const std::string* opt_target_directory) {
     std::filesystem::path source_path(source);
 
-    if (source_path.is_absolute()) {
-        return source_path.string();
-    }
+    if (source_path.is_absolute()) { return source_path.string(); }
 
     // Determine the base directory
     std::string base_dir;
@@ -103,9 +96,7 @@ void register_property_builtins(Interpreter& interp) {
             std::vector<std::string> names;
             for (const auto& [name, value] : cache_vars) {
                 // Skip internal property storage keys
-                if (name.find(".__property__.") == std::string::npos) {
-                    names.push_back(name);
-                }
+                if (name.find(".__property__.") == std::string::npos) { names.push_back(name); }
             }
             std::sort(names.begin(), names.end());
             for (size_t i = 0; i < names.size(); ++i) {
@@ -117,24 +108,18 @@ void register_property_builtins(Interpreter& interp) {
             std::set<std::string> components;
             for (const auto& rule : interp.get_install_rules()) {
                 if (rule->targets_rule) {
-                    if (!rule->targets_rule->archive_dest.component.empty())
-                        components.insert(rule->targets_rule->archive_dest.component);
-                    if (!rule->targets_rule->library_dest.component.empty())
-                        components.insert(rule->targets_rule->library_dest.component);
-                    if (!rule->targets_rule->runtime_dest.component.empty())
-                        components.insert(rule->targets_rule->runtime_dest.component);
+                    if (!rule->targets_rule->archive_dest.component.empty()) components.insert(rule->targets_rule->archive_dest.component);
+                    if (!rule->targets_rule->library_dest.component.empty()) components.insert(rule->targets_rule->library_dest.component);
+                    if (!rule->targets_rule->runtime_dest.component.empty()) components.insert(rule->targets_rule->runtime_dest.component);
                 }
                 if (rule->files_rule) {
-                    if (!rule->files_rule->destination.component.empty())
-                        components.insert(rule->files_rule->destination.component);
+                    if (!rule->files_rule->destination.component.empty()) components.insert(rule->files_rule->destination.component);
                 }
                 if (rule->script_rule) {
-                    if (!rule->script_rule->component.empty())
-                        components.insert(rule->script_rule->component);
+                    if (!rule->script_rule->component.empty()) components.insert(rule->script_rule->component);
                 }
                 if (rule->export_rule) {
-                    if (!rule->export_rule->component.empty())
-                        components.insert(rule->export_rule->component);
+                    if (!rule->export_rule->component.empty()) components.insert(rule->export_rule->component);
                 }
             }
             result = join(components, ";");
@@ -265,17 +250,13 @@ void register_property_builtins(Interpreter& interp) {
 
         std::string property_name = args[property_idx + 1];
         std::vector<std::string> property_values;
-        for (size_t i = property_idx + 2; i < args.size(); ++i) {
-            property_values.push_back(args[i]);
-        }
+        for (size_t i = property_idx + 2; i < args.size(); ++i) { property_values.push_back(args[i]); }
 
         // Build the value string
         std::string value;
         if (append_string) {
             // APPEND_STRING: concatenate as single string
-            for (const auto& v : property_values) {
-                value += v;
-            }
+            for (const auto& v : property_values) { value += v; }
         } else {
             // Regular or APPEND: semicolon-separated list
             for (size_t i = 0; i < property_values.size(); ++i) {
@@ -290,352 +271,337 @@ void register_property_builtins(Interpreter& interp) {
         auto& cache_variables = interp.get_cache_variables();
 
         switch (scope) {
-            case PropertyScope::GLOBAL: {
-                if (!items.empty()) {
-                    interp.set_fatal_error("set_property(GLOBAL ...) does not accept item names");
-                    return;
-                }
-                // Read-only global properties
-                if (property_name == "GENERATOR_IS_MULTI_CONFIG") {
-                    interp.set_fatal_error("set_property: GENERATOR_IS_MULTI_CONFIG is a read-only property");
-                    return;
-                }
-                if (append || append_string) {
-                    std::string old_val = global_properties[property_name];
-                    if (!old_val.empty() && !value.empty()) {
-                        if (append_string) {
-                            global_properties[property_name] = old_val + value;
-                        } else {
-                            global_properties[property_name] = old_val + ";" + value;
-                        }
-                    } else if (!value.empty()) {
-                        global_properties[property_name] = value;
+        case PropertyScope::GLOBAL: {
+            if (!items.empty()) {
+                interp.set_fatal_error("set_property(GLOBAL ...) does not accept item names");
+                return;
+            }
+            // Read-only global properties
+            if (property_name == "GENERATOR_IS_MULTI_CONFIG") {
+                interp.set_fatal_error("set_property: GENERATOR_IS_MULTI_CONFIG is a read-only property");
+                return;
+            }
+            if (append || append_string) {
+                std::string old_val = global_properties[property_name];
+                if (!old_val.empty() && !value.empty()) {
+                    if (append_string) {
+                        global_properties[property_name] = old_val + value;
+                    } else {
+                        global_properties[property_name] = old_val + ";" + value;
                     }
-                } else {
+                } else if (!value.empty()) {
                     global_properties[property_name] = value;
                 }
-                break;
+            } else {
+                global_properties[property_name] = value;
             }
+            break;
+        }
 
-            case PropertyScope::DIRECTORY: {
-                // Items are directory paths (optional)
-                std::vector<DirectoryContext*> target_contexts;
-                if (items.empty()) {
-                    // Current directory
-                    target_contexts.push_back(&interp.get_current_directory_context());
-                } else {
-                    for (const auto& dir_path : items) {
-                        // Check if it's the current directory
-                        std::string current_source_dir = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
-                        if (dir_path == "." || dir_path == current_source_dir) {
-                            target_contexts.push_back(&interp.get_current_directory_context());
+        case PropertyScope::DIRECTORY: {
+            // Items are directory paths (optional)
+            std::vector<DirectoryContext*> target_contexts;
+            if (items.empty()) {
+                // Current directory
+                target_contexts.push_back(&interp.get_current_directory_context());
+            } else {
+                for (const auto& dir_path : items) {
+                    // Check if it's the current directory
+                    std::string current_source_dir = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
+                    if (dir_path == "." || dir_path == current_source_dir) {
+                        target_contexts.push_back(&interp.get_current_directory_context());
+                    } else {
+                        // Look up the directory context for the specified directory
+                        DirectoryContext* dir_ctx = interp.get_directory_context(dir_path);
+                        if (dir_ctx) {
+                            target_contexts.push_back(dir_ctx);
                         } else {
-                            // Look up the directory context for the specified directory
-                            DirectoryContext* dir_ctx = interp.get_directory_context(dir_path);
-                            if (dir_ctx) {
-                                target_contexts.push_back(dir_ctx);
-                            } else {
-                                interp.set_fatal_error("set_property(DIRECTORY ...) unknown directory: " + dir_path);
-                                return;
-                            }
+                            interp.set_fatal_error("set_property(DIRECTORY ...) unknown directory: " + dir_path);
+                            return;
                         }
                     }
                 }
+            }
 
-                for (auto* target_ctx : target_contexts) {
-                    auto& dir_props = target_ctx->properties;
-                    if (append || append_string) {
-                        std::string old_val = dir_props[property_name];
-                        if (!old_val.empty() && !value.empty()) {
-                            if (append_string) {
-                                dir_props[property_name] = old_val + value;
-                            } else {
-                                dir_props[property_name] = old_val + ";" + value;
-                            }
-                        } else if (!value.empty()) {
-                            dir_props[property_name] = value;
+            for (auto* target_ctx : target_contexts) {
+                auto& dir_props = target_ctx->properties;
+                if (append || append_string) {
+                    std::string old_val = dir_props[property_name];
+                    if (!old_val.empty() && !value.empty()) {
+                        if (append_string) {
+                            dir_props[property_name] = old_val + value;
+                        } else {
+                            dir_props[property_name] = old_val + ";" + value;
                         }
-                    } else {
+                    } else if (!value.empty()) {
                         dir_props[property_name] = value;
                     }
-
-                    // Sync with accumulated map (used by include_directories(), etc.)
-                    // In CMake these are the same property; in kiln they're stored separately.
-                    auto acc_it = target_ctx->accumulated.find(property_name);
-                    if (acc_it != target_ctx->accumulated.end() || property_values.empty()) {
-                        if (append) {
-                            for (const auto& v : property_values) {
-                                target_ctx->accumulated[property_name].push_back(v);
-                            }
-                        } else {
-                            // Replace: clear and set new values
-                            target_ctx->accumulated[property_name].clear();
-                            for (const auto& v : property_values) {
-                                target_ctx->accumulated[property_name].push_back(v);
-                            }
-                        }
-                    }
-                }
-                break;
-            }
-
-            case PropertyScope::TARGET: {
-                // Items are target names
-                if (items.empty()) {
-                    interp.set_fatal_error("set_property(TARGET ...) requires at least one target name");
-                    return;
+                } else {
+                    dir_props[property_name] = value;
                 }
 
-                // Handle list properties generically using the shared property metadata table
-                auto handle_list_property = [](Target* target,
-                                               const std::string& prop_name,
-                                               const std::vector<std::string>& values,
-                                               bool append_mode) -> bool {
-                    std::string base_prop;
-                    PropertyVisibility visibility = PropertyVisibility::PRIVATE;
-
-                    // Check INTERFACE_ prefix first, then plain name
-                    if (auto* iface_meta = find_interface_list_property(prop_name)) {
-                        base_prop = std::string(iface_meta->name);
-                        visibility = PropertyVisibility::INTERFACE;
-                    } else if (auto* meta = find_list_property(prop_name)) {
-                        base_prop = std::string(meta->name);
+                // Sync with accumulated map (used by include_directories(), etc.)
+                // In CMake these are the same property; in kiln they're stored separately.
+                auto acc_it = target_ctx->accumulated.find(property_name);
+                if (acc_it != target_ctx->accumulated.end() || property_values.empty()) {
+                    if (append) {
+                        for (const auto& v : property_values) { target_ctx->accumulated[property_name].push_back(v); }
                     } else {
-                        return false;
-                    }
-
-                    std::vector<std::string> items;
-                    for (const auto& v : values) {
-                        std::istringstream ss(v);
-                        std::string item;
-                        while (std::getline(ss, item, ';')) {
-                            if (!item.empty()) items.push_back(item);
-                        }
-                    }
-
-                    if (!items.empty()) {
-                        target->append_property(base_prop, items, visibility);
-                    }
-                    return true;
-                };
-                auto handle_interface_property = handle_list_property;
-
-                for (const auto& target_name : items) {
-                    auto target = get_target_from_name(interp, target_name, "set_property");
-                    if (!target) continue;
-
-                    // Try to handle as INTERFACE property first
-                    if (handle_interface_property(target, property_name, property_values, append)) {
-                        continue;
-                    }
-
-                    // Special handling for language standard properties
-                    if (property_name == "C_STANDARD") {
-                        target->set_language_standard(Language::C, value);
-                        continue;
-                    } else if (property_name == "CXX_STANDARD") {
-                        target->set_language_standard(Language::CXX, value);
-                        continue;
-                    } else if (property_name == "C_EXTENSIONS") {
-                        bool enabled = !interp.is_falsy(value);
-                        target->set_language_extensions(Language::C, enabled);
-                        continue;
-                    } else if (property_name == "CXX_EXTENSIONS") {
-                        bool enabled = !interp.is_falsy(value);
-                        target->set_language_extensions(Language::CXX, enabled);
-                        continue;
-                    }
-
-                    // IMPORTED_LOCATION or IMPORTED_LOCATION_<CONFIG> → update dedicated field
-                    if (property_name == "IMPORTED_LOCATION" || property_name.starts_with("IMPORTED_LOCATION_")) {
-                        target->set_imported_location(value);
-                    }
-
-                    // OUTPUT_NAME → update dedicated field (used by get_output_path())
-                    if (property_name == "OUTPUT_NAME") {
-                        target->set_output_name(value);
-                    }
-
-                    // Generic property handling
-                    if (append || append_string) {
-                        std::string old_val = target->get_property(property_name);
-                        if (!old_val.empty() && !value.empty()) {
-                            if (append_string) {
-                                target->set_property(property_name, old_val + value);
-                            } else {
-                                target->set_property(property_name, old_val + ";" + value);
-                            }
-                        } else if (!value.empty()) {
-                            target->set_property(property_name, value);
-                        }
-                    } else {
-                        target->set_property(property_name, value);
+                        // Replace: clear and set new values
+                        target_ctx->accumulated[property_name].clear();
+                        for (const auto& v : property_values) { target_ctx->accumulated[property_name].push_back(v); }
                     }
                 }
-                break;
             }
+            break;
+        }
 
-            case PropertyScope::SOURCE: {
-                // Items are source file paths
-                if (items.empty()) {
-                    interp.set_fatal_error("set_property(SOURCE ...) requires at least one source file");
-                    return;
-                }
-
-                // Parse optional DIRECTORY or TARGET_DIRECTORY
-                std::string opt_directory;
-                std::string opt_target_directory;
-
-                // Re-scan args for sub-options (after items, before PROPERTY)
-                for (size_t i = 1; i < property_idx; ++i) {
-                    if (args[i] == "DIRECTORY" && i + 1 < property_idx) {
-                        opt_directory = args[++i];
-                    } else if (args[i] == "TARGET_DIRECTORY" && i + 1 < property_idx) {
-                        opt_target_directory = args[++i];
-                    }
-                }
-
-                for (const auto& source : items) {
-                    std::string abs_source = resolve_source_path(
-                        interp, source,
-                        opt_directory.empty() ? nullptr : &opt_directory,
-                        opt_target_directory.empty() ? nullptr : &opt_target_directory
-                    );
-                    if (abs_source.empty()) continue;
-
-                    if (append || append_string) {
-                        std::string old_val = source_properties[abs_source][property_name];
-                        if (!old_val.empty() && !value.empty()) {
-                            if (append_string) {
-                                source_properties[abs_source][property_name] = old_val + value;
-                            } else {
-                                source_properties[abs_source][property_name] = old_val + ";" + value;
-                            }
-                        } else if (!value.empty()) {
-                            source_properties[abs_source][property_name] = value;
-                        }
-                    } else {
-                        source_properties[abs_source][property_name] = value;
-                    }
-                }
-                break;
-            }
-
-            case PropertyScope::TEST: {
-                // Items are test names
-                if (items.empty()) {
-                    interp.set_fatal_error("set_property(TEST ...) requires at least one test name");
-                    return;
-                }
-
-                for (const auto& test_name : items) {
-                    auto* test = get_test_from_name(interp, test_name);
-                    if (!test) {
-                        interp.set_fatal_error("set_property(TEST ...) unknown test: " + test_name);
-                        return;
-                    }
-
-                    if (append || append_string) {
-                        std::string old_val = test->properties[property_name];
-                        if (!old_val.empty() && !value.empty()) {
-                            if (append_string) {
-                                test->properties[property_name] = old_val + value;
-                            } else {
-                                test->properties[property_name] = old_val + ";" + value;
-                            }
-                        } else if (!value.empty()) {
-                            test->properties[property_name] = value;
-                        }
-                    } else {
-                        test->properties[property_name] = value;
-                    }
-                }
-                break;
-            }
-
-            case PropertyScope::CACHED_VARIABLE: {
-                // Items are cache entry names
-                if (items.empty()) {
-                    interp.set_fatal_error("set_property(CACHE ...) requires at least one cache entry name");
-                    return;
-                }
-
-                for (const auto& entry_name : items) {
-                    // Setting the VALUE property updates the actual cache variable
-                    if (property_name == "VALUE") {
-                        if (append || append_string) {
-                            std::string old_val = cache_variables[entry_name];
-                            if (!old_val.empty() && !value.empty()) {
-                                if (append_string) {
-                                    cache_variables[entry_name] = old_val + value;
-                                } else {
-                                    cache_variables[entry_name] = old_val + ";" + value;
-                                }
-                            } else if (!value.empty()) {
-                                cache_variables[entry_name] = value;
-                            }
-                        } else {
-                            cache_variables[entry_name] = value;
-                        }
-                    } else {
-                        // Other properties (TYPE, STRINGS, etc.) use metadata storage
-                        std::string cache_prop_key = entry_name + ".__property__." + property_name;
-
-                        if (append || append_string) {
-                            std::string old_val = cache_variables[cache_prop_key];
-                            if (!old_val.empty() && !value.empty()) {
-                                if (append_string) {
-                                    cache_variables[cache_prop_key] = old_val + value;
-                                } else {
-                                    cache_variables[cache_prop_key] = old_val + ";" + value;
-                                }
-                            } else if (!value.empty()) {
-                                cache_variables[cache_prop_key] = value;
-                            }
-                        } else {
-                            cache_variables[cache_prop_key] = value;
-                        }
-                    }
-                }
-                break;
-            }
-
-            case PropertyScope::VARIABLE: {
-                // VARIABLE scope is only for documentation
-                interp.set_fatal_error("set_property(VARIABLE ...) is only for documentation, cannot set values");
+        case PropertyScope::TARGET: {
+            // Items are target names
+            if (items.empty()) {
+                interp.set_fatal_error("set_property(TARGET ...) requires at least one target name");
                 return;
             }
 
-            case PropertyScope::INSTALL: {
-                // Items are installed file paths
-                if (items.empty()) {
-                    interp.set_fatal_error("set_property(INSTALL ...) requires at least one installed file path");
+            // Handle list properties generically using the shared property metadata table
+            auto handle_list_property = [](Target* target, const std::string& prop_name, const std::vector<std::string>& values,
+                                           bool append_mode) -> bool {
+                std::string base_prop;
+                PropertyVisibility visibility = PropertyVisibility::PRIVATE;
+
+                // Check INTERFACE_ prefix first, then plain name
+                if (auto* iface_meta = find_interface_list_property(prop_name)) {
+                    base_prop = std::string(iface_meta->name);
+                    visibility = PropertyVisibility::INTERFACE;
+                } else if (auto* meta = find_list_property(prop_name)) {
+                    base_prop = std::string(meta->name);
+                } else {
+                    return false;
+                }
+
+                std::vector<std::string> items;
+                for (const auto& v : values) {
+                    std::istringstream ss(v);
+                    std::string item;
+                    while (std::getline(ss, item, ';')) {
+                        if (!item.empty()) items.push_back(item);
+                    }
+                }
+
+                if (!items.empty()) { target->append_property(base_prop, items, visibility); }
+                return true;
+            };
+            auto handle_interface_property = handle_list_property;
+
+            for (const auto& target_name : items) {
+                auto target = get_target_from_name(interp, target_name, "set_property");
+                if (!target) continue;
+
+                // Try to handle as INTERFACE property first
+                if (handle_interface_property(target, property_name, property_values, append)) { continue; }
+
+                // Special handling for language standard properties
+                if (property_name == "C_STANDARD") {
+                    target->set_language_standard(Language::C, value);
+                    continue;
+                } else if (property_name == "CXX_STANDARD") {
+                    target->set_language_standard(Language::CXX, value);
+                    continue;
+                } else if (property_name == "C_EXTENSIONS") {
+                    bool enabled = !interp.is_falsy(value);
+                    target->set_language_extensions(Language::C, enabled);
+                    continue;
+                } else if (property_name == "CXX_EXTENSIONS") {
+                    bool enabled = !interp.is_falsy(value);
+                    target->set_language_extensions(Language::CXX, enabled);
+                    continue;
+                }
+
+                // IMPORTED_LOCATION or IMPORTED_LOCATION_<CONFIG> → update dedicated field
+                if (property_name == "IMPORTED_LOCATION" || property_name.starts_with("IMPORTED_LOCATION_")) {
+                    target->set_imported_location(value);
+                }
+
+                // OUTPUT_NAME → update dedicated field (used by get_output_path())
+                if (property_name == "OUTPUT_NAME") { target->set_output_name(value); }
+
+                // Generic property handling
+                if (append || append_string) {
+                    std::string old_val = target->get_property(property_name);
+                    if (!old_val.empty() && !value.empty()) {
+                        if (append_string) {
+                            target->set_property(property_name, old_val + value);
+                        } else {
+                            target->set_property(property_name, old_val + ";" + value);
+                        }
+                    } else if (!value.empty()) {
+                        target->set_property(property_name, value);
+                    }
+                } else {
+                    target->set_property(property_name, value);
+                }
+            }
+            break;
+        }
+
+        case PropertyScope::SOURCE: {
+            // Items are source file paths
+            if (items.empty()) {
+                interp.set_fatal_error("set_property(SOURCE ...) requires at least one source file");
+                return;
+            }
+
+            // Parse optional DIRECTORY or TARGET_DIRECTORY
+            std::string opt_directory;
+            std::string opt_target_directory;
+
+            // Re-scan args for sub-options (after items, before PROPERTY)
+            for (size_t i = 1; i < property_idx; ++i) {
+                if (args[i] == "DIRECTORY" && i + 1 < property_idx) {
+                    opt_directory = args[++i];
+                } else if (args[i] == "TARGET_DIRECTORY" && i + 1 < property_idx) {
+                    opt_target_directory = args[++i];
+                }
+            }
+
+            for (const auto& source : items) {
+                std::string abs_source = resolve_source_path(interp, source, opt_directory.empty() ? nullptr : &opt_directory,
+                                                             opt_target_directory.empty() ? nullptr : &opt_target_directory);
+                if (abs_source.empty()) continue;
+
+                if (append || append_string) {
+                    std::string old_val = source_properties[abs_source][property_name];
+                    if (!old_val.empty() && !value.empty()) {
+                        if (append_string) {
+                            source_properties[abs_source][property_name] = old_val + value;
+                        } else {
+                            source_properties[abs_source][property_name] = old_val + ";" + value;
+                        }
+                    } else if (!value.empty()) {
+                        source_properties[abs_source][property_name] = value;
+                    }
+                } else {
+                    source_properties[abs_source][property_name] = value;
+                }
+            }
+            break;
+        }
+
+        case PropertyScope::TEST: {
+            // Items are test names
+            if (items.empty()) {
+                interp.set_fatal_error("set_property(TEST ...) requires at least one test name");
+                return;
+            }
+
+            for (const auto& test_name : items) {
+                auto* test = get_test_from_name(interp, test_name);
+                if (!test) {
+                    interp.set_fatal_error("set_property(TEST ...) unknown test: " + test_name);
                     return;
                 }
 
-                auto& install_properties = interp.get_install_properties();
-                for (const auto& install_path : items) {
-                    // Normalize the install path
-                    std::filesystem::path normalized = std::filesystem::path(install_path).lexically_normal();
-                    std::string path_key = normalized.string();
+                if (append || append_string) {
+                    std::string old_val = test->properties[property_name];
+                    if (!old_val.empty() && !value.empty()) {
+                        if (append_string) {
+                            test->properties[property_name] = old_val + value;
+                        } else {
+                            test->properties[property_name] = old_val + ";" + value;
+                        }
+                    } else if (!value.empty()) {
+                        test->properties[property_name] = value;
+                    }
+                } else {
+                    test->properties[property_name] = value;
+                }
+            }
+            break;
+        }
 
+        case PropertyScope::CACHED_VARIABLE: {
+            // Items are cache entry names
+            if (items.empty()) {
+                interp.set_fatal_error("set_property(CACHE ...) requires at least one cache entry name");
+                return;
+            }
+
+            for (const auto& entry_name : items) {
+                // Setting the VALUE property updates the actual cache variable
+                if (property_name == "VALUE") {
                     if (append || append_string) {
-                        std::string old_val = install_properties[path_key][property_name];
+                        std::string old_val = cache_variables[entry_name];
                         if (!old_val.empty() && !value.empty()) {
                             if (append_string) {
-                                install_properties[path_key][property_name] = old_val + value;
+                                cache_variables[entry_name] = old_val + value;
                             } else {
-                                install_properties[path_key][property_name] = old_val + ";" + value;
+                                cache_variables[entry_name] = old_val + ";" + value;
                             }
                         } else if (!value.empty()) {
-                            install_properties[path_key][property_name] = value;
+                            cache_variables[entry_name] = value;
                         }
                     } else {
-                        install_properties[path_key][property_name] = value;
+                        cache_variables[entry_name] = value;
+                    }
+                } else {
+                    // Other properties (TYPE, STRINGS, etc.) use metadata storage
+                    std::string cache_prop_key = entry_name + ".__property__." + property_name;
+
+                    if (append || append_string) {
+                        std::string old_val = cache_variables[cache_prop_key];
+                        if (!old_val.empty() && !value.empty()) {
+                            if (append_string) {
+                                cache_variables[cache_prop_key] = old_val + value;
+                            } else {
+                                cache_variables[cache_prop_key] = old_val + ";" + value;
+                            }
+                        } else if (!value.empty()) {
+                            cache_variables[cache_prop_key] = value;
+                        }
+                    } else {
+                        cache_variables[cache_prop_key] = value;
                     }
                 }
-                break;
             }
+            break;
+        }
+
+        case PropertyScope::VARIABLE: {
+            // VARIABLE scope is only for documentation
+            interp.set_fatal_error("set_property(VARIABLE ...) is only for documentation, cannot set values");
+            return;
+        }
+
+        case PropertyScope::INSTALL: {
+            // Items are installed file paths
+            if (items.empty()) {
+                interp.set_fatal_error("set_property(INSTALL ...) requires at least one installed file path");
+                return;
+            }
+
+            auto& install_properties = interp.get_install_properties();
+            for (const auto& install_path : items) {
+                // Normalize the install path
+                std::filesystem::path normalized = std::filesystem::path(install_path).lexically_normal();
+                std::string path_key = normalized.string();
+
+                if (append || append_string) {
+                    std::string old_val = install_properties[path_key][property_name];
+                    if (!old_val.empty() && !value.empty()) {
+                        if (append_string) {
+                            install_properties[path_key][property_name] = old_val + value;
+                        } else {
+                            install_properties[path_key][property_name] = old_val + ";" + value;
+                        }
+                    } else if (!value.empty()) {
+                        install_properties[path_key][property_name] = value;
+                    }
+                } else {
+                    install_properties[path_key][property_name] = value;
+                }
+            }
+            break;
+        }
         }
     });
 
@@ -671,7 +637,8 @@ void register_property_builtins(Interpreter& interp) {
         }
 
         if (num_pairs % 2 != 0) {
-            interp.set_fatal_error("set_directory_properties() requires an even number of arguments after PROPERTIES (property-value pairs)");
+            interp.set_fatal_error(
+                "set_directory_properties() requires an even number of arguments after PROPERTIES (property-value pairs)");
             return;
         }
 
@@ -742,8 +709,7 @@ void register_property_builtins(Interpreter& interp) {
             // Get variable from the directory's scope
             // For now, we only support getting variables from the current directory
             // A full implementation would need to track per-directory variable scopes
-            if (directory_path.empty() || directory_path == "." ||
-                directory_path == interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) {
+            if (directory_path.empty() || directory_path == "." || directory_path == interp.get_variable("CMAKE_CURRENT_SOURCE_DIR")) {
                 interp.set_variable(var_name, interp.get_variable(def_var_name));
             } else {
                 // For other directories, return empty (CMake would have the full scope)
@@ -817,9 +783,7 @@ void register_property_builtins(Interpreter& interp) {
         if (scope == PropertyScope::DIRECTORY) {
             // Item name is optional for DIRECTORY
             // If next arg is not PROPERTY, it's an item name
-            if (arg_idx < args.size() && args[arg_idx] != "PROPERTY") {
-                item_name = args[arg_idx++];
-            }
+            if (arg_idx < args.size() && args[arg_idx] != "PROPERTY") { item_name = args[arg_idx++]; }
         } else if (scope != PropertyScope::GLOBAL && scope != PropertyScope::VARIABLE) {
             // For other scopes (TARGET, SOURCE, TEST, CACHED_VARIABLE), item name is required
             if (arg_idx >= args.size()) {
@@ -841,9 +805,7 @@ void register_property_builtins(Interpreter& interp) {
                     opt_target_directory = args[++arg_idx];
                 }
             } else if (scope == PropertyScope::TEST) {
-                if (args[arg_idx] == "DIRECTORY" && arg_idx + 1 < args.size()) {
-                    opt_directory = args[++arg_idx];
-                }
+                if (args[arg_idx] == "DIRECTORY" && arg_idx + 1 < args.size()) { opt_directory = args[++arg_idx]; }
             } else if (scope == PropertyScope::DIRECTORY && args[arg_idx] != "PROPERTY") {
                 // Skip any unrecognized args before PROPERTY for DIRECTORY scope
                 ++arg_idx;
@@ -875,10 +837,14 @@ void register_property_builtins(Interpreter& interp) {
         // Parse optional query mode
         if (arg_idx < args.size()) {
             std::string query_mode = args[arg_idx];
-            if (query_mode == "SET") get_set = true;
-            else if (query_mode == "DEFINED") get_defined = true;
-            else if (query_mode == "BRIEF_DOCS") get_brief_docs = true;
-            else if (query_mode == "FULL_DOCS") get_full_docs = true;
+            if (query_mode == "SET")
+                get_set = true;
+            else if (query_mode == "DEFINED")
+                get_defined = true;
+            else if (query_mode == "BRIEF_DOCS")
+                get_brief_docs = true;
+            else if (query_mode == "FULL_DOCS")
+                get_full_docs = true;
             else {
                 interp.set_fatal_error("get_property() invalid query mode: " + query_mode);
                 return;
@@ -919,256 +885,265 @@ void register_property_builtins(Interpreter& interp) {
         bool value_found = false;
 
         switch (scope) {
-            case PropertyScope::GLOBAL: {
-                auto it = global_properties.find(property_name);
-                if (it != global_properties.end()) {
-                    value = it->second;
-                    value_found = true;
-                }
-                break;
+        case PropertyScope::GLOBAL: {
+            auto it = global_properties.find(property_name);
+            if (it != global_properties.end()) {
+                value = it->second;
+                value_found = true;
             }
+            break;
+        }
 
-            case PropertyScope::DIRECTORY: {
-                // Determine which directory context to use
-                DirectoryContext* target_ctx = nullptr;
-                if (!item_name.empty()) {
-                    // Explicit directory path provided
-                    std::string current_source_dir = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
-                    if (item_name == "." || item_name == current_source_dir) {
-                        target_ctx = &interp.get_current_directory_context();
-                    } else {
-                        target_ctx = interp.get_directory_context(item_name);
-                        if (!target_ctx) {
-                            // Unknown directory - return empty
-                            interp.set_variable(var_name, "");
-                            return;
-                        }
-                    }
-                } else {
-                    // No directory specified - use current directory
+        case PropertyScope::DIRECTORY: {
+            // Determine which directory context to use
+            DirectoryContext* target_ctx = nullptr;
+            if (!item_name.empty()) {
+                // Explicit directory path provided
+                std::string current_source_dir = interp.get_variable("CMAKE_CURRENT_SOURCE_DIR");
+                if (item_name == "." || item_name == current_source_dir) {
                     target_ctx = &interp.get_current_directory_context();
-                }
-
-                // Check accumulated properties first (INCLUDE_DIRECTORIES, etc.)
-                // These are the "live" values set by include_directories(), add_definitions(), etc.
-                // Must be checked before target_ctx->properties so that get_property(DIRECTORY)
-                // and get_directory_property() return the same values.
-                auto acc_it = target_ctx->accumulated.find(property_name);
-                if (acc_it != target_ctx->accumulated.end()) {
-                    for (size_t i = 0; i < acc_it->second.size(); ++i) {
-                        if (i > 0) value += ";";
-                        value += acc_it->second[i];
-                    }
-                    value_found = true;
-                }
-
-                if (!value_found) {
-                    // Check directory properties map
-                    auto it = target_ctx->properties.find(property_name);
-                    if (it != target_ctx->properties.end()) {
-                        value = it->second;
-                        value_found = true;
-                    }
-                }
-
-                // If not found and property is inherited, check parent directories
-                if (!value_found && is_inherited()) {
-                    std::string parent_dir = target_ctx->parent_dir;
-                    while (!parent_dir.empty()) {
-                        DirectoryContext* parent_ctx = interp.get_directory_context(parent_dir);
-                        if (!parent_ctx) break;
-
-                        auto parent_it = parent_ctx->properties.find(property_name);
-                        if (parent_it != parent_ctx->properties.end()) {
-                            value = parent_it->second;
-                            value_found = true;
-                            break;
-                        }
-                        parent_dir = parent_ctx->parent_dir;
-                    }
-
-                    // If still not found, check GLOBAL scope
-                    if (!value_found) {
-                        auto global_it = global_properties.find(property_name);
-                        if (global_it != global_properties.end()) {
-                            value = global_it->second;
-                            value_found = true;
-                        }
-                    }
-                }
-                break;
-            }
-
-            case PropertyScope::TARGET: {
-                auto target = get_target_from_name(interp, item_name, "get_property");
-                if (!target) {
-                    interp.set_variable(var_name, "");
-                    return;
-                }
-
-                // Handle special built-in target properties
-                if (property_name == "TYPE") {
-                    switch(target->get_type()) {
-                        case TargetType::EXECUTABLE: value = "EXECUTABLE"; break;
-                        case TargetType::SHARED_LIBRARY: value = "SHARED_LIBRARY"; break;
-                        case TargetType::STATIC_LIBRARY: value = "STATIC_LIBRARY"; break;
-                        case TargetType::OBJECT_LIBRARY: value = "OBJECT_LIBRARY"; break;
-                        case TargetType::INTERFACE_LIBRARY: value = "INTERFACE_LIBRARY"; break;
-                        case TargetType::CUSTOM: value = "UTILITY"; break;
-                    }
-                    value_found = true;
-                } else if (property_name == "NAME") {
-                    value = target->get_name();
-                    value_found = true;
-                } else if (property_name == "SOURCE_DIR") {
-                    value = target->get_source_dir();
-                    value_found = true;
-                } else if (property_name == "BINARY_DIR") {
-                    value = target->get_binary_dir();
-                    value_found = true;
-                } else if (property_name == "IMPORTED") {
-                    value = target->is_imported() ? "TRUE" : "FALSE";
-                    value_found = true;
-                } else if (property_name == "IMPORTED_LOCATION") {
-                    value = target->get_imported_location();
-                    value_found = !value.empty();
                 } else {
-                    // Try generic property
-                    value = target->get_property(property_name);
-                    value_found = !value.empty();
-                }
-
-                // If not found and inherited, check DIRECTORY scope
-                if (!value_found && is_inherited()) {
-                    auto dir_it = directory_properties.find(property_name);
-                    if (dir_it != directory_properties.end()) {
-                        value = dir_it->second;
-                        value_found = true;
+                    target_ctx = interp.get_directory_context(item_name);
+                    if (!target_ctx) {
+                        // Unknown directory - return empty
+                        interp.set_variable(var_name, "");
+                        return;
                     }
                 }
-                break;
+            } else {
+                // No directory specified - use current directory
+                target_ctx = &interp.get_current_directory_context();
             }
 
-            case PropertyScope::SOURCE: {
-                std::string abs_source = resolve_source_path(
-                    interp, item_name,
-                    opt_directory.empty() ? nullptr : &opt_directory,
-                    opt_target_directory.empty() ? nullptr : &opt_target_directory
-                );
-                if (abs_source.empty()) {
-                    interp.set_variable(var_name, "");
-                    return;
+            // Check accumulated properties first (INCLUDE_DIRECTORIES, etc.)
+            // These are the "live" values set by include_directories(), add_definitions(), etc.
+            // Must be checked before target_ctx->properties so that get_property(DIRECTORY)
+            // and get_directory_property() return the same values.
+            auto acc_it = target_ctx->accumulated.find(property_name);
+            if (acc_it != target_ctx->accumulated.end()) {
+                for (size_t i = 0; i < acc_it->second.size(); ++i) {
+                    if (i > 0) value += ";";
+                    value += acc_it->second[i];
                 }
-
-                auto source_it = source_properties.find(abs_source);
-                if (source_it != source_properties.end()) {
-                    auto prop_it = source_it->second.find(property_name);
-                    if (prop_it != source_it->second.end()) {
-                        value = prop_it->second;
-                        value_found = true;
-                    }
-                }
-
-                // If not found and inherited, check DIRECTORY scope
-                if (!value_found && is_inherited()) {
-                    auto dir_it = directory_properties.find(property_name);
-                    if (dir_it != directory_properties.end()) {
-                        value = dir_it->second;
-                        value_found = true;
-                    }
-                }
-                break;
+                value_found = true;
             }
 
-            case PropertyScope::TEST: {
-                auto* test = get_test_from_name(interp, item_name);
-                if (!test) {
-                    interp.set_variable(var_name, "");
-                    return;
-                }
-
-                auto it = test->properties.find(property_name);
-                if (it != test->properties.end()) {
+            if (!value_found) {
+                // Check directory properties map
+                auto it = target_ctx->properties.find(property_name);
+                if (it != target_ctx->properties.end()) {
                     value = it->second;
                     value_found = true;
                 }
+            }
 
-                // If not found and inherited, check DIRECTORY scope
-                if (!value_found && is_inherited()) {
-                    auto dir_it = directory_properties.find(property_name);
-                    if (dir_it != directory_properties.end()) {
-                        value = dir_it->second;
+            // If not found and property is inherited, check parent directories
+            if (!value_found && is_inherited()) {
+                std::string parent_dir = target_ctx->parent_dir;
+                while (!parent_dir.empty()) {
+                    DirectoryContext* parent_ctx = interp.get_directory_context(parent_dir);
+                    if (!parent_ctx) break;
+
+                    auto parent_it = parent_ctx->properties.find(property_name);
+                    if (parent_it != parent_ctx->properties.end()) {
+                        value = parent_it->second;
+                        value_found = true;
+                        break;
+                    }
+                    parent_dir = parent_ctx->parent_dir;
+                }
+
+                // If still not found, check GLOBAL scope
+                if (!value_found) {
+                    auto global_it = global_properties.find(property_name);
+                    if (global_it != global_properties.end()) {
+                        value = global_it->second;
                         value_found = true;
                     }
                 }
-                break;
             }
+            break;
+        }
 
-            case PropertyScope::CACHED_VARIABLE: {
-                // Handle special built-in cache properties
-                if (property_name == "TYPE") {
-                    // Check if the cache variable exists
-                    auto cache_it = cache_variables.find(item_name);
-                    if (cache_it != cache_variables.end()) {
-                        // For now, all cache variables are treated as STRING type
-                        // CMake has BOOL, FILEPATH, PATH, STRING, INTERNAL types
-                        value = "STRING";
-                        value_found = true;
-                    }
-                } else if (property_name == "VALUE") {
-                    // Built-in VALUE property returns the cache variable's value
-                    auto cache_it = cache_variables.find(item_name);
-                    if (cache_it != cache_variables.end()) {
-                        value = cache_it->second;
-                        value_found = true;
-                    }
-                } else if (property_name == "HELPSTRING") {
-                    // Built-in HELPSTRING property (we don't track this currently)
-                    value = "";
-                    value_found = true;
-                } else if (property_name == "ADVANCED") {
-                    // Built-in ADVANCED property (we don't track this currently)
-                    value = "0";
-                    value_found = true;
-                } else {
-                    // Custom cache property
-                    std::string cache_prop_key = item_name + ".__property__." + property_name;
-                    auto it = cache_variables.find(cache_prop_key);
-                    if (it != cache_variables.end()) {
-                        value = it->second;
-                        value_found = true;
-                    }
-                }
-                break;
-            }
-
-            case PropertyScope::VARIABLE: {
-                // VARIABLE scope only has documentation
+        case PropertyScope::TARGET: {
+            auto target = get_target_from_name(interp, item_name, "get_property");
+            if (!target) {
                 interp.set_variable(var_name, "");
                 return;
             }
 
-            case PropertyScope::INSTALL: {
-                // Item name is the installed file path
-                if (item_name.empty()) {
-                    interp.set_fatal_error("get_property(INSTALL ...) requires an installed file path");
-                    return;
+            // Handle special built-in target properties
+            if (property_name == "TYPE") {
+                switch (target->get_type()) {
+                case TargetType::EXECUTABLE:
+                    value = "EXECUTABLE";
+                    break;
+                case TargetType::SHARED_LIBRARY:
+                    value = "SHARED_LIBRARY";
+                    break;
+                case TargetType::STATIC_LIBRARY:
+                    value = "STATIC_LIBRARY";
+                    break;
+                case TargetType::OBJECT_LIBRARY:
+                    value = "OBJECT_LIBRARY";
+                    break;
+                case TargetType::INTERFACE_LIBRARY:
+                    value = "INTERFACE_LIBRARY";
+                    break;
+                case TargetType::CUSTOM:
+                    value = "UTILITY";
+                    break;
                 }
-
-                auto& install_properties = interp.get_install_properties();
-                std::filesystem::path normalized = std::filesystem::path(item_name).lexically_normal();
-                std::string path_key = normalized.string();
-
-                auto path_it = install_properties.find(path_key);
-                if (path_it != install_properties.end()) {
-                    auto prop_it = path_it->second.find(property_name);
-                    if (prop_it != path_it->second.end()) {
-                        value = prop_it->second;
-                        value_found = true;
-                    }
-                }
-                break;
+                value_found = true;
+            } else if (property_name == "NAME") {
+                value = target->get_name();
+                value_found = true;
+            } else if (property_name == "SOURCE_DIR") {
+                value = target->get_source_dir();
+                value_found = true;
+            } else if (property_name == "BINARY_DIR") {
+                value = target->get_binary_dir();
+                value_found = true;
+            } else if (property_name == "IMPORTED") {
+                value = target->is_imported() ? "TRUE" : "FALSE";
+                value_found = true;
+            } else if (property_name == "IMPORTED_LOCATION") {
+                value = target->get_imported_location();
+                value_found = !value.empty();
+            } else {
+                // Try generic property
+                value = target->get_property(property_name);
+                value_found = !value.empty();
             }
+
+            // If not found and inherited, check DIRECTORY scope
+            if (!value_found && is_inherited()) {
+                auto dir_it = directory_properties.find(property_name);
+                if (dir_it != directory_properties.end()) {
+                    value = dir_it->second;
+                    value_found = true;
+                }
+            }
+            break;
+        }
+
+        case PropertyScope::SOURCE: {
+            std::string abs_source = resolve_source_path(interp, item_name, opt_directory.empty() ? nullptr : &opt_directory,
+                                                         opt_target_directory.empty() ? nullptr : &opt_target_directory);
+            if (abs_source.empty()) {
+                interp.set_variable(var_name, "");
+                return;
+            }
+
+            auto source_it = source_properties.find(abs_source);
+            if (source_it != source_properties.end()) {
+                auto prop_it = source_it->second.find(property_name);
+                if (prop_it != source_it->second.end()) {
+                    value = prop_it->second;
+                    value_found = true;
+                }
+            }
+
+            // If not found and inherited, check DIRECTORY scope
+            if (!value_found && is_inherited()) {
+                auto dir_it = directory_properties.find(property_name);
+                if (dir_it != directory_properties.end()) {
+                    value = dir_it->second;
+                    value_found = true;
+                }
+            }
+            break;
+        }
+
+        case PropertyScope::TEST: {
+            auto* test = get_test_from_name(interp, item_name);
+            if (!test) {
+                interp.set_variable(var_name, "");
+                return;
+            }
+
+            auto it = test->properties.find(property_name);
+            if (it != test->properties.end()) {
+                value = it->second;
+                value_found = true;
+            }
+
+            // If not found and inherited, check DIRECTORY scope
+            if (!value_found && is_inherited()) {
+                auto dir_it = directory_properties.find(property_name);
+                if (dir_it != directory_properties.end()) {
+                    value = dir_it->second;
+                    value_found = true;
+                }
+            }
+            break;
+        }
+
+        case PropertyScope::CACHED_VARIABLE: {
+            // Handle special built-in cache properties
+            if (property_name == "TYPE") {
+                // Check if the cache variable exists
+                auto cache_it = cache_variables.find(item_name);
+                if (cache_it != cache_variables.end()) {
+                    // For now, all cache variables are treated as STRING type
+                    // CMake has BOOL, FILEPATH, PATH, STRING, INTERNAL types
+                    value = "STRING";
+                    value_found = true;
+                }
+            } else if (property_name == "VALUE") {
+                // Built-in VALUE property returns the cache variable's value
+                auto cache_it = cache_variables.find(item_name);
+                if (cache_it != cache_variables.end()) {
+                    value = cache_it->second;
+                    value_found = true;
+                }
+            } else if (property_name == "HELPSTRING") {
+                // Built-in HELPSTRING property (we don't track this currently)
+                value = "";
+                value_found = true;
+            } else if (property_name == "ADVANCED") {
+                // Built-in ADVANCED property (we don't track this currently)
+                value = "0";
+                value_found = true;
+            } else {
+                // Custom cache property
+                std::string cache_prop_key = item_name + ".__property__." + property_name;
+                auto it = cache_variables.find(cache_prop_key);
+                if (it != cache_variables.end()) {
+                    value = it->second;
+                    value_found = true;
+                }
+            }
+            break;
+        }
+
+        case PropertyScope::VARIABLE: {
+            // VARIABLE scope only has documentation
+            interp.set_variable(var_name, "");
+            return;
+        }
+
+        case PropertyScope::INSTALL: {
+            // Item name is the installed file path
+            if (item_name.empty()) {
+                interp.set_fatal_error("get_property(INSTALL ...) requires an installed file path");
+                return;
+            }
+
+            auto& install_properties = interp.get_install_properties();
+            std::filesystem::path normalized = std::filesystem::path(item_name).lexically_normal();
+            std::string path_key = normalized.string();
+
+            auto path_it = install_properties.find(path_key);
+            if (path_it != install_properties.end()) {
+                auto prop_it = path_it->second.find(property_name);
+                if (prop_it != path_it->second.end()) {
+                    value = prop_it->second;
+                    value_found = true;
+                }
+            }
+            break;
+        }
         }
 
         // Handle SET query mode

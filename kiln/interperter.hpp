@@ -54,13 +54,13 @@ struct TestDefinition {
 // Custom command rule for OUTPUT form of add_custom_command
 // Maps output files to the commands that generate them
 struct CustomCommandRule {
-    std::vector<std::string> outputs;           // Files this command generates
-    std::vector<std::vector<std::string>> commands;  // Commands to run (in order)
-    std::vector<std::string> depends;           // Input files/targets
-    std::string working_dir;                    // Working directory for commands
-    std::string comment;                        // Display comment during build
-    std::string source_dir;                     // Source directory where command was defined
-    std::string binary_dir;                     // Binary directory where command was defined
+    std::vector<std::string> outputs;               // Files this command generates
+    std::vector<std::vector<std::string>> commands; // Commands to run (in order)
+    std::vector<std::string> depends;               // Input files/targets
+    std::string working_dir;                        // Working directory for commands
+    std::string comment;                            // Display comment during build
+    std::string source_dir;                         // Source directory where command was defined
+    std::string binary_dir;                         // Binary directory where command was defined
 };
 
 // Deferred file(GENERATE) — evaluated at graph generation time when genex context is available
@@ -74,23 +74,15 @@ struct PendingFileGenerate {
 };
 
 // Install system structures
-enum class InstallRuleType {
-    TARGETS,
-    FILES,
-    PROGRAMS,
-    DIRECTORY,
-    SCRIPT,
-    CODE,
-    EXPORT
-};
+enum class InstallRuleType { TARGETS, FILES, PROGRAMS, DIRECTORY, SCRIPT, CODE, EXPORT };
 
 struct InstallDestination {
-    std::string destination;                // Relative to CMAKE_INSTALL_PREFIX
-    std::vector<std::string> permissions;   // OWNER_READ, OWNER_WRITE, etc.
+    std::string destination;                 // Relative to CMAKE_INSTALL_PREFIX
+    std::vector<std::string> permissions;    // OWNER_READ, OWNER_WRITE, etc.
     std::string component;                   // Component name (empty = "Unspecified")
     std::vector<std::string> configurations; // Debug, Release, etc.
-    bool optional = false;                  // Continue if source missing
-    bool exclude_from_all = false;          // Skip from default install
+    bool optional = false;                   // Continue if source missing
+    bool exclude_from_all = false;           // Skip from default install
 };
 
 struct InstallTargetsRule {
@@ -106,36 +98,36 @@ struct InstallTargetsRule {
 struct InstallFilesRule {
     std::vector<std::string> files;
     InstallDestination destination;
-    std::string rename;                     // RENAME <name> (only valid with single file)
-    bool is_programs = false;               // Different default permissions
+    std::string rename;       // RENAME <name> (only valid with single file)
+    bool is_programs = false; // Different default permissions
 };
 
 struct InstallDirectoryRule {
     std::vector<std::string> directories;
     InstallDestination destination;
-    std::vector<std::string> file_patterns;      // FILES_MATCHING PATTERN
-    std::vector<std::string> exclude_patterns;   // PATTERN EXCLUDE
+    std::vector<std::string> file_patterns;    // FILES_MATCHING PATTERN
+    std::vector<std::string> exclude_patterns; // PATTERN EXCLUDE
     bool use_source_permissions = false;
 };
 
 struct InstallScriptRule {
-    std::string script_path;                // For SCRIPT mode
-    std::string code;                       // For CODE mode
-    std::string component;                  // Component name (empty = "Unspecified")
+    std::string script_path; // For SCRIPT mode
+    std::string code;        // For CODE mode
+    std::string component;   // Component name (empty = "Unspecified")
 };
 
 struct InstallExportRule {
-    std::string export_name;                // Name of the export set
-    std::string file_name;                  // Output file name (e.g., MyProjectTargets.cmake)
-    std::string namespace_prefix;           // Namespace for imported targets
-    std::string destination;                // Install destination
-    std::string component;                  // Component name (empty = "Unspecified")
+    std::string export_name;      // Name of the export set
+    std::string file_name;        // Output file name (e.g., MyProjectTargets.cmake)
+    std::string namespace_prefix; // Namespace for imported targets
+    std::string destination;      // Install destination
+    std::string component;        // Component name (empty = "Unspecified")
 };
 
 struct InstallRule {
     InstallRuleType type;
-    std::string source_dir;  // CMAKE_CURRENT_SOURCE_DIR when defined
-    std::string binary_dir;  // CMAKE_CURRENT_BINARY_DIR when defined
+    std::string source_dir; // CMAKE_CURRENT_SOURCE_DIR when defined
+    std::string binary_dir; // CMAKE_CURRENT_BINARY_DIR when defined
 
     // Only one is populated based on type
     std::shared_ptr<InstallTargetsRule> targets_rule;
@@ -148,7 +140,7 @@ struct InstallRule {
 // Entry in an export set (populated by install(TARGETS ... EXPORT))
 struct ExportSetEntry {
     std::string target_name;
-    std::string source_dir;  // For relative path computation
+    std::string source_dir; // For relative path computation
     std::string binary_dir;
     // Destinations from install(TARGETS ... ) so the install-tree export can
     // reproduce IMPORTED_LOCATION at the actual install path. Empty when the
@@ -163,16 +155,7 @@ struct ExportSetEntry {
 class Interpreter;
 
 // Property system
-enum class PropertyScope {
-    GLOBAL,
-    DIRECTORY,
-    TARGET,
-    SOURCE,
-    TEST,
-    VARIABLE,
-    CACHED_VARIABLE,
-    INSTALL
-};
+enum class PropertyScope { GLOBAL, DIRECTORY, TARGET, SOURCE, TEST, VARIABLE, CACHED_VARIABLE, INSTALL };
 
 struct PropertyDefinition {
     PropertyScope scope;
@@ -184,40 +167,40 @@ struct PropertyDefinition {
 };
 
 struct FrameMetadata {
-    const std::string* script_dir;                  // Non-owning pointer (outlives the frame)
-    const FunctionBlock* function_block = nullptr;  // Pointer to FunctionBlock if this is a function frame
+    const std::string* script_dir;                 // Non-owning pointer (outlives the frame)
+    const FunctionBlock* function_block = nullptr; // Pointer to FunctionBlock if this is a function frame
 };
 
 // Directory-specific state (stored in map at root, keyed by abs source path)
 struct DeferredCall {
-    std::string id;                      // Unique identifier
-    std::string command;                 // Command to call
-    std::vector<std::string> arguments;  // Unevaluated arguments
+    std::string id;                     // Unique identifier
+    std::string command;                // Command to call
+    std::vector<std::string> arguments; // Unevaluated arguments
 };
 
 struct DirectoryContext {
     std::string source_dir;
     std::string binary_dir;
-    std::string parent_dir;  // For property inheritance (empty for root)
+    std::string parent_dir; // For property inheritance (empty for root)
 
-    std::map<std::string, std::string> properties;                    // DIRECTORY scope properties
-    std::map<std::string, std::vector<std::string>> accumulated;      // Compile defs, includes, etc.
-    std::vector<std::shared_ptr<Target>> owned_targets;               // For finalize_directory_targets()
-    std::set<std::string> guarded_files;                              // Directory-level include guards
-    std::vector<DeferredCall> deferred_calls;                         // cmake_language(DEFER) calls
-    int next_deferred_id = 0;                                         // Auto-increment for ID generation
+    std::map<std::string, std::string> properties;               // DIRECTORY scope properties
+    std::map<std::string, std::vector<std::string>> accumulated; // Compile defs, includes, etc.
+    std::vector<std::shared_ptr<Target>> owned_targets;          // For finalize_directory_targets()
+    std::set<std::string> guarded_files;                         // Directory-level include guards
+    std::vector<DeferredCall> deferred_calls;                    // cmake_language(DEFER) calls
+    int next_deferred_id = 0;                                    // Auto-increment for ID generation
 };
 
 // Lightweight trace stack entry — avoids copying file paths and command names.
 // file points into the interpreter's interned_files_ set; command is a view into
 // the AST node's identifier (valid while the node's body is executing).
 struct TraceEntry {
-    const std::string* file;        // non-owning pointer into intern pool
+    const std::string* file; // non-owning pointer into intern pool
     size_t row;
     size_t col;
     size_t offset;
     size_t length;
-    std::string_view command;       // non-owning view into AST node
+    std::string_view command; // non-owning view into AST node
 };
 
 class Interpreter {
@@ -231,10 +214,8 @@ public:
     // -DCMAKE_<LANG>_COMPILER override is in play and the eager work would be
     // discarded; lazy on-demand detection inside enable_compiler_for_language
     // picks up the slack.
-    explicit Interpreter(std::string script_dir, std::ostream* out = &std::cout,
-                         std::ostream* err = &std::cerr,
-                         std::optional<std::string> build_dir = std::nullopt,
-                         bool skip_sys_init = false, bool skip_cache_load = false,
+    explicit Interpreter(std::string script_dir, std::ostream* out = &std::cout, std::ostream* err = &std::cerr,
+                         std::optional<std::string> build_dir = std::nullopt, bool skip_sys_init = false, bool skip_cache_load = false,
                          bool skip_host_compiler_detection = false);
 
     std::expected<void, InterpreterError> interpret(const std::vector<AstNode>& ast);
@@ -242,8 +223,7 @@ public:
 
     // For ExternalProject: generate full build graph for atomic EP attachment.
     // Returns the complete BuildGraph (not just dirty tasks).
-    std::expected<BuildGraph, BuildError>
-    generate_build_graph(const std::vector<std::string>& targets = {});
+    std::expected<BuildGraph, BuildError> generate_build_graph(const std::vector<std::string>& targets = {});
 
     void add_builtin(const std::string& name, BuiltinFunction func);
     std::string evaluate_argument(const Argument& arg);
@@ -316,7 +296,6 @@ public:
     // Returns nullptr if directory doesn't exist or can't be read
     const TransparentStringSet* get_directory_subdirs(std::string_view dir);
 
-
     // Policy system
     PolicyState get_policy(CMakePolicy p) const { return policies_.get(p); }
     void set_policy(CMakePolicy p, PolicyState s) { policies_.set(p, s); }
@@ -360,9 +339,7 @@ public:
             std::string cur = const_cast<Interpreter*>(this)->get_variable("CMAKE_CURRENT_SOURCE_DIR");
             if (!creator.empty() && !cur.empty()) {
                 if (cur != creator
-                    && !(cur.size() > creator.size()
-                         && cur.compare(0, creator.size(), creator) == 0
-                         && cur[creator.size()] == '/')) {
+                    && !(cur.size() > creator.size() && cur.compare(0, creator.size(), creator) == 0 && cur[creator.size()] == '/')) {
                     return nullptr;
                 }
             }
@@ -395,9 +372,7 @@ public:
     // Drives PROJECT_IS_TOP_LEVEL and similar gates that should fire only
     // when the current CMakeLists is not being consumed via add_subdirectory
     // or FetchContent.
-    bool in_top_source_dir() {
-        return get_variable("CMAKE_CURRENT_SOURCE_DIR") == get_variable("CMAKE_SOURCE_DIR");
-    }
+    bool in_top_source_dir() { return get_variable("CMAKE_CURRENT_SOURCE_DIR") == get_variable("CMAKE_SOURCE_DIR"); }
     CacheStore& get_cache_store() { return *get_root()->cache_store_; }
 
     // Enable a compiler for the given language (C, CXX, ASM).
@@ -434,50 +409,33 @@ public:
     const std::set<std::string>& get_targets_to_dump_at_build() const { return get_root()->targets_to_dump_at_build_; }
 
     // Custom command rules (OUTPUT form of add_custom_command)
-    std::map<std::string, std::shared_ptr<CustomCommandRule>>& get_custom_command_rules() {
-        return get_root()->custom_command_rules_;
-    }
+    std::map<std::string, std::shared_ptr<CustomCommandRule>>& get_custom_command_rules() { return get_root()->custom_command_rules_; }
     const std::map<std::string, std::shared_ptr<CustomCommandRule>>& get_custom_command_rules() const {
         return get_root()->custom_command_rules_;
     }
 
     // Install rules
-    std::vector<std::shared_ptr<InstallRule>>& get_install_rules() {
-        return get_root()->install_rules_;
-    }
-    const std::vector<std::shared_ptr<InstallRule>>& get_install_rules() const {
-        return get_root()->install_rules_;
-    }
+    std::vector<std::shared_ptr<InstallRule>>& get_install_rules() { return get_root()->install_rules_; }
+    const std::vector<std::shared_ptr<InstallRule>>& get_install_rules() const { return get_root()->install_rules_; }
 
     // Export sets (populated by install(TARGETS ... EXPORT))
-    void add_to_export_set(const std::string& export_name, const std::string& target,
-                           const std::string& src_dir, const std::string& bin_dir,
-                           const std::string& archive_dest = {},
-                           const std::string& library_dest = {},
+    void add_to_export_set(const std::string& export_name, const std::string& target, const std::string& src_dir,
+                           const std::string& bin_dir, const std::string& archive_dest = {}, const std::string& library_dest = {},
                            const std::string& runtime_dest = {}) {
-        get_root()->export_sets_[export_name].push_back(
-            {target, src_dir, bin_dir, archive_dest, library_dest, runtime_dest});
+        get_root()->export_sets_[export_name].push_back({target, src_dir, bin_dir, archive_dest, library_dest, runtime_dest});
     }
-    const std::map<std::string, std::vector<ExportSetEntry>>& get_export_sets() const {
-        return get_root()->export_sets_;
-    }
+    const std::map<std::string, std::vector<ExportSetEntry>>& get_export_sets() const { return get_root()->export_sets_; }
 
     // Property system accessors
     std::map<PropertyScope, std::map<std::string, PropertyDefinition>>& get_property_definitions() {
         return get_root()->property_definitions_;
     }
-    std::map<std::string, std::string>& get_global_properties() {
-        return get_root()->global_properties_;
-    }
-    std::map<std::string, std::map<std::string, std::string>>& get_source_properties() {
-        return get_root()->source_properties_;
-    }
+    std::map<std::string, std::string>& get_global_properties() { return get_root()->global_properties_; }
+    std::map<std::string, std::map<std::string, std::string>>& get_source_properties() { return get_root()->source_properties_; }
     const std::map<std::string, std::map<std::string, std::string>>& get_source_properties() const {
         return get_root()->source_properties_;
     }
-    auto& get_cache_variables() {
-        return get_root()->cache_variables_;
-    }
+    auto& get_cache_variables() { return get_root()->cache_variables_; }
 
     // Variable map accessor for builtins (needed for PARENT_SCOPE)
     ShadowMap& get_variables() { return variables_; }
@@ -486,22 +444,16 @@ public:
     // Directory context accessors (scope-based approach)
     DirectoryContext& get_current_directory_context();
     DirectoryContext* get_directory_context(const std::string& dir);
-    const std::map<std::string, DirectoryContext>& get_all_directory_contexts() const {
-        return get_root()->directory_contexts_;
-    }
+    const std::map<std::string, DirectoryContext>& get_all_directory_contexts() const { return get_root()->directory_contexts_; }
     void push_directory(const std::string& source_dir, const std::string& binary_dir);
     void pop_directory();
     void execute_deferred_calls();
 
     // For property.cpp compatibility - returns current directory's properties
-    std::map<std::string, std::string>& get_directory_properties() {
-        return get_current_directory_context().properties;
-    }
+    std::map<std::string, std::string>& get_directory_properties() { return get_current_directory_context().properties; }
 
     // Install properties: installed_path -> property_name -> value
-    std::map<std::string, std::map<std::string, std::string>>& get_install_properties() {
-        return get_root()->install_properties_;
-    }
+    std::map<std::string, std::map<std::string, std::string>>& get_install_properties() { return get_root()->install_properties_; }
 
     // Friend registration functions
     friend void register_message_builtins(Interpreter& interp);
@@ -574,29 +526,29 @@ private:
     std::expected<void, InterpreterError> execute_block_block(const BlockBlock& block_block);
     std::expected<void, InterpreterError> invoke_user_function(const FunctionBlock& func, const std::vector<std::string>& args);
     std::expected<void, InterpreterError> invoke_user_macro(const MacroBlock& macro, const std::vector<std::string>& args);
-    std::expected<bool, InterpreterError> evaluate_condition(const std::vector<Argument>& condition, size_t row, size_t col, size_t offset, size_t length);
-    std::expected<bool, InterpreterError> evaluate_condition(const std::vector<Argument>& condition, const PreParsedCondition& pp, size_t row, size_t col, size_t offset, size_t length);
+    std::expected<bool, InterpreterError> evaluate_condition(const std::vector<Argument>& condition, size_t row, size_t col, size_t offset,
+                                                             size_t length);
+    std::expected<bool, InterpreterError> evaluate_condition(const std::vector<Argument>& condition, const PreParsedCondition& pp,
+                                                             size_t row, size_t col, size_t offset, size_t length);
     std::string evaluate_variable_reference(const VariableReference& ref);
 
-    const std::string* intern_file(const std::string& path) {
-        return &*get_root()->interned_files_.insert(path).first;
-    }
+    const std::string* intern_file(const std::string& path) { return &*get_root()->interned_files_.insert(path).first; }
 
     void clear_fatal_error();
 
     std::string build_dir_;
     std::ostream* out_;
     std::ostream* err_;
-    bool force_colors_ = false;  // Force color output even when not writing to TTY
+    bool force_colors_ = false; // Force color output even when not writing to TTY
 
     // Global state (managed by root)
     inner::ankerl::unordered_dense::map<std::string, BuiltinFunction, TransparentStringHash, TransparentStringEqual> builtins_;
     TargetMap targets_;
-    std::unordered_map<std::string, std::string> target_aliases_;  // alias_name -> real_target_name
+    std::unordered_map<std::string, std::string> target_aliases_; // alias_name -> real_target_name
     std::vector<TestDefinition> tests_;
-    std::set<std::string> targets_to_dump_at_build_;  // For kiln_dump_target_info AT_BUILD
+    std::set<std::string> targets_to_dump_at_build_; // For kiln_dump_target_info AT_BUILD
     std::vector<PendingFileGenerate> pending_file_generates_;
-    std::set<std::string> file_generate_outputs_;  // Resolved paths from file(GENERATE)
+    std::set<std::string> file_generate_outputs_; // Resolved paths from file(GENERATE)
 
     // Custom command rules (OUTPUT form of add_custom_command)
     // Maps output file path -> rule that generates it
@@ -617,8 +569,7 @@ private:
     AstCache ast_cache_;
     std::unique_ptr<Debugger> debugger_;
     std::set<std::string> global_guarded_files_;
-    std::unordered_map<std::string, std::string,
-                       TransparentStringHash, TransparentStringEqual> cache_variables_;
+    std::unordered_map<std::string, std::string, TransparentStringHash, TransparentStringEqual> cache_variables_;
 
     // Session-wide directory mtime cache (for find_xxx performance)
     // Key: absolute path, Value: mtime (or nullopt if doesn't exist)
@@ -645,9 +596,9 @@ private:
     // Directory scan cache for optimizing file lookups and glob
     // Uses transparent hashing so lookups can use string_view without allocating
     struct DirectoryCacheEntry {
-        std::filesystem::file_time_type mtime;           // Directory modification time
-        TransparentStringSet entries;                    // All entries (filenames only) - O(1) lookup
-        TransparentStringSet subdirs;                    // Subdirectory names (for recursive glob)
+        std::filesystem::file_time_type mtime; // Directory modification time
+        TransparentStringSet entries;          // All entries (filenames only) - O(1) lookup
+        TransparentStringSet subdirs;          // Subdirectory names (for recursive glob)
     };
     const DirectoryCacheEntry* get_directory_cache_entry(std::string_view dir);
     std::unordered_map<std::string, DirectoryCacheEntry, TransparentStringHash, TransparentStringEqual> dir_scan_cache_;
@@ -662,8 +613,10 @@ private:
 
     // Global functions and macros (stored at root, accessible everywhere)
     // CMake semantics: functions/macros are globally visible once defined
-    inner::ankerl::unordered_dense::map<std::string, std::unique_ptr<FunctionBlock>, TransparentStringHash, TransparentStringEqual> user_functions_;
-    inner::ankerl::unordered_dense::map<std::string, std::unique_ptr<MacroBlock>, TransparentStringHash, TransparentStringEqual> user_macros_;
+    inner::ankerl::unordered_dense::map<std::string, std::unique_ptr<FunctionBlock>, TransparentStringHash, TransparentStringEqual>
+        user_functions_;
+    inner::ankerl::unordered_dense::map<std::string, std::unique_ptr<MacroBlock>, TransparentStringHash, TransparentStringEqual>
+        user_macros_;
 
     // Deferred deletion for functions/macros replaced during their own execution.
     // Each entry records {delete_when_size_at_or_below, function_ptr}.
@@ -671,22 +624,22 @@ private:
     std::vector<std::pair<size_t, std::unique_ptr<FunctionBlock>>> deferred_function_deletions_;
 
     struct DeferredMacroDeletion {
-        std::string name;       // Which macro was replaced
-        size_t depth;           // Execution depth at time of replacement
+        std::string name; // Which macro was replaced
+        size_t depth;     // Execution depth at time of replacement
         std::unique_ptr<MacroBlock> block;
     };
     std::vector<DeferredMacroDeletion> deferred_macro_deletions_;
 
     // Shadow Map-based variable scoping (O(1) access, automatic cleanup)
-    ShadowMap variables_;  // Regular variables with scope tracking
+    ShadowMap variables_; // Regular variables with scope tracking
 
     std::vector<FrameMetadata> frame_stack_; // Metadata only (no variables)
-    std::vector<TraceEntry> trace_stack_;   // For backtraces (lightweight, non-owning)
+    std::vector<TraceEntry> trace_stack_;    // For backtraces (lightweight, non-owning)
     static constexpr size_t max_trace_depth_ = 2000;
     std::string current_file_;
-    const std::string* current_file_interned_ = nullptr;  // Points into interned_files_
-    std::string_view source_view_;  // Non-owning; set by set_source_view() when source is in-memory
-    std::unordered_set<std::string> interned_files_;       // Owns file path strings
+    const std::string* current_file_interned_ = nullptr; // Points into interned_files_
+    std::string_view source_view_;                       // Non-owning; set by set_source_view() when source is in-memory
+    std::unordered_set<std::string> interned_files_;     // Owns file path strings
     std::optional<InterpreterError> fatal_error_;
     size_t current_cmd_row_ = 0;
     size_t current_cmd_col_ = 0;
@@ -700,7 +653,6 @@ private:
 
     // Return control state (for return() command)
     bool return_requested_ = false;
-
 
     // Macro parameter substitution (for text-replacement in macros)
     // Checked before variable lookup to implement CMake macro semantics
@@ -730,9 +682,7 @@ private:
 struct ReturnGuard {
     Interpreter& interp_;
     bool saved_;
-    explicit ReturnGuard(Interpreter& interp) : interp_(interp), saved_(interp.is_return_requested()) {
-        interp_.clear_return_request();
-    }
+    explicit ReturnGuard(Interpreter& interp) : interp_(interp), saved_(interp.is_return_requested()) { interp_.clear_return_request(); }
     ~ReturnGuard() {
         interp_.clear_return_request();
         if (saved_) interp_.request_return();

@@ -8,13 +8,13 @@ using namespace kiln;
 TEST_CASE("CommandParser: basic positional", "[command_parser]") {
     std::vector<std::string> args = {"my_target", "src1.cpp", "src2.cpp"};
     CommandParser parser("test_cmd");
-    
+
     std::string target;
     std::vector<std::string> sources;
-    
+
     parser.positional(target, "target");
     parser.positionals(sources, "sources");
-    
+
     auto res = parser.parse(args);
     REQUIRE(res.has_value());
     CHECK(target == "my_target");
@@ -24,17 +24,17 @@ TEST_CASE("CommandParser: basic positional", "[command_parser]") {
 TEST_CASE("CommandParser: flags and keywords", "[command_parser]") {
     std::vector<std::string> args = {"my_lib", "SHARED", "SOURCES", "s1.cpp", "s2.cpp", "VERBOSE"};
     CommandParser parser("add_library");
-    
+
     std::string name;
     bool shared = false;
     bool verbose = false;
     std::vector<std::string> sources;
-    
+
     parser.positional(name, "name");
     parser.flag("SHARED", shared);
     parser.flag("VERBOSE", verbose);
     parser.list("SOURCES", sources);
-    
+
     auto res = parser.parse(args);
     REQUIRE(res.has_value());
     CHECK(name == "my_lib");
@@ -46,13 +46,13 @@ TEST_CASE("CommandParser: flags and keywords", "[command_parser]") {
 TEST_CASE("CommandParser: single values", "[command_parser]") {
     std::vector<std::string> args = {"DESTINATION", "bin", "COMPONENT", "runtime"};
     CommandParser parser("install");
-    
+
     std::string dest;
     std::string comp;
-    
+
     parser.value("DESTINATION", dest);
     parser.value("COMPONENT", comp);
-    
+
     auto res = parser.parse(args);
     REQUIRE(res.has_value());
     CHECK(dest == "bin");
@@ -60,19 +60,15 @@ TEST_CASE("CommandParser: single values", "[command_parser]") {
 }
 
 TEST_CASE("CommandParser: multi-lists", "[command_parser]") {
-    std::vector<std::string> args = {
-        "COMMAND", "echo", "hello",
-        "COMMAND", "ls", "-l",
-        "WORKING_DIRECTORY", "/tmp"
-    };
+    std::vector<std::string> args = {"COMMAND", "echo", "hello", "COMMAND", "ls", "-l", "WORKING_DIRECTORY", "/tmp"};
     CommandParser parser("execute_process");
-    
+
     std::vector<std::vector<std::string>> commands;
     std::string working_dir;
-    
+
     parser.multi_list("COMMAND", commands);
     parser.value("WORKING_DIRECTORY", working_dir);
-    
+
     auto res = parser.parse(args);
     REQUIRE(res.has_value());
     REQUIRE(commands.size() == 2);
@@ -84,10 +80,10 @@ TEST_CASE("CommandParser: multi-lists", "[command_parser]") {
 TEST_CASE("CommandParser: optional positional", "[command_parser]") {
     std::vector<std::string> args = {};
     CommandParser parser("test_cmd");
-    
+
     std::string target = "default";
     parser.positional(target, "target", false);
-    
+
     auto res = parser.parse(args);
     REQUIRE(res.has_value());
     CHECK(target == "default");
@@ -96,14 +92,14 @@ TEST_CASE("CommandParser: optional positional", "[command_parser]") {
 TEST_CASE("CommandParser: positional stops at keyword", "[command_parser]") {
     std::vector<std::string> args = {"pos1", "KEY", "val"};
     CommandParser parser("test_cmd");
-    
+
     std::string p1, p2;
     std::string key_val;
-    
+
     parser.positional(p1, "p1");
     parser.positional(p2, "p2", false);
     parser.value("KEY", key_val);
-    
+
     auto res = parser.parse(args);
     REQUIRE(res.has_value());
     CHECK(p1 == "pos1");
@@ -114,13 +110,13 @@ TEST_CASE("CommandParser: positional stops at keyword", "[command_parser]") {
 TEST_CASE("CommandParser: default list after positionals", "[command_parser]") {
     std::vector<std::string> args = {"target", "extra1", "extra2"};
     CommandParser parser("test_cmd");
-    
+
     std::string target;
     std::vector<std::string> extras;
-    
+
     parser.positional(target, "target");
     parser.positionals(extras, "extras");
-    
+
     auto res = parser.parse(args);
     REQUIRE(res.has_value());
     CHECK(target == "target");

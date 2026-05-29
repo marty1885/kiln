@@ -16,8 +16,7 @@ namespace kiln {
 
 class Target;
 struct CustomCommandRule;
-using TargetMap = std::unordered_map<std::string, std::shared_ptr<Target>,
-                                     TransparentStringHash, TransparentStringEqual>;
+using TargetMap = std::unordered_map<std::string, std::shared_ptr<Target>, TransparentStringHash, TransparentStringEqual>;
 
 enum class TargetType { EXECUTABLE, SHARED_LIBRARY, STATIC_LIBRARY, OBJECT_LIBRARY, INTERFACE_LIBRARY, CUSTOM };
 
@@ -31,29 +30,24 @@ enum class PropertyVisibility { PRIVATE, INTERFACE, PUBLIC };
 // Semantic scopes for querying properties. Maps to visibility combinations.
 // Use this instead of manually combining PropertyVisibility values.
 enum class TargetPropertyScope {
-    BUILD,      // PRIVATE + PUBLIC — what this target uses to build itself
-    INTERFACE,  // PUBLIC + INTERFACE — what consumers of this target inherit
+    BUILD,     // PRIVATE + PUBLIC — what this target uses to build itself
+    INTERFACE, // PUBLIC + INTERFACE — what consumers of this target inherit
 };
 
 // Single source of truth for all list properties that use visibility (PUBLIC/PRIVATE/INTERFACE).
 // Used by resolve(), generate_dump_info(), set_target_properties(), set_property(TARGET).
 struct PropertyMeta {
     std::string_view name;
-    bool is_path;       // needs absolutification during resolve
-    bool transitive;    // resolved across dependencies
+    bool is_path;    // needs absolutification during resolve
+    bool transitive; // resolved across dependencies
 };
 
 inline constexpr PropertyMeta kListProperties[] = {
-    {"INCLUDE_DIRECTORIES",        true,  true},
-    {"SYSTEM_INCLUDE_DIRECTORIES", true,  true},
-    {"COMPILE_DEFINITIONS",        false, true},
-    {"COMPILE_OPTIONS",            false, true},
-    {"COMPILE_FEATURES",           false, true},
-    {"LINK_LIBRARIES",             false, true},
-    {"LINK_DIRECTORIES",           true,  true},
-    {"LINK_OPTIONS",               false, true},
-    {"PRECOMPILE_HEADERS",         false, true},
-    {"SOURCES",                    false, false},
+    {"INCLUDE_DIRECTORIES", true, true},  {"SYSTEM_INCLUDE_DIRECTORIES", true, true},
+    {"COMPILE_DEFINITIONS", false, true}, {"COMPILE_OPTIONS", false, true},
+    {"COMPILE_FEATURES", false, true},    {"LINK_LIBRARIES", false, true},
+    {"LINK_DIRECTORIES", true, true},     {"LINK_OPTIONS", false, true},
+    {"PRECOMPILE_HEADERS", false, true},  {"SOURCES", false, false},
 };
 
 // Check if a property name is a known list property (returns pointer or nullptr)
@@ -68,12 +62,12 @@ inline const PropertyMeta* find_list_property(std::string_view name) {
 // If so, returns pointer to the base property meta. E.g. "INTERFACE_COMPILE_OPTIONS" → &COMPILE_OPTIONS meta.
 inline const PropertyMeta* find_interface_list_property(std::string_view name) {
     if (!name.starts_with("INTERFACE_")) return nullptr;
-    return find_list_property(name.substr(10));  // len("INTERFACE_") == 10
+    return find_list_property(name.substr(10)); // len("INTERFACE_") == 10
 }
 
 struct FileSet {
     std::string name;
-    std::string type;  // "HEADERS" or "CXX_MODULES"
+    std::string type; // "HEADERS" or "CXX_MODULES"
     PropertyVisibility visibility;
     std::vector<std::string> base_dirs;
     std::vector<std::string> files;
@@ -93,7 +87,8 @@ struct GenexEvaluationContext;
 class Target {
 public:
     Target(std::string name, TargetType type, std::string source_dir, std::string binary_dir)
-        : name_(std::move(name)), type_(type), source_dir_(std::move(source_dir)), binary_dir_(std::move(binary_dir)), is_imported_(false) {}
+        : name_(std::move(name)), type_(type), source_dir_(std::move(source_dir)), binary_dir_(std::move(binary_dir)), is_imported_(false) {
+    }
     virtual ~Target() = default;
 
     const std::string& get_name() const { return name_; }
@@ -162,8 +157,7 @@ public:
     // Look up the visibility of the cxx_modules FILE_SET that contains `source`,
     // if any. Returns nullopt if not in any cxx_modules file set (treat as PRIVATE
     // for export purposes — those modules stay internal to this target).
-    std::optional<PropertyVisibility>
-    file_set_visibility_for_source(const std::string& source) const;
+    std::optional<PropertyVisibility> file_set_visibility_for_source(const std::string& source) const;
 
     // Manually added dependencies (add_dependencies command)
     void add_dependency(const std::string& dep) { manually_added_dependencies_.push_back(dep); }
@@ -177,9 +171,7 @@ public:
     // set(CMAKE_CXX_COMPILER ...) in a different scope won't change which
     // compiler this target uses. Empty values mean "fall back to the
     // toolchain default for this language."
-    void capture_compiler_var(const std::string& var, std::string value) {
-        compiler_var_snapshot_[var] = std::move(value);
-    }
+    void capture_compiler_var(const std::string& var, std::string value) { compiler_var_snapshot_[var] = std::move(value); }
     const std::string& captured_compiler_var(const std::string& var) const {
         static const std::string empty;
         auto it = compiler_var_snapshot_.find(var);
@@ -209,12 +201,15 @@ public:
     virtual std::string get_output_path(class GenexEvaluator* evaluator = nullptr) const;
 
     // The core task generation logic
-    virtual std::expected<void, std::string> generate_tasks(GraphTransaction& txn, const Toolchain& toolchain, const TargetMap& all_targets, const class Interpreter& interp, const std::vector<std::string>& exe_linker_flags = {}, const std::vector<std::string>& shared_linker_flags = {});
+    virtual std::expected<void, std::string> generate_tasks(GraphTransaction& txn, const Toolchain& toolchain, const TargetMap& all_targets,
+                                                            const class Interpreter& interp,
+                                                            const std::vector<std::string>& exe_linker_flags = {},
+                                                            const std::vector<std::string>& shared_linker_flags = {});
 
     // Resolves transitive properties (includes, definitions, options, libraries).
     // Must be called before generating tasks. Safe to call multiple times (cached).
     void resolve(const TargetMap& all_targets, const class Interpreter& interp);
-    
+
     // Access resolved properties (after resolve() is called)
     const std::vector<std::string>& get_resolved_property(const std::string& name) const;
     const std::vector<std::string>& get_resolved_interface_property(const std::string& name) const;
@@ -222,11 +217,8 @@ public:
     // Like get_resolved_property() but with $<COMPILE_LANGUAGE:...> deferred
     // genex evaluated for the given language. Use this when feeding tools
     // that consume per-language flags (compilers, moc, etc.).
-    std::vector<std::string> get_resolved_property_for_language(
-        const std::string& name,
-        Language lang,
-        const class Interpreter& interp,
-        const TargetMap& all_targets) const;
+    std::vector<std::string> get_resolved_property_for_language(const std::string& name, Language lang, const class Interpreter& interp,
+                                                                const TargetMap& all_targets) const;
 
     // Linker language used by $<LINK_LANGUAGE>. Returns LINKER_LANGUAGE
     // property if set, else inferred from this target's own sources
@@ -235,8 +227,7 @@ public:
 
     // Second pass after all targets are resolved: pick up interface properties
     // from circular dependencies that were unavailable during the DFS.
-    void resolve_deferred_circular_deps(
-        const TargetMap& all_targets);
+    void resolve_deferred_circular_deps(const TargetMap& all_targets);
 
     // All direct target dependencies (canonical names) discovered during resolve().
     // Single source of truth for dependency discovery.
@@ -261,12 +252,9 @@ public:
     void remove_source(const std::string& path);
 
     // Factory for GenexEvaluationContext. Populates from interpreter variables.
-    static GenexEvaluationContext make_genex_context(
-        const Target* current_target,
-        const class Interpreter& interp,
-        const TargetMap& all_targets,
-        std::optional<Language> compile_language = std::nullopt,
-        bool allow_deferred = false);
+    static GenexEvaluationContext make_genex_context(const Target* current_target, const class Interpreter& interp,
+                                                     const TargetMap& all_targets, std::optional<Language> compile_language = std::nullopt,
+                                                     bool allow_deferred = false);
 
 protected:
     // Metadata for a transitive property during resolve().
@@ -281,9 +269,7 @@ protected:
 
     // Phase 1 of resolve(): populate resolved_properties_ and resolved_interface_properties_
     // from this target's own property values. Evaluates generator expressions, resolves paths.
-    void initialize_local_properties(
-        const std::vector<PropInfo>& props_to_resolve,
-        class GenexEvaluator& evaluator);
+    void initialize_local_properties(const std::vector<PropInfo>& props_to_resolve, class GenexEvaluator& evaluator);
 
     // Get the link library dependencies that should propagate from a dependency.
     // Static (non-imported): ALL link deps; Shared/imported/interface: only INTERFACE.
@@ -292,50 +278,39 @@ protected:
     // Merge a resolved dependency's INTERFACE properties into an output property map.
     // If the dependency has deferred genex (single-arg $<TARGET_PROPERTY:>), re-evaluates
     // them with the provided evaluator (which has the consumer as current_target).
-    void propagate_from_dependency(
-        const Target& dep,
-        const std::vector<PropInfo>& props_to_resolve,
-        std::map<std::string, std::vector<std::string>>& output_props,
-        bool skip_non_link,
-        class GenexEvaluator& evaluator);
+    void propagate_from_dependency(const Target& dep, const std::vector<PropInfo>& props_to_resolve,
+                                   std::map<std::string, std::vector<std::string>>& output_props, bool skip_non_link,
+                                   class GenexEvaluator& evaluator);
 
     // Handle a circular dependency detected during resolve().
-    void handle_circular_dep(
-        const Target& dep,
-        bool is_public, bool is_interface_only,
-        std::vector<std::string>& res_libs,
-        std::vector<std::string>& res_iface_libs);
+    void handle_circular_dep(const Target& dep, bool is_public, bool is_interface_only, std::vector<std::string>& res_libs,
+                             std::vector<std::string>& res_iface_libs);
 
     // Circular static lib deps recorded during resolve() for deferred property pickup.
     std::vector<std::string> deferred_circular_deps_;
 
     // Helper methods for task generation
-    std::expected<void, std::string> generate_object_tasks(GraphTransaction& txn, const Toolchain& toolchain, std::vector<std::string>& obj_files,
-                               const std::map<Language, PchInfo>& pch_per_lang,
-                               bool is_shared, bool is_pie, const TargetMap& all_targets,
-                               class GenexEvaluator& evaluator, const class Interpreter& interp,
-                               const std::string& pre_build_task_id,
-                               const std::string& module_mapper_path,
-                               std::set<std::string>& generated_custom_tasks,
-                               const std::set<std::string>& implicit_includes,
-                               std::vector<struct ResolvedDep> resolved_manual_deps);
+    std::expected<void, std::string>
+    generate_object_tasks(GraphTransaction& txn, const Toolchain& toolchain, std::vector<std::string>& obj_files,
+                          const std::map<Language, PchInfo>& pch_per_lang, bool is_shared, bool is_pie, const TargetMap& all_targets,
+                          class GenexEvaluator& evaluator, const class Interpreter& interp, const std::string& pre_build_task_id,
+                          const std::string& module_mapper_path, std::set<std::string>& generated_custom_tasks,
+                          const std::set<std::string>& implicit_includes, std::vector<struct ResolvedDep> resolved_manual_deps);
 
     // C++20 modules task generation
     // Returns true if module pipeline (scanner+collator) was generated for this target
     std::expected<bool, std::string> generate_module_scanner_tasks(GraphTransaction& txn, const Toolchain& toolchain,
-                                       const TargetMap& all_targets, const class Interpreter& interp,
-                                       int cxx_default_std = 0);
+                                                                   const TargetMap& all_targets, const class Interpreter& interp,
+                                                                   int cxx_default_std = 0);
 
     // Generate the collator task that depends on all scanner tasks plus the
     // module-export manifests of every module-providing transitive PUBLIC/INTERFACE
     // link dep, so cross-target imports resolve.
-    std::expected<void, std::string> generate_module_collator_task(GraphTransaction& txn,
-                                       const std::vector<std::string>& scanner_task_ids,
-                                       const TargetMap& all_targets,
-                                       const std::string& std_module_manifest_path,
-                                       const class Compiler* cxx_compiler,
-                                       const std::string& cxx_standard,
-                                       bool cxx_extensions_enabled);
+    std::expected<void, std::string> generate_module_collator_task(GraphTransaction& txn, const std::vector<std::string>& scanner_task_ids,
+                                                                   const TargetMap& all_targets,
+                                                                   const std::string& std_module_manifest_path,
+                                                                   const class Compiler* cxx_compiler, const std::string& cxx_standard,
+                                                                   bool cxx_extensions_enabled);
 
     // Check if target has any module sources of its own
     bool has_module_sources() const;
@@ -367,19 +342,19 @@ protected:
     TargetType type_;
     std::string source_dir_;
     std::string binary_dir_;
-    
+
     bool is_imported_;
     bool imported_global_ = false;
     std::string imported_location_;
 
     std::map<Language, std::string> standards_;
-    std::map<Language, bool> extensions_enabled_;  // Whether GNU extensions are enabled (gnu11 vs c11)
+    std::map<Language, bool> extensions_enabled_; // Whether GNU extensions are enabled (gnu11 vs c11)
     std::map<Language, std::vector<std::string>> language_flags_;
 
     // Generic Storage
     // Scalar properties (e.g., OUTPUT_NAME, CXX_STANDARD)
     std::map<std::string, std::string> properties_;
-    
+
     // List properties with visibility (e.g., INCLUDE_DIRECTORIES[PUBLIC])
     // Structure: map<PropertyName, map<Visibility, vector<Value>>>
     std::map<std::string, std::map<PropertyVisibility, std::vector<std::string>>> list_properties_;
@@ -443,7 +418,9 @@ public:
     void set_build_by_default(bool b) { build_by_default_ = b; }
     bool is_build_by_default() const { return build_by_default_; }
 
-    std::expected<void, std::string> generate_tasks(GraphTransaction& txn, const Toolchain& toolchain, const TargetMap& all_targets, const class Interpreter& interp, const std::vector<std::string>& exe_linker_flags = {}, const std::vector<std::string>& shared_linker_flags = {}) override;
+    std::expected<void, std::string> generate_tasks(GraphTransaction& txn, const Toolchain& toolchain, const TargetMap& all_targets,
+                                                    const class Interpreter& interp, const std::vector<std::string>& exe_linker_flags = {},
+                                                    const std::vector<std::string>& shared_linker_flags = {}) override;
 
 private:
     std::vector<CustomCommand> custom_commands_;
@@ -459,12 +436,9 @@ std::string get_obj_path(const std::string& binary_dir, const std::string& targe
 // Generate a task for an add_custom_command rule (and its custom-command DEPENDS chain).
 // Used by the missing-dependency resolver when a target's input/dep is the OUTPUT of a
 // stand-alone add_custom_command not pulled in via target_sources/DEPENDS.
-std::expected<void, std::string> generate_custom_command_task_for_rule(
-    GraphTransaction& txn,
-    const CustomCommandRule& rule,
-    const TargetMap& all_targets,
-    const std::map<std::string, std::shared_ptr<CustomCommandRule>>& custom_rules,
-    std::set<std::string>& generated,
-    const std::unordered_map<std::string, std::string>& target_aliases);
+std::expected<void, std::string>
+generate_custom_command_task_for_rule(GraphTransaction& txn, const CustomCommandRule& rule, const TargetMap& all_targets,
+                                      const std::map<std::string, std::shared_ptr<CustomCommandRule>>& custom_rules,
+                                      std::set<std::string>& generated, const std::unordered_map<std::string, std::string>& target_aliases);
 
 } // namespace kiln

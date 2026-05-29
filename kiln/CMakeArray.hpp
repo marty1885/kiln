@@ -34,10 +34,8 @@ public:
     void append(const std::string& item);
     void append(const CMakeArray& other);
     void push_back(const std::string& item) { append(item); }
-    void erase(size_t idx) { items_.erase(items_.begin()+idx);  }
-    void erase_range(size_t idx, size_t count) {
-        items_.erase(items_.begin() + idx, items_.begin() + idx + count);
-    }
+    void erase(size_t idx) { items_.erase(items_.begin() + idx); }
+    void erase_range(size_t idx, size_t count) { items_.erase(items_.begin() + idx, items_.begin() + idx + count); }
     void insert(size_t idx, const std::vector<std::string>& items);
 
     void reverse();
@@ -70,8 +68,15 @@ public:
         iterator(const CMakeArrayView* parent, size_t idx) : parent_(parent), idx_(idx) {}
 
         std::string_view operator*() const { return parent_->element_at(idx_); }
-        iterator& operator++() { ++idx_; return *this; }
-        iterator operator++(int) { auto tmp = *this; ++idx_; return tmp; }
+        iterator& operator++() {
+            ++idx_;
+            return *this;
+        }
+        iterator operator++(int) {
+            auto tmp = *this;
+            ++idx_;
+            return tmp;
+        }
         bool operator==(const iterator& other) const { return idx_ == other.idx_; }
         bool operator!=(const iterator& other) const { return idx_ != other.idx_; }
 
@@ -112,8 +117,7 @@ public:
         using value_type = std::string_view;
         using difference_type = std::ptrdiff_t;
 
-        explicit iterator(std::string_view source)
-            : source_(source) {
+        explicit iterator(std::string_view source) : source_(source) {
             if (source_.empty()) {
                 done_ = true;
             } else {
@@ -121,9 +125,7 @@ public:
             }
         }
 
-        std::string_view operator*() const {
-            return source_.substr(pos_, end_ - pos_);
-        }
+        std::string_view operator*() const { return source_.substr(pos_, end_ - pos_); }
 
         iterator& operator++() {
             if (end_ >= source_.size()) {
@@ -213,9 +215,7 @@ struct ProgressiveListIndex {
             exhausted = true;
             return;
         }
-        if (offsets.empty()) {
-            offsets.push_back(0);
-        }
+        if (offsets.empty()) { offsets.push_back(0); }
         const char* data = source.data();
         size_t len = source.size();
         while (offsets.size() <= target_idx + 1 && scan_pos < len) {
@@ -242,8 +242,7 @@ struct ProgressiveListIndex {
     std::string_view element(std::string_view source, size_t idx) const {
         if (idx >= offsets.size()) return {};
         uint32_t start = offsets[idx];
-        uint32_t end = (idx + 1 < offsets.size()) ? offsets[idx + 1] - 1
-                                                  : static_cast<uint32_t>(source.size());
+        uint32_t end = (idx + 1 < offsets.size()) ? offsets[idx + 1] - 1 : static_cast<uint32_t>(source.size());
         return source.substr(start, end - start);
     }
 
@@ -284,4 +283,4 @@ inline std::string unescape_list_element(std::string_view sv) {
     return result;
 }
 
-}
+} // namespace kiln

@@ -6,12 +6,16 @@ namespace kiln {
 
 namespace {
 struct CodeDeleter {
-    void operator()(pcre2_code* p) const noexcept { if (p) pcre2_code_free(p); }
+    void operator()(pcre2_code* p) const noexcept {
+        if (p) pcre2_code_free(p);
+    }
 };
 struct MatchDataDeleter {
-    void operator()(pcre2_match_data* p) const noexcept { if (p) pcre2_match_data_free(p); }
+    void operator()(pcre2_match_data* p) const noexcept {
+        if (p) pcre2_match_data_free(p);
+    }
 };
-}
+} // namespace
 
 struct Regex::Impl {
     std::unique_ptr<pcre2_code, CodeDeleter> code;
@@ -34,20 +38,29 @@ static std::string normalize_cmake_regex(std::string_view pattern, std::string* 
     // CMake regex metacharacters: ^ $ . \ [ ] * + ? | ( )
     auto is_cmake_metachar = [](char c) -> bool {
         switch (c) {
-            case '^': case '$': case '.': case '\\':
-            case '[': case ']': case '*': case '+':
-            case '?': case '|': case '(': case ')':
-                return true;
-            default:
-                return false;
+        case '^':
+        case '$':
+        case '.':
+        case '\\':
+        case '[':
+        case ']':
+        case '*':
+        case '+':
+        case '?':
+        case '|':
+        case '(':
+        case ')':
+            return true;
+        default:
+            return false;
         }
     };
 
     std::string result;
     result.reserve(pattern.size());
     std::string normalized_escapes; // Track which escapes were normalized
-    bool in_bracket = false;    // Inside a character class [...]
-    bool bracket_first = false; // Next char is first in class (where ] is literal)
+    bool in_bracket = false;        // Inside a character class [...]
+    bool bracket_first = false;     // Next char is first in class (where ] is literal)
 
     for (size_t i = 0; i < pattern.size(); ++i) {
         if (in_bracket) {
@@ -62,9 +75,7 @@ static std::string normalize_cmake_regex(std::string_view pattern, std::string* 
                 result += "\\\\"; // Literal backslash for PCRE2
                 bracket_first = false;
             } else {
-                if (bracket_first && pattern[i] != '^') {
-                    bracket_first = false;
-                }
+                if (bracket_first && pattern[i] != '^') { bracket_first = false; }
                 result += pattern[i];
             }
         } else if (pattern[i] == '[') {
@@ -98,8 +109,8 @@ static std::string normalize_cmake_regex(std::string_view pattern, std::string* 
     }
 
     if (warning_out && !normalized_escapes.empty()) {
-        *warning_out = "Regex contains non-special escape sequences (" + normalized_escapes +
-                       ") - these match literal characters in CMake regex";
+        *warning_out =
+            "Regex contains non-special escape sequences (" + normalized_escapes + ") - these match literal characters in CMake regex";
     }
     return result;
 }
@@ -108,11 +119,9 @@ static std::expected<std::unique_ptr<Regex::Impl>, std::string> compile_raw(std:
     int errcode;
     PCRE2_SIZE erroffset;
 
-    std::unique_ptr<pcre2_code, CodeDeleter> code(pcre2_compile(
-        reinterpret_cast<PCRE2_SPTR>(pattern.data()),
-        pattern.size(),
-        PCRE2_UTF | PCRE2_NO_UTF_CHECK | PCRE2_DOTALL,
-        &errcode, &erroffset, nullptr));
+    std::unique_ptr<pcre2_code, CodeDeleter> code(pcre2_compile(reinterpret_cast<PCRE2_SPTR>(pattern.data()), pattern.size(),
+                                                                PCRE2_UTF | PCRE2_NO_UTF_CHECK | PCRE2_DOTALL, &errcode, &erroffset,
+                                                                nullptr));
 
     if (!code) {
         PCRE2_UCHAR buf[256];
@@ -167,13 +176,8 @@ Regex::~Regex() = default;
 Regex::Regex(Regex&&) noexcept = default;
 Regex& Regex::operator=(Regex&&) noexcept = default;
 
-static bool do_match(const Regex::Impl* impl, std::string_view input,
-                     std::vector<std::string>* captures) {
-    int rc = pcre2_match(
-        impl->code.get(),
-        reinterpret_cast<PCRE2_SPTR>(input.data()),
-        input.size(), 0, 0,
-        impl->match_data.get(), nullptr);
+static bool do_match(const Regex::Impl* impl, std::string_view input, std::vector<std::string>* captures) {
+    int rc = pcre2_match(impl->code.get(), reinterpret_cast<PCRE2_SPTR>(input.data()), input.size(), 0, 0, impl->match_data.get(), nullptr);
 
     if (rc < 0) return false;
 
@@ -186,9 +190,7 @@ static bool do_match(const Regex::Impl* impl, std::string_view input,
             if (ovector[2 * i] == PCRE2_UNSET) {
                 captures->emplace_back();
             } else {
-                captures->emplace_back(
-                    input.data() + ovector[2 * i],
-                    ovector[2 * i + 1] - ovector[2 * i]);
+                captures->emplace_back(input.data() + ovector[2 * i], ovector[2 * i + 1] - ovector[2 * i]);
             }
         }
     }
@@ -217,11 +219,8 @@ std::vector<std::vector<std::string>> Regex::match_all(std::string_view input) c
     PCRE2_SIZE offset = 0;
 
     while (offset <= input.size()) {
-        int rc = pcre2_match(
-            impl_->code.get(),
-            reinterpret_cast<PCRE2_SPTR>(input.data()),
-            input.size(), offset, 0,
-            impl_->match_data.get(), nullptr);
+        int rc = pcre2_match(impl_->code.get(), reinterpret_cast<PCRE2_SPTR>(input.data()), input.size(), offset, 0,
+                             impl_->match_data.get(), nullptr);
 
         if (rc < 0) break;
 
@@ -233,9 +232,7 @@ std::vector<std::vector<std::string>> Regex::match_all(std::string_view input) c
             if (ovector[2 * i] == PCRE2_UNSET) {
                 groups.emplace_back();
             } else {
-                groups.emplace_back(
-                    input.data() + ovector[2 * i],
-                    ovector[2 * i + 1] - ovector[2 * i]);
+                groups.emplace_back(input.data() + ovector[2 * i], ovector[2 * i + 1] - ovector[2 * i]);
             }
         }
         results.push_back(std::move(groups));
@@ -283,35 +280,23 @@ std::string Regex::replace_all(std::string_view input, std::string_view replacem
 
     // First call to determine output length
     PCRE2_SIZE out_len = 0;
-    int rc = pcre2_substitute(
-        impl_->code.get(), reinterpret_cast<PCRE2_SPTR>(input.data()), input.size(),
-        0, PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH,
-        impl_->match_data.get(), nullptr,
-        reinterpret_cast<PCRE2_SPTR>(pcre2_repl.data()), pcre2_repl.size(),
-        nullptr, &out_len);
+    int rc = pcre2_substitute(impl_->code.get(), reinterpret_cast<PCRE2_SPTR>(input.data()), input.size(), 0,
+                              PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH, impl_->match_data.get(), nullptr,
+                              reinterpret_cast<PCRE2_SPTR>(pcre2_repl.data()), pcre2_repl.size(), nullptr, &out_len);
 
-    if (rc == PCRE2_ERROR_NOMATCH) {
-        return std::string(input);
-    }
+    if (rc == PCRE2_ERROR_NOMATCH) { return std::string(input); }
 
-    if (rc != PCRE2_ERROR_NOMEMORY && rc < 0) {
-        return std::string(input);
-    }
+    if (rc != PCRE2_ERROR_NOMEMORY && rc < 0) { return std::string(input); }
 
     // Allocate and perform the substitution
     PCRE2_SIZE result_len = out_len + 1; // pcre2 needs space for NUL
     std::string result(result_len, '\0');
 
-    rc = pcre2_substitute(
-        impl_->code.get(), reinterpret_cast<PCRE2_SPTR>(input.data()), input.size(),
-        0, PCRE2_SUBSTITUTE_GLOBAL,
-        impl_->match_data.get(), nullptr,
-        reinterpret_cast<PCRE2_SPTR>(pcre2_repl.data()), pcre2_repl.size(),
-        reinterpret_cast<PCRE2_UCHAR*>(result.data()), &result_len);
+    rc = pcre2_substitute(impl_->code.get(), reinterpret_cast<PCRE2_SPTR>(input.data()), input.size(), 0, PCRE2_SUBSTITUTE_GLOBAL,
+                          impl_->match_data.get(), nullptr, reinterpret_cast<PCRE2_SPTR>(pcre2_repl.data()), pcre2_repl.size(),
+                          reinterpret_cast<PCRE2_UCHAR*>(result.data()), &result_len);
 
-    if (rc < 0) {
-        return std::string(input);
-    }
+    if (rc < 0) { return std::string(input); }
 
     result.resize(result_len);
     return result;

@@ -31,14 +31,10 @@ static auto run_and_resolve(const std::string& script) {
 
     // Resolve all targets
     auto& targets = interp.get_targets();
-    for (auto& [name, target] : targets) {
-        target->resolve(targets, interp);
-    }
+    for (auto& [name, target] : targets) { target->resolve(targets, interp); }
 
     // Deferred circular dep pass
-    for (auto& [name, target] : targets) {
-        target->resolve_deferred_circular_deps(targets);
-    }
+    for (auto& [name, target] : targets) { target->resolve_deferred_circular_deps(targets); }
 
     std::filesystem::remove_all(temp_dir);
     return std::make_pair(std::move(targets), err.str());
@@ -130,9 +126,7 @@ TEST_CASE("Static lib propagates PRIVATE link deps", "[resolve]") {
     auto& app = targets["myapp"];
     const auto& libs = app->get_resolved_property("LINK_LIBRARIES");
     // Static libs propagate ALL link deps (inner must appear for symbol resolution)
-    bool has_inner = std::any_of(libs.begin(), libs.end(), [](const std::string& s) {
-        return s.find("libinner.a") != std::string::npos;
-    });
+    bool has_inner = std::any_of(libs.begin(), libs.end(), [](const std::string& s) { return s.find("libinner.a") != std::string::npos; });
     REQUIRE(has_inner);
 }
 
@@ -147,9 +141,7 @@ TEST_CASE("Shared lib does NOT propagate PRIVATE link deps", "[resolve]") {
 
     auto& app = targets["myapp"];
     const auto& libs = app->get_resolved_property("LINK_LIBRARIES");
-    bool has_inner = std::any_of(libs.begin(), libs.end(), [](const std::string& s) {
-        return s.find("libinner.a") != std::string::npos;
-    });
+    bool has_inner = std::any_of(libs.begin(), libs.end(), [](const std::string& s) { return s.find("libinner.a") != std::string::npos; });
     REQUIRE_FALSE(has_inner);
 }
 

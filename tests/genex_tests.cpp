@@ -104,7 +104,7 @@ TEST_CASE("GenexEvaluator - INSTALL_INTERFACE in BUILD phase", "[genex][evaluato
 
     auto result = eval.evaluate("$<INSTALL_INTERFACE:include>");
     REQUIRE(result.has_value());
-    REQUIRE(*result == "");  // Empty in BUILD phase
+    REQUIRE(*result == ""); // Empty in BUILD phase
 }
 
 TEST_CASE("GenexEvaluator - CONFIG matching", "[genex][evaluator]") {
@@ -272,8 +272,7 @@ TEST_CASE("GenexEvaluator - LINK_LANGUAGE infers from sources", "[genex][evaluat
 TEST_CASE("GenexEvaluator - LINK_GROUP wraps libs with feature prologue/epilogue", "[genex][evaluator]") {
     std::ostringstream out;
     Interpreter interp("", &out);
-    interp.set_variable("CMAKE_LINK_GROUP_USING_no_as_needed",
-                        "LINKER:--push-state,--no-as-needed;LINKER:--pop-state");
+    interp.set_variable("CMAKE_LINK_GROUP_USING_no_as_needed", "LINKER:--push-state,--no-as-needed;LINKER:--pop-state");
 
     GenexEvaluationContext ctx;
     ctx.interp = &interp;
@@ -427,7 +426,7 @@ TEST_CASE("GenexEvaluator - COMPILE_LANG_AND_ID", "[genex][evaluator]") {
 
         auto result = eval.evaluate("$<COMPILE_LANG_AND_ID:CXX,GNU>");
         REQUIRE(result.has_value());
-        REQUIRE(*result == "$<COMPILE_LANG_AND_ID:CXX,GNU>");  // Returned as-is for deferred evaluation
+        REQUIRE(*result == "$<COMPILE_LANG_AND_ID:CXX,GNU>"); // Returned as-is for deferred evaluation
     }
 }
 
@@ -464,16 +463,12 @@ TEST_CASE("GenexEvaluator - Property list evaluation", "[genex][evaluator]") {
     ctx.phase = GenexEvaluationContext::Phase::BUILD;
     GenexEvaluator eval(ctx);
 
-    std::vector<std::string> values = {
-        "$<BUILD_INTERFACE:/include>",
-        "$<INSTALL_INTERFACE:include>",
-        "$<$<CONFIG:Debug>:/debug/include>",
-        "/always/include"
-    };
+    std::vector<std::string> values = {"$<BUILD_INTERFACE:/include>", "$<INSTALL_INTERFACE:include>", "$<$<CONFIG:Debug>:/debug/include>",
+                                       "/always/include"};
 
     auto result = eval.evaluate_property_list(values);
     REQUIRE(result.has_value());
-    REQUIRE(result->size() == 3);  // INSTALL_INTERFACE and non-matching CONFIG are removed
+    REQUIRE(result->size() == 3); // INSTALL_INTERFACE and non-matching CONFIG are removed
     REQUIRE((*result)[0] == "/include");
     REQUIRE((*result)[1] == "/debug/include");
     REQUIRE((*result)[2] == "/always/include");
@@ -627,10 +622,8 @@ TEST_CASE("GenexEvaluator - Pure genex whitespace splitting", "[genex][evaluator
     GenexEvaluator eval(ctx);
 
     SECTION("Pure genex should split on whitespace") {
-        std::vector<std::string> values = {
-            "$<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Wshadow>",
-            "$<$<CXX_COMPILER_ID:GNU>:-pedantic -pedantic-errors>"
-        };
+        std::vector<std::string> values = {"$<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Wshadow>",
+                                           "$<$<CXX_COMPILER_ID:GNU>:-pedantic -pedantic-errors>"};
 
         auto result = eval.evaluate_property_list(values);
         REQUIRE(result.has_value());
@@ -646,9 +639,7 @@ TEST_CASE("GenexEvaluator - Pure genex whitespace splitting", "[genex][evaluator
 
     SECTION("Mixed content should NOT split on whitespace") {
         // If genex is mixed with other text, keep as single value (like quoted argument)
-        std::vector<std::string> values = {
-            "prefix$<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra>suffix"
-        };
+        std::vector<std::string> values = {"prefix$<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra>suffix"};
 
         auto result = eval.evaluate_property_list(values);
         REQUIRE(result.has_value());
@@ -660,9 +651,7 @@ TEST_CASE("GenexEvaluator - Pure genex whitespace splitting", "[genex][evaluator
 
     SECTION("Literal values should NOT split on whitespace") {
         // Plain literals should remain as single values
-        std::vector<std::string> values = {
-            "-Wall -Wextra -Wshadow"
-        };
+        std::vector<std::string> values = {"-Wall -Wextra -Wshadow"};
 
         auto result = eval.evaluate_property_list(values);
         REQUIRE(result.has_value());
@@ -675,8 +664,8 @@ TEST_CASE("GenexEvaluator - Pure genex whitespace splitting", "[genex][evaluator
     SECTION("Pure genex evaluating to empty should be skipped") {
         // Genex that evaluates to empty string should not contribute to result
         std::vector<std::string> values = {
-            "$<$<CXX_COMPILER_ID:MSVC>:-Wall -Wextra>",  // Evaluates to empty (not MSVC)
-            "$<$<CXX_COMPILER_ID:GNU>:-pedantic>"        // Evaluates to "-pedantic"
+            "$<$<CXX_COMPILER_ID:MSVC>:-Wall -Wextra>", // Evaluates to empty (not MSVC)
+            "$<$<CXX_COMPILER_ID:GNU>:-pedantic>"       // Evaluates to "-pedantic"
         };
 
         auto result = eval.evaluate_property_list(values);
@@ -690,9 +679,7 @@ TEST_CASE("GenexEvaluator - Pure genex whitespace splitting", "[genex][evaluator
     SECTION("Pure genex should split on semicolons (CMake list separator)") {
         // When genex output contains semicolons, it represents a CMake list
         // Each list item should become a separate entry (like yaml-cpp's ${yaml-cpp-contrib-sources})
-        std::vector<std::string> values = {
-            "$<$<BOOL:ON>:src/a.cpp;src/b.cpp;src/c.cpp>"
-        };
+        std::vector<std::string> values = {"$<$<BOOL:ON>:src/a.cpp;src/b.cpp;src/c.cpp>"};
 
         auto result = eval.evaluate_property_list(values);
         REQUIRE(result.has_value());
@@ -706,9 +693,7 @@ TEST_CASE("GenexEvaluator - Pure genex whitespace splitting", "[genex][evaluator
 
     SECTION("Pure genex should split semicolons AND whitespace") {
         // Both semicolons and whitespace should cause splitting
-        std::vector<std::string> values = {
-            "$<$<BOOL:ON>:src/a.cpp;src/b.cpp -flag1 -flag2>"
-        };
+        std::vector<std::string> values = {"$<$<BOOL:ON>:src/a.cpp;src/b.cpp -flag1 -flag2>"};
 
         auto result = eval.evaluate_property_list(values);
         REQUIRE(result.has_value());
@@ -1446,10 +1431,7 @@ TEST_CASE("BuildGraph::evaluate_genex evaluates genex in commands", "[genex][eva
     SECTION("Multiple commands are all evaluated") {
         BuildTask task;
         task.id = "test_task";
-        task.commands = {
-            {"echo", "$<$<CONFIG:Debug>:cmd1>"},
-            {"echo", "$<$<CONFIG:Debug>:cmd2>"}
-        };
+        task.commands = {{"echo", "$<$<CONFIG:Debug>:cmd1>"}, {"echo", "$<$<CONFIG:Debug>:cmd2>"}};
 
         auto txn = graph.begin();
         REQUIRE(txn.add(std::move(task)));
@@ -1633,8 +1615,8 @@ TEST_CASE("GenexEvaluator - monkey test", "[genex][evaluator][monkey]") {
         "$<UPPER_CASE:{}>",
         "$<BUILD_INTERFACE:{}>",
         "$<INSTALL_INTERFACE:{}>",
-        "prefix-{}-suffix",   // genex embedded in literal context
-        "{}",                 // identity
+        "prefix-{}-suffix", // genex embedded in literal context
+        "{}",               // identity
     };
 
     auto substitute = [](string tmpl, const string& inner) -> string {
@@ -1662,13 +1644,13 @@ TEST_CASE("GenexEvaluator - monkey test", "[genex][evaluator][monkey]") {
     // reproduce a CI failure locally.
     uint64_t seed = 0xC0FFEEULL;
     if (const char* s = std::getenv("KILN_GENEX_MONKEY_SEED")) {
-        try { seed = std::stoull(s); } catch (...) {}
+        try {
+            seed = std::stoull(s);
+        } catch (...) {}
     }
     std::mt19937_64 rng(seed);
 
-    auto pick = [&](const auto& v) -> const string& {
-        return v[std::uniform_int_distribution<size_t>(0, v.size() - 1)(rng)];
-    };
+    auto pick = [&](const auto& v) -> const string& { return v[std::uniform_int_distribution<size_t>(0, v.size() - 1)(rng)]; };
 
     // Generate `iterations` random expressions, nesting up to max_depth wrappers
     // around a randomly-chosen atom.
@@ -1679,9 +1661,7 @@ TEST_CASE("GenexEvaluator - monkey test", "[genex][evaluator][monkey]") {
     for (int i = 0; i < iterations; ++i) {
         string expr = pick(atoms);
         int depth = std::uniform_int_distribution<int>(0, max_depth)(rng);
-        for (int d = 0; d < depth; ++d) {
-            expr = substitute(pick(wrappers_unary), expr);
-        }
+        for (int d = 0; d < depth; ++d) { expr = substitute(pick(wrappers_unary), expr); }
 
         std::expected<string, string> result;
         try {

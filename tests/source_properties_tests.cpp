@@ -20,9 +20,7 @@ static std::string run_script(const std::string& src) {
     }
 
     auto result = interpreter.interpret(ast_or_error.value());
-    if (!result) {
-        throw std::runtime_error(result.error().message);
-    }
+    if (!result) { throw std::runtime_error(result.error().message); }
 
     return output.str();
 }
@@ -41,9 +39,7 @@ static std::string get_variable(const std::string& src, const std::string& var_n
     }
 
     auto result = interpreter.interpret(ast_or_error.value());
-    if (!result) {
-        throw std::runtime_error(result.error().message);
-    }
+    if (!result) { throw std::runtime_error(result.error().message); }
 
     return interpreter.get_variable(var_name);
 }
@@ -53,7 +49,8 @@ TEST_CASE("set_source_files_properties basic", "[source_properties]") {
         auto result = get_variable(R"(
             set_source_files_properties(test.cpp PROPERTIES GENERATED TRUE)
             get_source_file_property(val test.cpp GENERATED)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "TRUE");
     }
 
@@ -70,7 +67,7 @@ TEST_CASE("set_source_files_properties basic", "[source_properties]") {
         )";
 
         interpreter.set_source_view(src);
-    kiln::Parser parser(src);
+        kiln::Parser parser(src);
         auto ast = parser.parse();
         REQUIRE(ast.has_value());
         auto result = interpreter.interpret(*ast);
@@ -92,7 +89,7 @@ TEST_CASE("set_source_files_properties basic", "[source_properties]") {
         )";
 
         interpreter.set_source_view(src);
-    kiln::Parser parser(src);
+        kiln::Parser parser(src);
         auto ast = parser.parse();
         REQUIRE(ast.has_value());
         auto result = interpreter.interpret(*ast);
@@ -108,7 +105,8 @@ TEST_CASE("get_source_file_property", "[source_properties]") {
     SECTION("Returns NOTFOUND for unset property") {
         auto result = get_variable(R"(
             get_source_file_property(val test.cpp SOME_PROPERTY)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "NOTFOUND");
     }
 
@@ -116,7 +114,8 @@ TEST_CASE("get_source_file_property", "[source_properties]") {
         auto result = get_variable(R"(
             set_source_files_properties(test.cpp PROPERTIES LANGUAGE CXX)
             get_source_file_property(val test.cpp LANGUAGE)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "CXX");
     }
 }
@@ -126,7 +125,8 @@ TEST_CASE("Source property types", "[source_properties]") {
         auto result = get_variable(R"(
             set_source_files_properties(gen.cpp PROPERTIES GENERATED TRUE)
             get_source_file_property(val gen.cpp GENERATED)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "TRUE");
     }
 
@@ -134,7 +134,8 @@ TEST_CASE("Source property types", "[source_properties]") {
         auto result = get_variable(R"(
             set_source_files_properties(src.cpp PROPERTIES COMPILE_FLAGS "-O3 -march=native")
             get_source_file_property(val src.cpp COMPILE_FLAGS)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "-O3 -march=native");
     }
 
@@ -142,7 +143,8 @@ TEST_CASE("Source property types", "[source_properties]") {
         auto result = get_variable(R"(
             set_source_files_properties(src.cpp PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-pedantic")
             get_source_file_property(val src.cpp COMPILE_OPTIONS)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "-Wall;-Wextra;-pedantic");
     }
 
@@ -150,7 +152,8 @@ TEST_CASE("Source property types", "[source_properties]") {
         auto result = get_variable(R"(
             set_source_files_properties(src.cpp PROPERTIES COMPILE_DEFINITIONS "DEBUG;VERSION=1.0")
             get_source_file_property(val src.cpp COMPILE_DEFINITIONS)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "DEBUG;VERSION=1.0");
     }
 
@@ -158,7 +161,8 @@ TEST_CASE("Source property types", "[source_properties]") {
         auto result = get_variable(R"(
             set_source_files_properties(src.cpp PROPERTIES INCLUDE_DIRECTORIES "/usr/include;/opt/include")
             get_source_file_property(val src.cpp INCLUDE_DIRECTORIES)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "/usr/include;/opt/include");
     }
 
@@ -166,7 +170,8 @@ TEST_CASE("Source property types", "[source_properties]") {
         auto result = get_variable(R"(
             set_source_files_properties(file.c PROPERTIES LANGUAGE CXX)
             get_source_file_property(val file.c LANGUAGE)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "CXX");
     }
 
@@ -174,7 +179,8 @@ TEST_CASE("Source property types", "[source_properties]") {
         auto result = get_variable(R"(
             set_source_files_properties(impl.h PROPERTIES HEADER_FILE_ONLY TRUE)
             get_source_file_property(val impl.h HEADER_FILE_ONLY)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "TRUE");
     }
 
@@ -182,7 +188,8 @@ TEST_CASE("Source property types", "[source_properties]") {
         auto result = get_variable(R"(
             set_source_files_properties(src.cpp PROPERTIES OBJECT_DEPENDS "generated.h;other.h")
             get_source_file_property(val src.cpp OBJECT_DEPENDS)
-        )", "val");
+        )",
+                                   "val");
         REQUIRE(result == "generated.h;other.h");
     }
 }
@@ -197,7 +204,7 @@ TEST_CASE("set_source_files_properties error handling", "[source_properties]") {
         )";
 
         interpreter.set_source_view(src);
-    kiln::Parser parser(src);
+        kiln::Parser parser(src);
         auto ast = parser.parse();
         REQUIRE(ast.has_value());
         auto result = interpreter.interpret(*ast);
@@ -215,7 +222,7 @@ TEST_CASE("set_source_files_properties error handling", "[source_properties]") {
         )";
 
         interpreter.set_source_view(src);
-    kiln::Parser parser(src);
+        kiln::Parser parser(src);
         auto ast = parser.parse();
         REQUIRE(ast.has_value());
         auto result = interpreter.interpret(*ast);
@@ -231,7 +238,7 @@ TEST_CASE("set_source_files_properties error handling", "[source_properties]") {
         )";
 
         interpreter.set_source_view(src);
-    kiln::Parser parser(src);
+        kiln::Parser parser(src);
         auto ast = parser.parse();
         REQUIRE(ast.has_value());
         auto result = interpreter.interpret(*ast);
@@ -253,7 +260,7 @@ TEST_CASE("Path normalization", "[source_properties]") {
         )";
 
         interpreter.set_source_view(src);
-    kiln::Parser parser(src);
+        kiln::Parser parser(src);
         auto ast = parser.parse();
         REQUIRE(ast.has_value());
         auto result = interpreter.interpret(*ast);

@@ -38,9 +38,7 @@ std::unordered_map<std::string, std::string> parse_cpuinfo() {
         // trim
         while (!key.empty() && (key.back() == ' ' || key.back() == '\t')) key.pop_back();
         while (!val.empty() && (val.front() == ' ' || val.front() == '\t')) val.erase(val.begin());
-        if (!info.contains(key)) {
-            info[key] = val;
-        }
+        if (!info.contains(key)) { info[key] = val; }
     }
     return info;
 }
@@ -75,9 +73,7 @@ std::unordered_map<std::string, std::string> parse_os_release() {
         std::string key = line.substr(0, eq);
         std::string val = line.substr(eq + 1);
         // Remove quotes
-        if (val.size() >= 2 && val.front() == '"' && val.back() == '"') {
-            val = val.substr(1, val.size() - 2);
-        }
+        if (val.size() >= 2 && val.front() == '"' && val.back() == '"') { val = val.substr(1, val.size() - 2); }
         info[key] = val;
     }
     return info;
@@ -121,12 +117,8 @@ std::string query_system_info(const std::string& key) {
         long n = sysconf(_SC_NPROCESSORS_ONLN);
         return n > 0 ? std::to_string(n) : "1";
     }
-    if (key == "NUMBER_OF_PHYSICAL_CORES") {
-        return std::to_string(count_physical_cores());
-    }
-    if (key == "IS_64BIT") {
-        return sizeof(void*) == 8 ? "1" : "0";
-    }
+    if (key == "NUMBER_OF_PHYSICAL_CORES") { return std::to_string(count_physical_cores()); }
+    if (key == "IS_64BIT") { return sizeof(void*) == 8 ? "1" : "0"; }
     if (key == "PROCESSOR_NAME" || key == "PROCESSOR_DESCRIPTION") {
         auto info = parse_cpuinfo();
         if (auto it = info.find("model name"); it != info.end()) return it->second;
@@ -150,14 +142,12 @@ std::string query_system_info(const std::string& key) {
     // Memory (CMake reports in MiB)
     if (key == "TOTAL_PHYSICAL_MEMORY") {
         auto info = parse_meminfo();
-        if (auto it = info.find("MemTotal"); it != info.end())
-            return std::to_string(it->second / 1024);
+        if (auto it = info.find("MemTotal"); it != info.end()) return std::to_string(it->second / 1024);
         return "0";
     }
     if (key == "AVAILABLE_PHYSICAL_MEMORY") {
         auto info = parse_meminfo();
-        if (auto it = info.find("MemAvailable"); it != info.end())
-            return std::to_string(it->second / 1024);
+        if (auto it = info.find("MemAvailable"); it != info.end()) return std::to_string(it->second / 1024);
         return "0";
     }
     if (key == "TOTAL_VIRTUAL_MEMORY") {
@@ -201,9 +191,7 @@ std::string query_system_info(const std::string& key) {
     if (key == "DISTRIB_INFO") {
         auto info = parse_os_release();
         // Return semicolon-separated key=value pairs
-        return join(info, ";", [](const auto& p) {
-            return p.first + "=" + p.second;
-        });
+        return join(info, ";", [](const auto& p) { return p.first + "=" + p.second; });
     }
     // DISTRIB_<name> queries specific os-release keys (e.g., DISTRIB_ID → ID)
     if (key.starts_with("DISTRIB_")) {
@@ -221,25 +209,14 @@ std::string query_system_info(const std::string& key) {
 
         // Map CMake key names to /proc/cpuinfo flag names
         static const std::unordered_map<std::string, std::string> flag_map = {
-            {"HAS_FPU", "fpu"},
-            {"HAS_MMX", "mmx"},
-            {"HAS_MMX_PLUS", "mmxext"},
-            {"HAS_SSE", "sse"},
-            {"HAS_SSE2", "sse2"},
-            {"HAS_SSE_FP", "sse"},
-            {"HAS_SSE_MMX", "sse"},
-            {"HAS_AMD_3DNOW", "3dnow"},
-            {"HAS_AMD_3DNOW_PLUS", "3dnowext"},
-            {"HAS_IA64", "ia64"},
-            {"HAS_SSE3", "pni"},
-            {"HAS_SSSE3", "ssse3"},
-            {"HAS_SSE4_1", "sse4_1"},
-            {"HAS_SSE4_2", "sse4_2"},
+            {"HAS_FPU", "fpu"},       {"HAS_MMX", "mmx"},         {"HAS_MMX_PLUS", "mmxext"},
+            {"HAS_SSE", "sse"},       {"HAS_SSE2", "sse2"},       {"HAS_SSE_FP", "sse"},
+            {"HAS_SSE_MMX", "sse"},   {"HAS_AMD_3DNOW", "3dnow"}, {"HAS_AMD_3DNOW_PLUS", "3dnowext"},
+            {"HAS_IA64", "ia64"},     {"HAS_SSE3", "pni"},        {"HAS_SSSE3", "ssse3"},
+            {"HAS_SSE4_1", "sse4_1"}, {"HAS_SSE4_2", "sse4_2"},
         };
 
-        if (auto it = flag_map.find(key); it != flag_map.end()) {
-            return has_cpu_flag(flags, it->second) ? "1" : "0";
-        }
+        if (auto it = flag_map.find(key); it != flag_map.end()) { return has_cpu_flag(flags, it->second) ? "1" : "0"; }
         // Unknown HAS_ key, default to 0
         return "0";
     }
@@ -250,30 +227,27 @@ std::string query_system_info(const std::string& key) {
 } // anonymous namespace
 
 void register_system_info_builtins(Interpreter& interp) {
-    interp.add_builtin("cmake_host_system_information",
-        [](Interpreter& interp, const std::vector<std::string>& args) {
-            CommandParser parser("cmake_host_system_information");
-            std::string result_var;
-            std::vector<std::string> queries;
+    interp.add_builtin("cmake_host_system_information", [](Interpreter& interp, const std::vector<std::string>& args) {
+        CommandParser parser("cmake_host_system_information");
+        std::string result_var;
+        std::vector<std::string> queries;
 
-            parser.value("RESULT", result_var);
-            parser.list("QUERY", queries);
+        parser.value("RESULT", result_var);
+        parser.list("QUERY", queries);
 
-            PARSE_OR_RETURN(parser, interp, args);
+        PARSE_OR_RETURN(parser, interp, args);
 
-            if (result_var.empty()) {
-                interp.set_fatal_error("cmake_host_system_information() requires RESULT");
-                return;
-            }
-            if (queries.empty()) {
-                interp.set_fatal_error("cmake_host_system_information() requires QUERY");
-                return;
-            }
+        if (result_var.empty()) {
+            interp.set_fatal_error("cmake_host_system_information() requires RESULT");
+            return;
+        }
+        if (queries.empty()) {
+            interp.set_fatal_error("cmake_host_system_information() requires QUERY");
+            return;
+        }
 
-            interp.set_variable(result_var, join(queries, ";", [](const auto& q) {
-                return query_system_info(q);
-            }));
-        });
+        interp.set_variable(result_var, join(queries, ";", [](const auto& q) { return query_system_info(q); }));
+    });
 }
 
 } // namespace kiln

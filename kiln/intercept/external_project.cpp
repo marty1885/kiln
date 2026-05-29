@@ -31,9 +31,7 @@ static EPStepCommand make_step_command(const std::vector<std::string>& args) {
             current.push_back(token);
         }
     }
-    if (!current.empty()) {
-        result.commands.push_back(std::move(current));
-    }
+    if (!current.empty()) { result.commands.push_back(std::move(current)); }
     return result;
 }
 
@@ -187,8 +185,8 @@ void register_external_project_builtins(Interpreter& interp) {
                     if (i > 0) opts += ", ";
                     opts += ignored_used[i];
                 }
-                interp.print_message("WARNING", "ExternalProject_Add(" + name +
-                    "): The following options are not yet implemented and will be ignored: " + opts);
+                interp.print_message("WARNING", "ExternalProject_Add(" + name
+                                                    + "): The following options are not yet implemented and will be ignored: " + opts);
             }
         }
 
@@ -204,17 +202,11 @@ void register_external_project_builtins(Interpreter& interp) {
         std::string bin_dir = interp.get_variable("CMAKE_CURRENT_BINARY_DIR");
 
         // Fallback if KILN_BUILD_ROOT not set (shouldn't happen in normal builds)
-        if (build_root.empty()) {
-            build_root = interp.get_variable("CMAKE_BINARY_DIR");
-        }
+        if (build_root.empty()) { build_root = interp.get_variable("CMAKE_BINARY_DIR"); }
 
         // Resolve prefix (config-specific)
-        if (prefix.empty()) {
-            prefix = bin_dir + "/" + name + "-prefix";
-        }
-        if (!std::filesystem::path(prefix).is_absolute()) {
-            prefix = bin_dir + "/" + prefix;
-        }
+        if (prefix.empty()) { prefix = bin_dir + "/" + name + "-prefix"; }
+        if (!std::filesystem::path(prefix).is_absolute()) { prefix = bin_dir + "/" + prefix; }
 
         // Source dir: shared across configs
         if (source_dir.empty()) {
@@ -235,26 +227,23 @@ void register_external_project_builtins(Interpreter& interp) {
         }
 
         // Install dir: config-specific
-        if (install_dir.empty()) install_dir = prefix;
+        if (install_dir.empty())
+            install_dir = prefix;
         else if (!std::filesystem::path(install_dir).is_absolute())
             install_dir = bin_dir + "/" + install_dir;
 
         if (tmp_dir.empty()) tmp_dir = prefix + "/tmp";
         if (stamp_dir.empty()) stamp_dir = prefix + "/src/" + name + "-stamp";
-        if (download_dir.empty()) download_dir = build_root + "/_deps";  // Shared download dir
+        if (download_dir.empty()) download_dir = build_root + "/_deps"; // Shared download dir
 
         // Apply SOURCE_SUBDIR
         std::string effective_source_dir = source_dir;
-        if (!source_subdir.empty()) {
-            effective_source_dir = source_dir + "/" + source_subdir;
-        }
+        if (!source_subdir.empty()) { effective_source_dir = source_dir + "/" + source_subdir; }
 
         // Token replacements for step commands
         std::vector<std::pair<std::string, std::string>> tokens = {
-            {"<SOURCE_DIR>", source_dir},
-            {"<SOURCE_SUBDIR>", effective_source_dir},
-            {"<BINARY_DIR>", binary_dir},
-            {"<INSTALL_DIR>", install_dir},
+            {"<SOURCE_DIR>", source_dir}, {"<SOURCE_SUBDIR>", effective_source_dir},
+            {"<BINARY_DIR>", binary_dir}, {"<INSTALL_DIR>", install_dir},
             {"<TMP_DIR>", tmp_dir},
         };
 
@@ -287,22 +276,14 @@ void register_external_project_builtins(Interpreter& interp) {
         for (const auto& arg : cmake_args) {
             // Apply token replacements
             std::string processed = arg;
-            if (!list_separator.empty()) {
-                processed = kiln::replace_all(std::move(processed), list_separator, ";");
-            }
-            for (const auto& [token, value] : tokens) {
-                processed = kiln::replace_all(std::move(processed), token, value);
-            }
+            if (!list_separator.empty()) { processed = kiln::replace_all(std::move(processed), list_separator, ";"); }
+            for (const auto& [token, value] : tokens) { processed = kiln::replace_all(std::move(processed), token, value); }
             target->add_cmake_arg(eval_genex(std::move(processed)));
         }
         for (const auto& arg : cmake_cache_args) {
             std::string processed = arg;
-            if (!list_separator.empty()) {
-                processed = kiln::replace_all(std::move(processed), list_separator, ";");
-            }
-            for (const auto& [token, value] : tokens) {
-                processed = kiln::replace_all(std::move(processed), token, value);
-            }
+            if (!list_separator.empty()) { processed = kiln::replace_all(std::move(processed), list_separator, ";"); }
+            for (const auto& [token, value] : tokens) { processed = kiln::replace_all(std::move(processed), token, value); }
             target->add_cmake_cache_arg(eval_genex(std::move(processed)));
         }
         target->set_list_separator(list_separator);
@@ -311,9 +292,7 @@ void register_external_project_builtins(Interpreter& interp) {
         // Apply token replacements (and genex eval) to commands
         auto apply_tokens = [&tokens, &eval_genex](std::vector<std::string>& cmd) {
             for (auto& arg : cmd) {
-                for (const auto& [token, value] : tokens) {
-                    arg = kiln::replace_all(std::move(arg), token, value);
-                }
+                for (const auto& [token, value] : tokens) { arg = kiln::replace_all(std::move(arg), token, value); }
                 arg = eval_genex(std::move(arg));
             }
         };
@@ -358,9 +337,7 @@ void register_external_project_builtins(Interpreter& interp) {
         }
 
         // Add DEPENDS
-        for (const auto& dep : depends) {
-            target->add_custom_dependency(dep);
-        }
+        for (const auto& dep : depends) { target->add_custom_dependency(dep); }
 
         // === Download + Patch at CONFIGURE time ===
         // This runs now, not at build time, because:
@@ -431,8 +408,7 @@ void register_external_project_builtins(Interpreter& interp) {
                 }
 
                 // Extract unless DOWNLOAD_NO_EXTRACT
-                bool no_extract = !download_no_extract_str.empty() &&
-                                  !Interpreter::is_falsy(download_no_extract_str);
+                bool no_extract = !download_no_extract_str.empty() && !Interpreter::is_falsy(download_no_extract_str);
                 if (!no_extract) {
                     interp.print_message("STATUS", "  Extracting " + name + "...");
                     auto ex_result = extract_archive(archive_path, source_dir);
@@ -509,15 +485,13 @@ void register_external_project_builtins(Interpreter& interp) {
         for (size_t i = 1; i < args.size(); ++i) {
             std::string prop_name = args[i];
             std::string upper_prop = prop_name;
-            std::transform(upper_prop.begin(), upper_prop.end(), upper_prop.begin(),
-                           [](unsigned char c) { return std::toupper(c); });
+            std::transform(upper_prop.begin(), upper_prop.end(), upper_prop.begin(), [](unsigned char c) { return std::toupper(c); });
 
             std::string value = target->get_property("_EP_" + upper_prop);
 
             // Set variable with the lowercase property name (CMake convention)
             std::string var_name = prop_name;
-            std::transform(var_name.begin(), var_name.end(), var_name.begin(),
-                           [](unsigned char c) { return std::tolower(c); });
+            std::transform(var_name.begin(), var_name.end(), var_name.begin(), [](unsigned char c) { return std::tolower(c); });
             interp.set_variable(var_name, value);
         }
     });

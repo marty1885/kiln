@@ -27,9 +27,7 @@ struct TransparentStringHash {
 struct TransparentStringEqual {
     using is_transparent = void;
 
-    bool operator()(std::string_view lhs, std::string_view rhs) const noexcept {
-        return lhs == rhs;
-    }
+    bool operator()(std::string_view lhs, std::string_view rhs) const noexcept { return lhs == rhs; }
 };
 
 /**
@@ -45,7 +43,7 @@ struct TransparentStringEqual {
  */
 class ShadowMap {
     struct VariableVersion {
-        std::optional<std::string> value;  // nullopt = tombstone (unset masking parent)
+        std::optional<std::string> value; // nullopt = tombstone (unset masking parent)
         int depth;
         // Lazy progressive list-element index. Built on first list random-access
         // op; reset on every mutation (the macros below funnel through reset_list_index()).
@@ -74,9 +72,7 @@ public:
         if (it == variables_.end() || it->second->empty()) return nullptr;
         auto& top = it->second->back();
         if (!top.value.has_value()) return nullptr;
-        if (!top.list_index) {
-            top.list_index = std::make_unique<ProgressiveListIndex>();
-        }
+        if (!top.list_index) { top.list_index = std::make_unique<ProgressiveListIndex>(); }
         return top.list_index.get();
     }
 
@@ -100,10 +96,9 @@ public:
         friend class Entry;
         const std::vector<VariableVersion>* versions_;
         explicit ConstEntry(const std::vector<VariableVersion>* v) : versions_(v) {}
+
     public:
-        bool is_defined() const {
-            return !versions_->empty() && versions_->back().value.has_value();
-        }
+        bool is_defined() const { return !versions_->empty() && versions_->back().value.has_value(); }
         const std::string& get() const {
             static const std::string empty;
             if (!is_defined()) return empty;
@@ -130,12 +125,10 @@ public:
         ShadowMap& map_;
         std::vector<VariableVersion>* versions_;
 
-        Entry(ShadowMap& m, std::vector<VariableVersion>* v)
-            : map_(m), versions_(v) {}
+        Entry(ShadowMap& m, std::vector<VariableVersion>* v) : map_(m), versions_(v) {}
+
     public:
-        bool is_defined() const {
-            return !versions_->empty() && versions_->back().value.has_value();
-        }
+        bool is_defined() const { return !versions_->empty() && versions_->back().value.has_value(); }
         const std::string& get() const {
             static const std::string empty;
             if (!is_defined()) return empty;
@@ -219,9 +212,7 @@ public:
             if (versions_->empty()) return nullptr;
             auto& top = versions_->back();
             if (!top.value.has_value()) return nullptr;
-            if (!top.list_index) {
-                top.list_index = std::make_unique<ProgressiveListIndex>();
-            }
+            if (!top.list_index) { top.list_index = std::make_unique<ProgressiveListIndex>(); }
             return top.list_index.get();
         }
         operator ConstEntry() const { return ConstEntry(versions_); }
@@ -232,9 +223,7 @@ public:
      */
     Entry entry(const std::string& name) {
         auto [it, inserted] = variables_.try_emplace(name);
-        if (inserted) {
-            it->second = std::make_unique<std::vector<VariableVersion>>();
-        }
+        if (inserted) { it->second = std::make_unique<std::vector<VariableVersion>>(); }
         return Entry(*this, it->second.get());
     }
 
@@ -246,14 +235,10 @@ public:
     const std::string& get(std::string_view name) const {
         static const std::string empty;
         auto it = variables_.find(name);
-        if (it == variables_.end() || it->second->empty()) {
-            return empty;
-        }
+        if (it == variables_.end() || it->second->empty()) { return empty; }
         // Check for tombstone (nullopt = unset)
         const auto& val = it->second->back().value;
-        if (!val.has_value()) {
-            return empty;
-        }
+        if (!val.has_value()) { return empty; }
         return *val;
     }
 
@@ -306,15 +291,11 @@ public:
      * O(n) where n is the number of versions (typically small).
      */
     std::expected<bool, std::string> set_parent_scope(const std::string& name, const std::string& value) {
-        if (current_depth_ == 0) {
-            return std::unexpected("PARENT_SCOPE requires a parent scope (must be called from a function)");
-        }
+        if (current_depth_ == 0) { return std::unexpected("PARENT_SCOPE requires a parent scope (must be called from a function)"); }
 
         int target_depth = current_depth_ - 1;
         auto [it, inserted] = variables_.try_emplace(name);
-        if (inserted) {
-            it->second = std::make_unique<std::vector<VariableVersion>>();
-        }
+        if (inserted) { it->second = std::make_unique<std::vector<VariableVersion>>(); }
         auto* versions = it->second.get();
 
         // CMake semantics: PARENT_SCOPE should NOT affect current scope's view.
@@ -325,9 +306,7 @@ public:
             // Variable is visible from parent - snapshot current value to preserve local view
             std::string current_value = *versions->back().value;
             versions->push_back({std::optional<std::string>(current_value), current_depth_});
-            if (current_depth_ < static_cast<int>(modified_per_depth_.size())) {
-                modified_per_depth_[current_depth_].push_back(versions);
-            }
+            if (current_depth_ < static_cast<int>(modified_per_depth_.size())) { modified_per_depth_[current_depth_].push_back(versions); }
         }
 
         // Search for existing entry at parent depth and modify
@@ -335,7 +314,7 @@ public:
             if (ver.depth == target_depth) {
                 ver.reset_list_index();
                 ver.value = value;
-                return true;  // Replaced existing
+                return true; // Replaced existing
             }
         }
 
@@ -348,26 +327,20 @@ public:
         if (!has_local_entry) {
             // Insert tombstone at current depth to hide the new parent variable
             versions->push_back({std::nullopt, current_depth_});
-            if (current_depth_ < static_cast<int>(modified_per_depth_.size())) {
-                modified_per_depth_[current_depth_].push_back(versions);
-            }
+            if (current_depth_ < static_cast<int>(modified_per_depth_.size())) { modified_per_depth_[current_depth_].push_back(versions); }
         }
 
         // Insert the actual value at parent depth
         // Find the insertion point to maintain depth ordering
         auto insert_pos = versions->begin();
-        while (insert_pos != versions->end() && insert_pos->depth < target_depth) {
-            ++insert_pos;
-        }
+        while (insert_pos != versions->end() && insert_pos->depth < target_depth) { ++insert_pos; }
 
         versions->insert(insert_pos, {std::optional<std::string>(value), target_depth});
 
         // Track modification at parent depth
-        if (target_depth < static_cast<int>(modified_per_depth_.size())) {
-            modified_per_depth_[target_depth].push_back(versions);
-        }
+        if (target_depth < static_cast<int>(modified_per_depth_.size())) { modified_per_depth_[target_depth].push_back(versions); }
 
-        return false;  // Created new
+        return false; // Created new
     }
 
     /**
@@ -378,9 +351,7 @@ public:
      */
     void unset(const std::string& name) {
         auto it = variables_.find(name);
-        if (it == variables_.end() || it->second->empty()) {
-            return;
-        }
+        if (it == variables_.end() || it->second->empty()) { return; }
 
         auto* versions = it->second.get();
         if (versions->back().depth == current_depth_) {
@@ -420,14 +391,12 @@ public:
      * O(n) where n is the number of versions (typically small).
      */
     std::expected<bool, std::string> unset_parent_scope(const std::string& name) {
-        if (current_depth_ == 0) {
-            return std::unexpected("PARENT_SCOPE requires a parent scope (must be called from a function)");
-        }
+        if (current_depth_ == 0) { return std::unexpected("PARENT_SCOPE requires a parent scope (must be called from a function)"); }
 
         int target_depth = current_depth_ - 1;
         auto it = variables_.find(name);
         if (it == variables_.end() || it->second->empty()) {
-            return false;  // Variable not found
+            return false; // Variable not found
         }
 
         auto* versions = it->second.get();
@@ -440,19 +409,17 @@ public:
             // Variable is visible from parent - snapshot current value to preserve local view
             std::string current_value = *versions->back().value;
             versions->push_back({std::optional<std::string>(current_value), current_depth_});
-            if (current_depth_ < static_cast<int>(modified_per_depth_.size())) {
-                modified_per_depth_[current_depth_].push_back(versions);
-            }
+            if (current_depth_ < static_cast<int>(modified_per_depth_.size())) { modified_per_depth_[current_depth_].push_back(versions); }
         }
 
         // Find and remove the entry at parent depth
         for (auto ver_it = versions->begin(); ver_it != versions->end(); ++ver_it) {
             if (ver_it->depth == target_depth) {
                 versions->erase(ver_it);
-                return true;  // Found and removed
+                return true; // Found and removed
             }
         }
-        return false;  // Not found at parent depth
+        return false; // Not found at parent depth
     }
 
     /**
@@ -461,9 +428,7 @@ public:
      */
     bool is_defined(std::string_view name) const {
         auto it = variables_.find(name);
-        if (it == variables_.end() || it->second->empty()) {
-            return false;
-        }
+        if (it == variables_.end() || it->second->empty()) { return false; }
         // Check for tombstone
         return it->second->back().value.has_value();
     }
@@ -476,9 +441,7 @@ public:
         ++current_depth_;
 
         // Ensure tracking vector is large enough
-        if (current_depth_ >= static_cast<int>(modified_per_depth_.size())) {
-            modified_per_depth_.resize(current_depth_ + 1);
-        }
+        if (current_depth_ >= static_cast<int>(modified_per_depth_.size())) { modified_per_depth_.resize(current_depth_ + 1); }
     }
 
     /**
@@ -488,7 +451,7 @@ public:
      */
     void pop_scope() {
         if (current_depth_ == 0) {
-            return;  // Already at root
+            return; // Already at root
         }
 
         // Remove all modifications at current depth — direct pointer access, no hashing
@@ -496,9 +459,7 @@ public:
             for (auto* versions : modified_per_depth_[current_depth_]) {
                 // Remove all versions at current depth (should be at most one,
                 // but duplicates in the tracking vector are handled gracefully)
-                while (!versions->empty() && versions->back().depth == current_depth_) {
-                    versions->pop_back();
-                }
+                while (!versions->empty() && versions->back().depth == current_depth_) { versions->pop_back(); }
             }
             modified_per_depth_[current_depth_].clear();
         }
@@ -510,9 +471,7 @@ public:
      * Get current scope depth.
      * Used for debugging and validation.
      */
-    int depth() const {
-        return current_depth_;
-    }
+    int depth() const { return current_depth_; }
 
     /**
      * Return a snapshot of all currently visible variables.
@@ -521,9 +480,7 @@ public:
     std::unordered_map<std::string, std::string> snapshot() const {
         std::unordered_map<std::string, std::string> result;
         for (const auto& [name, versions] : variables_) {
-            if (!versions->empty() && versions->back().value.has_value()) {
-                result[name] = *versions->back().value;
-            }
+            if (!versions->empty() && versions->back().value.has_value()) { result[name] = *versions->back().value; }
         }
         return result;
     }
@@ -532,9 +489,7 @@ public:
      * Merge all variables from a map into the current scope.
      */
     void merge(const std::unordered_map<std::string, std::string>& vars) {
-        for (const auto& [name, value] : vars) {
-            set(name, value);
-        }
+        for (const auto& [name, value] : vars) { set(name, value); }
     }
 
     /**
@@ -544,9 +499,7 @@ public:
     std::vector<std::string> get_all_names() const {
         std::vector<std::string> result;
         for (const auto& [name, versions] : variables_) {
-            if (!versions->empty() && versions->back().value.has_value()) {
-                result.push_back(name);
-            }
+            if (!versions->empty() && versions->back().value.has_value()) { result.push_back(name); }
         }
         return result;
     }
@@ -556,9 +509,9 @@ private:
     // Uses open-addressing hash map (ankerl::unordered_dense) for cache-friendly probing.
     // Values are heap-allocated via unique_ptr for stable pointers across rehash.
     // Transparent hash/equal enables string_view lookup without allocation.
-    inner::ankerl::unordered_dense::map<
-        std::string, std::unique_ptr<std::vector<VariableVersion>>,
-        TransparentStringHash, TransparentStringEqual> variables_;
+    inner::ankerl::unordered_dense::map<std::string, std::unique_ptr<std::vector<VariableVersion>>, TransparentStringHash,
+                                        TransparentStringEqual>
+        variables_;
 
     // Current scope depth (0 = root)
     int current_depth_ = 0;
@@ -570,4 +523,4 @@ private:
     std::vector<std::vector<std::vector<VariableVersion>*>> modified_per_depth_;
 };
 
-}  // namespace kiln
+} // namespace kiln

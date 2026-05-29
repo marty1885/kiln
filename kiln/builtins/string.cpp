@@ -39,9 +39,7 @@ std::string regex_quote(const std::string& str) {
     result.reserve(str.size() * 2);
 
     for (char c : str) {
-        if (special_chars.find(c) != std::string::npos) {
-            result += '\\';
-        }
+        if (special_chars.find(c) != std::string::npos) { result += '\\'; }
         result += c;
     }
 
@@ -67,15 +65,12 @@ std::string genex_strip(const std::string& str) {
             continue;
         }
 
-        if (depth == 0) {
-            result += str[i];
-        }
+        if (depth == 0) { result += str[i]; }
         i++;
     }
 
     return result;
 }
-
 
 // Helper to make a valid C identifier
 std::string make_c_identifier(const std::string& str) {
@@ -197,9 +192,7 @@ std::vector<std::string> parse_unix_command(const std::string& input) {
         current += c;
     }
 
-    if (!current.empty()) {
-        result.push_back(current);
-    }
+    if (!current.empty()) { result.push_back(current); }
 
     return result;
 }
@@ -262,9 +255,7 @@ std::vector<std::string> parse_windows_command(const std::string& input) {
         }
     }
 
-    if (!current.empty()) {
-        result.push_back(current);
-    }
+    if (!current.empty()) { result.push_back(current); }
 
     return result;
 }
@@ -277,9 +268,7 @@ std::string find_program_in_path(const std::string& program_name) {
         std::error_code ec;
         if (std::filesystem::is_regular_file(p, ec)) {
             struct stat st;
-            if (stat(p.c_str(), &st) == 0 && (st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
-                return program_name;
-            }
+            if (stat(p.c_str(), &st) == 0 && (st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))) { return program_name; }
         }
     }
 
@@ -292,9 +281,7 @@ std::string find_program_in_path(const std::string& program_name) {
 
     while (start < path_str.size()) {
         size_t end = path_str.find(':', start);
-        if (end == std::string::npos) {
-            end = path_str.size();
-        }
+        if (end == std::string::npos) { end = path_str.size(); }
 
         std::string dir = path_str.substr(start, end - start);
         if (!dir.empty()) {
@@ -303,8 +290,7 @@ std::string find_program_in_path(const std::string& program_name) {
 
             if (std::filesystem::is_regular_file(candidate, ec)) {
                 struct stat st;
-                if (stat(candidate.c_str(), &st) == 0 &&
-                    (st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
+                if (stat(candidate.c_str(), &st) == 0 && (st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
                     return std::filesystem::absolute(candidate).string();
                 }
             }
@@ -348,8 +334,7 @@ static const std::string* single_simple_var_name(const Argument& a) {
 // Decode an Argument that's expected to be either a literal int or a simple
 // var ref. Sets `*is_var` + `var_name` (when var) or `*literal` (when not).
 // Returns false if neither shape fits.
-static bool decode_index_arg(const Argument& a, bool& is_var,
-                              std::string& var_name, int64_t& literal) {
+static bool decode_index_arg(const Argument& a, bool& is_var, std::string& var_name, int64_t& literal) {
     if (auto vn = single_simple_var_name(a)) {
         is_var = true;
         var_name = *vn;
@@ -363,8 +348,12 @@ static bool decode_index_arg(const Argument& a, bool& is_var,
     while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.remove_suffix(1);
     if (s.empty()) return false;
     bool neg = false;
-    if (s.front() == '-') { neg = true; s.remove_prefix(1); }
-    else if (s.front() == '+') { s.remove_prefix(1); }
+    if (s.front() == '-') {
+        neg = true;
+        s.remove_prefix(1);
+    } else if (s.front() == '+') {
+        s.remove_prefix(1);
+    }
     if (s.empty()) return false;
     int64_t v = 0;
     for (char c : s) {
@@ -400,12 +389,8 @@ std::optional<PreParsedSubstring> classify_substring(const std::vector<Argument>
         return std::nullopt;
     }
 
-    if (!decode_index_arg(args[2], pp.begin_is_var, pp.begin_var, pp.begin_literal)) {
-        return std::nullopt;
-    }
-    if (!decode_index_arg(args[3], pp.length_is_var, pp.length_var, pp.length_literal)) {
-        return std::nullopt;
-    }
+    if (!decode_index_arg(args[2], pp.begin_is_var, pp.begin_var, pp.begin_literal)) { return std::nullopt; }
+    if (!decode_index_arg(args[3], pp.length_is_var, pp.length_var, pp.length_literal)) { return std::nullopt; }
     return pp;
 }
 
@@ -416,8 +401,12 @@ static bool parse_index_value(std::string_view s, int64_t& out) {
     while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.remove_suffix(1);
     if (s.empty()) return false;
     bool neg = false;
-    if (s.front() == '-') { neg = true; s.remove_prefix(1); }
-    else if (s.front() == '+') { s.remove_prefix(1); }
+    if (s.front() == '-') {
+        neg = true;
+        s.remove_prefix(1);
+    } else if (s.front() == '+') {
+        s.remove_prefix(1);
+    }
     if (s.empty()) return false;
     int64_t v = 0;
     for (char c : s) {
@@ -428,11 +417,10 @@ static bool parse_index_value(std::string_view s, int64_t& out) {
     return true;
 }
 
-bool try_execute_pre_parsed_substring(Interpreter& interp,
-                                       const PreParsedSubstring& pp) {
+bool try_execute_pre_parsed_substring(Interpreter& interp, const PreParsedSubstring& pp) {
     // Resolve input. When input is a var, view its storage directly.
     std::string_view input;
-    std::string input_buf;  // only used in the literal/copy branch (rare)
+    std::string input_buf; // only used in the literal/copy branch (rare)
     if (pp.input_is_var) {
         auto v = interp.get_variable_view(pp.input);
         if (!v) {
@@ -531,9 +519,7 @@ void register_string_builtins(Interpreter& interp) {
 
             // Concatenate all inputs
             std::string input;
-            for (const auto& s : inputs) {
-                input += s;
-            }
+            for (const auto& s : inputs) { input += s; }
 
             // Replace all occurrences
             std::string result = kiln::replace_all(std::move(input), match_str, replace_str);
@@ -563,13 +549,9 @@ void register_string_builtins(Interpreter& interp) {
 
                 // Concatenate all inputs
                 std::string input;
-                for (const auto& s : inputs) {
-                    input += s;
-                }
+                for (const auto& s : inputs) { input += s; }
 
-                thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) {
-                    return Regex::from_cmake_regex(p);
-                });
+                thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) { return Regex::from_cmake_regex(p); });
                 auto re = cache.get(pattern);
                 if (!re) {
                     interp.set_fatal_error("string(REGEX MATCH) invalid regex: " + re.error());
@@ -579,18 +561,14 @@ void register_string_builtins(Interpreter& interp) {
                 std::vector<std::string> captures;
                 if ((*re)->search(input, captures)) {
                     interp.set_variable(out_var, captures[0]);
-                    for (size_t i = 0; i < captures.size(); ++i) {
-                        interp.set_variable("CMAKE_MATCH_" + std::to_string(i), captures[i]);
-                    }
+                    for (size_t i = 0; i < captures.size(); ++i) { interp.set_variable("CMAKE_MATCH_" + std::to_string(i), captures[i]); }
                     interp.set_variable("CMAKE_MATCH_COUNT", std::to_string(captures.size() - 1));
                 } else {
                     interp.set_variable(out_var, "");
                     // Clear CMAKE_MATCH_* variables on non-match (CMake behavior)
                     interp.set_variable("CMAKE_MATCH_COUNT", "0");
                     interp.set_variable("CMAKE_MATCH_0", "");
-                    for (int i = 1; i <= 9; ++i) {
-                        interp.set_variable("CMAKE_MATCH_" + std::to_string(i), "");
-                    }
+                    for (int i = 1; i <= 9; ++i) { interp.set_variable("CMAKE_MATCH_" + std::to_string(i), ""); }
                 }
 
             } else if (ci_equals(regex_op_str, "MATCHALL")) {
@@ -606,13 +584,9 @@ void register_string_builtins(Interpreter& interp) {
 
                 // Concatenate all inputs
                 std::string input;
-                for (const auto& s : inputs) {
-                    input += s;
-                }
+                for (const auto& s : inputs) { input += s; }
 
-                thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) {
-                    return Regex::from_cmake_regex(p);
-                });
+                thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) { return Regex::from_cmake_regex(p); });
                 auto re = cache.get(pattern);
                 if (!re) {
                     interp.set_fatal_error("string(REGEX MATCHALL) invalid regex: " + re.error());
@@ -630,16 +604,12 @@ void register_string_builtins(Interpreter& interp) {
                 // Set CMAKE_MATCH_* from the last match (CMake behavior)
                 if (!all_matches.empty()) {
                     const auto& last = all_matches.back();
-                    for (size_t i = 0; i < last.size(); ++i) {
-                        interp.set_variable("CMAKE_MATCH_" + std::to_string(i), last[i]);
-                    }
+                    for (size_t i = 0; i < last.size(); ++i) { interp.set_variable("CMAKE_MATCH_" + std::to_string(i), last[i]); }
                     interp.set_variable("CMAKE_MATCH_COUNT", std::to_string(last.size() - 1));
                 } else {
                     interp.set_variable("CMAKE_MATCH_COUNT", "0");
                     interp.set_variable("CMAKE_MATCH_0", "");
-                    for (int i = 1; i <= 9; ++i) {
-                        interp.set_variable("CMAKE_MATCH_" + std::to_string(i), "");
-                    }
+                    for (int i = 1; i <= 9; ++i) { interp.set_variable("CMAKE_MATCH_" + std::to_string(i), ""); }
                 }
 
             } else if (ci_equals(regex_op_str, "REPLACE")) {
@@ -656,13 +626,9 @@ void register_string_builtins(Interpreter& interp) {
 
                 // Concatenate all inputs
                 std::string input;
-                for (const auto& s : inputs) {
-                    input += s;
-                }
+                for (const auto& s : inputs) { input += s; }
 
-                thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) {
-                    return Regex::from_cmake_regex(p);
-                });
+                thread_local ClockCache<std::string, Regex> cache(8, [](const std::string& p) { return Regex::from_cmake_regex(p); });
                 auto re = cache.get(pattern);
                 if (!re) {
                     interp.set_fatal_error("string(REGEX REPLACE) invalid regex: " + re.error());
@@ -686,9 +652,7 @@ void register_string_builtins(Interpreter& interp) {
 
                 // Concatenate and quote all inputs
                 std::string input;
-                for (const auto& s : inputs) {
-                    input += s;
-                }
+                for (const auto& s : inputs) { input += s; }
 
                 interp.set_variable(out_var, regex_quote(input));
 
@@ -697,7 +661,7 @@ void register_string_builtins(Interpreter& interp) {
                 return;
             }
 
-        // ========== Manipulation ==========
+            // ========== Manipulation ==========
 
         } else if (ci_equals(operation, "APPEND")) {
             CommandParser parser("string", "APPEND");
@@ -714,21 +678,13 @@ void register_string_builtins(Interpreter& interp) {
             // the current scope depth. This makes a tight string(APPEND) loop
             // amortized O(1) per call instead of O(current-length) per call.
             if (std::string* p = entry.mutable_at_current_depth()) {
-                for (const auto& s : inputs) {
-                    p->append(s);
-                }
-                if (interp.has_variable_watches()) {
-                    interp.fire_variable_watch(var_name, "MODIFIED_ACCESS", *p);
-                }
+                for (const auto& s : inputs) { p->append(s); }
+                if (interp.has_variable_watches()) { interp.fire_variable_watch(var_name, "MODIFIED_ACCESS", *p); }
             } else {
                 std::string current = entry.get();
-                for (const auto& s : inputs) {
-                    current += s;
-                }
+                for (const auto& s : inputs) { current += s; }
                 entry.set(std::move(current));
-                if (interp.has_variable_watches()) {
-                    interp.fire_variable_watch(var_name, "MODIFIED_ACCESS", entry.get());
-                }
+                if (interp.has_variable_watches()) { interp.fire_variable_watch(var_name, "MODIFIED_ACCESS", entry.get()); }
             }
 
         } else if (ci_equals(operation, "PREPEND")) {
@@ -742,9 +698,7 @@ void register_string_builtins(Interpreter& interp) {
             PARSE_OR_RETURN(parser, interp, sub_args);
 
             std::string prefix;
-            for (const auto& s : inputs) {
-                prefix += s;
-            }
+            for (const auto& s : inputs) { prefix += s; }
 
             std::string current = interp.get_variable(var_name);
             interp.set_variable(var_name, prefix + current);
@@ -760,9 +714,7 @@ void register_string_builtins(Interpreter& interp) {
             PARSE_OR_RETURN(parser, interp, sub_args);
 
             std::string result;
-            for (const auto& s : inputs) {
-                result += s;
-            }
+            for (const auto& s : inputs) { result += s; }
 
             interp.set_variable(out_var, result);
 
@@ -895,15 +847,13 @@ void register_string_builtins(Interpreter& interp) {
                 }
 
                 std::string result;
-                for (int i = 0; i < count; ++i) {
-                    result += input;
-                }
+                for (int i = 0; i < count; ++i) { result += input; }
 
                 interp.set_variable(out_var, result);
                 return;
             }
 
-        // ========== Comparison ==========
+            // ========== Comparison ==========
 
         } else if (ci_equals(operation, "COMPARE")) {
             if (sub_args.empty()) {
@@ -947,7 +897,7 @@ void register_string_builtins(Interpreter& interp) {
 
             interp.set_variable(out_var, result ? "1" : "0");
 
-        // ========== Generation ==========
+            // ========== Generation ==========
 
         } else if (ci_equals(operation, "ASCII")) {
             CommandParser parser("string", "ASCII");
@@ -995,9 +945,7 @@ void register_string_builtins(Interpreter& interp) {
             PARSE_OR_RETURN(parser, interp, sub_args);
 
             std::string result;
-            for (unsigned char c : input) {
-                result += byte_to_hex(c);
-            }
+            for (unsigned char c : input) { result += byte_to_hex(c); }
 
             interp.set_variable(out_var, result);
 
@@ -1071,9 +1019,7 @@ void register_string_builtins(Interpreter& interp) {
                 length = *len_opt;
             }
 
-            if (alphabet.empty()) {
-                alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            }
+            if (alphabet.empty()) { alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; }
 
             if (alphabet.empty()) {
                 interp.set_fatal_error("string(RANDOM) alphabet cannot be empty");
@@ -1095,9 +1041,7 @@ void register_string_builtins(Interpreter& interp) {
             std::uniform_int_distribution<size_t> dis(0, alphabet.size() - 1);
 
             std::string result;
-            for (size_t i = 0; i < length; ++i) {
-                result += alphabet[dis(gen)];
-            }
+            for (size_t i = 0; i < length; ++i) { result += alphabet[dis(gen)]; }
 
             interp.set_variable(out_var, result);
 
@@ -1124,14 +1068,10 @@ void register_string_builtins(Interpreter& interp) {
                     format += sub_args[i];
                 }
 
-                if (has_utc_flag) {
-                    utc = true;
-                }
+                if (has_utc_flag) { utc = true; }
             }
 
-            if (format.empty()) {
-                format = "%Y-%m-%dT%H:%M:%S";
-            }
+            if (format.empty()) { format = "%Y-%m-%dT%H:%M:%S"; }
 
             auto now = std::chrono::system_clock::now();
             std::time_t now_c = std::chrono::system_clock::to_time_t(now);
@@ -1208,19 +1148,14 @@ void register_string_builtins(Interpreter& interp) {
 
             // Format as UUID: 8-4-4-4-12
             char uuid_str[37];
-            std::snprintf(uuid_str, sizeof(uuid_str),
-                "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-                hash_bytes[0], hash_bytes[1], hash_bytes[2], hash_bytes[3],
-                hash_bytes[4], hash_bytes[5],
-                hash_bytes[6], hash_bytes[7],
-                hash_bytes[8], hash_bytes[9],
-                hash_bytes[10], hash_bytes[11], hash_bytes[12], hash_bytes[13],
-                hash_bytes[14], hash_bytes[15]);
+            std::snprintf(uuid_str, sizeof(uuid_str), "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", hash_bytes[0],
+                          hash_bytes[1], hash_bytes[2], hash_bytes[3], hash_bytes[4], hash_bytes[5], hash_bytes[6], hash_bytes[7],
+                          hash_bytes[8], hash_bytes[9], hash_bytes[10], hash_bytes[11], hash_bytes[12], hash_bytes[13], hash_bytes[14],
+                          hash_bytes[15]);
 
             std::string result(uuid_str);
             if (upper) {
-                std::transform(result.begin(), result.end(), result.begin(),
-                    [](unsigned char c) { return std::toupper(c); });
+                std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return std::toupper(c); });
             }
 
             interp.set_variable(out_var, result);
@@ -1307,9 +1242,7 @@ void register_string_builtins(Interpreter& interp) {
             };
 
             auto clear_error = [&]() {
-                if (!error_var.empty()) {
-                    interp.set_variable(error_var, "NOTFOUND");
-                }
+                if (!error_var.empty()) { interp.set_variable(error_var, "NOTFOUND"); }
             };
 
             if (idx >= sub_args.size()) {
@@ -1406,13 +1339,20 @@ void register_string_builtins(Interpreter& interp) {
                 auto* target = navigate(json, idx);
                 if (!target) return;
                 std::string type;
-                if (target->holds<std::nullptr_t>()) type = "NULL";
-                else if (target->holds<bool>()) type = "BOOLEAN";
-                else if (target->is_number()) type = "NUMBER";
-                else if (target->is_string()) type = "STRING";
-                else if (target->is_array()) type = "ARRAY";
-                else if (target->is_object()) type = "OBJECT";
-                else type = "NULL";
+                if (target->holds<std::nullptr_t>())
+                    type = "NULL";
+                else if (target->holds<bool>())
+                    type = "BOOLEAN";
+                else if (target->is_number())
+                    type = "NUMBER";
+                else if (target->is_string())
+                    type = "STRING";
+                else if (target->is_array())
+                    type = "ARRAY";
+                else if (target->is_object())
+                    type = "OBJECT";
+                else
+                    type = "NULL";
                 clear_error();
                 interp.set_variable(out_var, type);
 
@@ -1566,7 +1506,8 @@ void register_string_builtins(Interpreter& interp) {
 
         // Validate mode
         if (!ci_equals(mode, "UNIX_COMMAND") && !ci_equals(mode, "WINDOWS_COMMAND") && !ci_equals(mode, "NATIVE_COMMAND")) {
-            interp.set_fatal_error("separate_arguments() invalid mode: " + args[1] + " (expected UNIX_COMMAND, WINDOWS_COMMAND, or NATIVE_COMMAND)");
+            interp.set_fatal_error("separate_arguments() invalid mode: " + args[1]
+                                   + " (expected UNIX_COMMAND, WINDOWS_COMMAND, or NATIVE_COMMAND)");
             return;
         }
 
@@ -1641,9 +1582,7 @@ void register_string_builtins(Interpreter& interp) {
                 // Return [absolute_path, arg1, arg2, ...]
                 CMakeArray result;
                 result.append(program_path);
-                for (size_t i = 1; i < parsed_args.size(); ++i) {
-                    result.append(parsed_args[i]);
-                }
+                for (size_t i = 1; i < parsed_args.size(); ++i) { result.append(parsed_args[i]); }
                 interp.set_variable(var_name, result.to_string());
             } else {
                 // Return [absolute_path, remaining_args_as_string]
@@ -1664,9 +1603,7 @@ void register_string_builtins(Interpreter& interp) {
         } else {
             // No PROGRAM option, just return parsed args as list
             CMakeArray result;
-            for (const auto& arg : parsed_args) {
-                result.append(arg);
-            }
+            for (const auto& arg : parsed_args) { result.append(arg); }
             interp.set_variable(var_name, result.to_string());
         }
     });

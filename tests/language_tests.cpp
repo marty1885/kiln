@@ -8,7 +8,7 @@ TEST_CASE("LanguageClassifier: CXX detection", "[language]") {
     CHECK(LanguageClassifier::from_extension(".cc").lang == Language::CXX);
     CHECK(LanguageClassifier::from_extension(".cxx").lang == Language::CXX);
     CHECK(LanguageClassifier::from_extension(".C").lang == Language::CXX);
-    
+
     CHECK(LanguageClassifier::from_path("main.cpp").lang == Language::CXX);
     CHECK(LanguageClassifier::from_path("src/lib.C").lang == Language::CXX);
 }
