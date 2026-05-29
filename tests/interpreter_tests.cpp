@@ -8523,8 +8523,12 @@ TEST_CASE("Parser warns on old-style control flow commands", "[parser][warning]"
     // Assert that non-matching cases DID generate warnings
     CHECK(warnings.find("old style CMake syntax: 'else(...)' has arguments that do not match the opening command.") != std::string::npos);
     CHECK(warnings.find("old style CMake syntax: 'endif(...)' has arguments that do not match the opening command.") != std::string::npos);
-CHECK(warnings.find("old style CMake syntax: 'endfunction(...)' has arguments that do not match the opening command.") != std::string::npos);
-CHECK(warnings.find("old style CMake syntax: 'endmacro(...)' has arguments that do not match the opening command.") != std::string::npos);
-CHECK(warnings.find("old style CMake syntax: 'endforeach(...)' has arguments that do not match the opening command.") != std::string::npos);
-CHECK(warnings.find("old style CMake syntax: 'endwhile(...)' has arguments that do not match the opening command.") != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endfunction(...)' has arguments that do not match the opening command.")
+          != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endmacro(...)' has arguments that do not match the opening command.")
+          != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endforeach(...)' has arguments that do not match the opening command.")
+          != std::string::npos);
+    CHECK(warnings.find("old style CMake syntax: 'endwhile(...)' has arguments that do not match the opening command.")
+          != std::string::npos);
 }

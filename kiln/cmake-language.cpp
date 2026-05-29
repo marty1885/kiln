@@ -272,9 +272,7 @@ std::expected<FunctionBlock, ParseError> Parser::parse_function_block(const Comm
         return std::unexpected(ParseError{row_, col_, pos_, 11, "Expected 'endfunction'"});
     }
     std::vector<Argument> expected_endfunction_args;
-    if (!function_command.arguments.empty()) {
-        expected_endfunction_args.push_back(function_command.arguments[0]);
-    }
+    if (!function_command.arguments.empty()) { expected_endfunction_args.push_back(function_command.arguments[0]); }
     check_old_style(endfunction_command_or_error.value(), expected_endfunction_args);
 
     // Populate definition file metadata
@@ -336,9 +334,7 @@ std::expected<MacroBlock, ParseError> Parser::parse_macro_block(const CommandInv
         return std::unexpected(ParseError{row_, col_, pos_, 8, "Expected 'endmacro'"});
     }
     std::vector<Argument> expected_endmacro_args;
-    if (!macro_command.arguments.empty()) {
-        expected_endmacro_args.push_back(macro_command.arguments[0]);
-    }
+    if (!macro_command.arguments.empty()) { expected_endmacro_args.push_back(macro_command.arguments[0]); }
     check_old_style(endmacro_command_or_error.value(), expected_endmacro_args);
 
     // Populate definition file metadata
@@ -533,9 +529,7 @@ std::expected<ForeachBlock, ParseError> Parser::parse_foreach_block(const Comman
         return std::unexpected(ParseError{row_, col_, pos_, 10, "Expected 'endforeach'"});
     }
     std::vector<Argument> expected_endforeach_args;
-    if (!foreach_command.arguments.empty()) {
-        expected_endforeach_args.push_back(foreach_command.arguments[0]);
-    }
+    if (!foreach_command.arguments.empty()) { expected_endforeach_args.push_back(foreach_command.arguments[0]); }
     check_old_style(endforeach_command_or_error.value(), expected_endforeach_args);
 
     foreach_block.length = pos_ - foreach_block.offset;
@@ -1453,17 +1447,13 @@ bool arguments_equal(const std::vector<Argument>& lhs, const std::vector<Argumen
 } // namespace
 
 void Parser::check_old_style(const CommandInvocation& cmd, const std::vector<Argument>& expected_args) {
-    if (ascii_ci_equal(cmd.identifier, "endif") ||
-        ascii_ci_equal(cmd.identifier, "else") ||
-        ascii_ci_equal(cmd.identifier, "endforeach") ||
-        ascii_ci_equal(cmd.identifier, "endwhile") ||
-        ascii_ci_equal(cmd.identifier, "endmacro") ||
-        ascii_ci_equal(cmd.identifier, "endfunction")) {
+    if (ascii_ci_equal(cmd.identifier, "endif") || ascii_ci_equal(cmd.identifier, "else") || ascii_ci_equal(cmd.identifier, "endforeach")
+        || ascii_ci_equal(cmd.identifier, "endwhile") || ascii_ci_equal(cmd.identifier, "endmacro")
+        || ascii_ci_equal(cmd.identifier, "endfunction")) {
         if (!cmd.arguments.empty() && !arguments_equal(cmd.arguments, expected_args)) {
             std::string msg = "old style CMake syntax: '" + cmd.identifier + "(...)' has arguments that do not match the opening command.";
-            kiln::print_diagnostic(std::cerr, DiagnosticSeverity::Warning,
-                msg, filename_, cmd.row, cmd.col, cmd.offset, cmd.length,
-                {}, std::string(content_), "These arguments are ignored by kiln.");
+            kiln::print_diagnostic(std::cerr, DiagnosticSeverity::Warning, msg, filename_, cmd.row, cmd.col, cmd.offset, cmd.length, {},
+                                   std::string(content_), "These arguments are ignored by kiln.");
         }
     }
 }

@@ -394,8 +394,7 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
         } else {
             // On-demand detection against the user's compiler + sysroot/target.
             // Cache-keyed so repeat invocations are cheap.
-on_demand_info = detect_compiler_for(
-    *cache_store_, effective_binary, lang_enum, probe_sysroot, compiler_target);
+            on_demand_info = detect_compiler_for(*cache_store_, effective_binary, lang_enum, probe_sysroot, compiler_target);
             detected_id = on_demand_info->compiler_id;
         }
 
