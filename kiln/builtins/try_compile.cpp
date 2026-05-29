@@ -768,6 +768,9 @@ void register_try_compile_builtins(Interpreter& interp) {
         // Imported targets like BlocksRuntime::BlocksRuntime carry options like
         // "$<$<COMPILE_LANGUAGE:C,CXX>:-fblocks>" that must be resolved before the test compile.
         merge_propagated_into_flags(interp, tc.lang, links, compile_definitions, raw_compile_flags);
+        for (const auto& flag : shell_split(tc.global_lang_flags)) {
+            if (!flag.empty()) raw_compile_flags.push_back(flag);
+        }
 
         // Compute initial signature (without header deps)
         auto sig_result = compute_signature(tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard, sources,
@@ -1065,6 +1068,9 @@ void register_try_compile_builtins(Interpreter& interp) {
 
         // Merge propagated INTERFACE properties (with genex evaluation) into compile flags.
         merge_propagated_into_flags(interp, tc.lang, links, compile_definitions, raw_compile_flags);
+        for (const auto& flag : shell_split(tc.global_lang_flags)) {
+            if (!flag.empty()) raw_compile_flags.push_back(flag);
+        }
 
         // Compute signature for caching (compilation inputs + run args)
         auto sig_result = compute_signature(tc.compiler_path, tc.compiler_version, tc.language_str, tc.standard, sources,

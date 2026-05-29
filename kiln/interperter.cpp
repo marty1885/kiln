@@ -327,6 +327,48 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
         std::string user_binary = get_variable("CMAKE_" + lang + "_COMPILER");
         std::string sysroot = get_variable("CMAKE_SYSROOT");
         std::string compiler_target = get_variable("CMAKE_" + lang + "_COMPILER_TARGET");
+
+        // $CC may embed flags (e.g. "gcc --sysroot=/path"). CMake splits these;
+        // kiln must not pass the whole string as the executable path.
+        std::string detect_sysroot;
+        if (!user_binary.empty()) {
+            auto parts = shell_split(user_binary);
+            if (parts.size() > 1) {
+                user_binary = parts.front();
+                set_variable("CMAKE_" + lang + "_COMPILER", user_binary);
+                set_cache_variable("CMAKE_" + lang + "_COMPILER", user_binary);
+                std::string cc_flags;
+                for (size_t i = 1; i < parts.size(); ++i) {
+                    const std::string& a = parts[i];
+                    if (detect_sysroot.empty() && a.starts_with("--sysroot=")) {
+                        detect_sysroot = a.substr(10);
+                    } else if (detect_sysroot.empty() && a == "--sysroot" && i + 1 < parts.size()) {
+                        detect_sysroot = parts[++i];
+                    } else if (compiler_target.empty() && a.starts_with("--target=")) {
+                        compiler_target = a.substr(9);
+                    } else if (compiler_target.empty() && a == "--target" && i + 1 < parts.size()) {
+                        compiler_target = parts[++i];
+                    }
+                    if (!cc_flags.empty()) cc_flags += ' ';
+                    cc_flags += a;
+                }
+                if (!compiler_target.empty()) {
+                    const std::string tvar = "CMAKE_" + lang + "_COMPILER_TARGET";
+                    set_variable(tvar, compiler_target);
+                    set_cache_variable(tvar, compiler_target);
+                }
+                const std::string flags_var = "CMAKE_" + lang + "_FLAGS";
+                std::string flags = get_variable(flags_var);
+                if (!cc_flags.empty()) {
+                    if (!flags.empty()) flags += ' ';
+                    flags += cc_flags;
+                    set_variable(flags_var, flags);
+                    set_cache_variable(flags_var, flags);
+                }
+            }
+        }
+        const std::string probe_sysroot = !sysroot.empty() ? sysroot : detect_sysroot;
+
         const std::string effective_binary = user_binary.empty() ? default_binary : user_binary;
 
         // Fast path: user didn't override anything → reuse host-detection backup.
@@ -352,7 +394,8 @@ std::string Interpreter::enable_compiler_for_language(const std::string& lang) {
         } else {
             // On-demand detection against the user's compiler + sysroot/target.
             // Cache-keyed so repeat invocations are cheap.
-            on_demand_info = detect_compiler_for(*cache_store_, effective_binary, lang_enum, sysroot, compiler_target);
+on_demand_info = detect_compiler_for(
+    *cache_store_, effective_binary, lang_enum, probe_sysroot, compiler_target);
             detected_id = on_demand_info->compiler_id;
         }
 
