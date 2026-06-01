@@ -135,6 +135,7 @@ void register_target_builtins(Interpreter& interp) {
 
         configure_lang(Language::CXX, "CXX");
         configure_lang(Language::C, "C");
+        if (!interp.get_variable("CMAKE_CUDA_COMPILER_LOADED").empty()) { configure_lang(Language::CUDA, "CUDA"); }
         if (!interp.get_variable("CMAKE_ASM_COMPILER_LOADED").empty()) { configure_lang(Language::ASM, "ASM"); }
 
         // CMAKE_SYSROOT is global, not per-language.
@@ -1333,11 +1334,17 @@ void register_target_builtins(Interpreter& interp) {
                 } else if (prop_name == "CXX_STANDARD") {
                     target->set_language_standard(Language::CXX, prop_value);
                     target->set_property(prop_name, prop_value);
+                } else if (prop_name == "CUDA_STANDARD") {
+                    target->set_language_standard(Language::CUDA, prop_value);
+                    target->set_property(prop_name, prop_value);
                 } else if (prop_name == "C_STANDARD") {
                     target->set_language_standard(Language::C, prop_value);
                     target->set_property(prop_name, prop_value);
                 } else if (prop_name == "CXX_EXTENSIONS") {
                     target->set_language_extensions(Language::CXX, !Interpreter::is_falsy(prop_value));
+                    target->set_property(prop_name, prop_value);
+                } else if (prop_name == "CUDA_EXTENSIONS") {
+                    target->set_language_extensions(Language::CUDA, !Interpreter::is_falsy(prop_value));
                     target->set_property(prop_name, prop_value);
                 } else if (prop_name == "C_EXTENSIONS") {
                     target->set_language_extensions(Language::C, !Interpreter::is_falsy(prop_value));

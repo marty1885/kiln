@@ -113,7 +113,7 @@ private:
     std::string current_cmd_;                                 // Set on entering on_command / interactive_loop
     const std::vector<Argument>* current_raw_args_ = nullptr; // Valid during on_command scope
     int selected_frame_ = 0;                                  // 0 = current command, 1..N = callers
-    struct sigaction old_sigint_action_{};                    // Saved for restoration in destructor
+    struct sigaction old_sigint_action_ {};                   // Saved for restoration in destructor
     InputFunction input_fn_;                                  // Pluggable input (default: std::getline)
 };
 

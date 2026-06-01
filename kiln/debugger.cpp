@@ -63,7 +63,7 @@ std::string serialize_argument(const Argument& arg) {
 
 Debugger::Debugger(Interpreter& interp) : interp_(interp), input_fn_(default_input) {
     // Install SIGINT handler so Ctrl+C drops to debugger instead of killing
-    struct sigaction sa{};
+    struct sigaction sa {};
     sa.sa_handler = sigint_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;

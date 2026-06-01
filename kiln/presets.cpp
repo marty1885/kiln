@@ -122,7 +122,7 @@ std::expected<std::vector<const RawPreset*>, std::string> flatten_inherits(const
 }
 
 std::string host_system_name() {
-    struct utsname u{};
+    struct utsname u {};
     if (uname(&u) == 0) return u.sysname;
     return {};
 }

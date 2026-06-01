@@ -36,6 +36,20 @@ TEST_CASE("LanguageClassifier: Unknown detection", "[language]") {
     CHECK(info.is_header == false);
 }
 
-TEST_CASE("LanguageClassifier: CUDA detection", "[language]") {
+TEST_CASE("LanguageClassifier: CUDA detection", "[language][cuda]") {
+    auto info = LanguageClassifier::from_extension(".cu");
+    CHECK(info.lang == Language::CUDA);
+    CHECK(info.name == "CUDA");
+    CHECK(info.is_compileable == true);
+    CHECK(info.is_header == false);
+    CHECK(info.is_module_interface == false);
+    CHECK(LanguageClassifier::from_path("kernel.cu").lang == Language::CUDA);
+    CHECK(language_name(Language::CUDA) == "CUDA");
+    CHECK(language_has_compiler(Language::CUDA) == true);
+}
+
+TEST_CASE("LanguageClassifier: CUDA does not interfere with other languages", "[language][cuda]") {
+    CHECK(LanguageClassifier::from_extension(".c").lang == Language::C);
+    CHECK(LanguageClassifier::from_extension(".cpp").lang == Language::CXX);
     CHECK(LanguageClassifier::from_extension(".cu").lang == Language::CUDA);
 }

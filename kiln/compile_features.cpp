@@ -11,8 +11,18 @@ const CompileFeatures& CompileFeatures::instance() {
 CompileFeatures::CompileFeatures() {
     register_cxx_features();
     register_c_features();
+    register_cuda_features();
 }
+void CompileFeatures::register_cuda_features() {
+    cuda_features_.push_back({"cuda_std_03", Language::CUDA, 3, true});
+    cuda_features_.push_back({"cuda_std_11", Language::CUDA, 11, true});
+    cuda_features_.push_back({"cuda_std_14", Language::CUDA, 14, true});
+    cuda_features_.push_back({"cuda_std_17", Language::CUDA, 17, true});
+    cuda_features_.push_back({"cuda_std_20", Language::CUDA, 20, true});
+    cuda_features_.push_back({"cuda_std_23", Language::CUDA, 23, true});
 
+    for (const auto& feat : cuda_features_) { feature_map_[feat.name] = &feat; }
+}
 void CompileFeatures::register_cxx_features() {
     // C++ Meta-features (high-level standard support)
     cxx_features_.push_back({"cxx_std_98", Language::CXX, 98, true});
@@ -146,6 +156,14 @@ int CompileFeatures::get_required_standard(const std::vector<std::string>& featu
             if (std == 20) return 2020;
             if (std == 23) return 2023;
             if (std == 26) return 2026;
+        }
+        if (lang == Language::CUDA) {
+            if (std == 3) return 2003;
+            if (std == 11) return 2011;
+            if (std == 14) return 2014;
+            if (std == 17) return 2017;
+            if (std == 20) return 2020;
+            if (std == 23) return 2023;
         }
         return std;
     };

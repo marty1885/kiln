@@ -175,3 +175,58 @@ TEST_CASE("make_compiler dispatches TCC to TccCompiler", "[compiler][tcc]") {
     REQUIRE(!cmd.empty());
     CHECK(cmd[0] == "tcc");
 }
+
+// NvccCompiler Tests
+
+TEST_CASE("make_compiler dispatches NVCC to NvccCompiler", "[compiler][cuda]") {
+    for (const auto& id : {"NVCC", "nvcc", "Cuda"}) {
+        auto c = make_compiler(id, "nvcc", Language::CUDA);
+        REQUIRE(c != nullptr);
+        CompileContext ctx;
+        ctx.source = "kernel.cu";
+        ctx.output = "kernel.o";
+        auto cmd = c->get_compile_command(ctx).argv;
+        CHECK(cmd[0] == "nvcc");
+        CHECK(std::find(cmd.begin(), cmd.end(), "kernel.cu") != cmd.end());
+    }
+}
+
+TEST_CASE("NvccCompiler: CUDA compile command", "[compiler][cuda]") {
+    NvccCompiler compiler("nvcc", Language::CUDA);
+    CompileContext ctx;
+    ctx.source = "kernel.cu";
+    ctx.output = "kernel.o";
+    ctx.standard = "17";
+    ctx.extensions_enabled = false;
+    ctx.is_shared = true;
+    ctx.includes = {"include"};
+    ctx.system_includes = {"/usr/local/cuda/include"};
+    ctx.definitions = {"CUDA_BUILD"};
+    ctx.color_diagnostics = true;
+    ctx.visibility_preset = "hidden";
+
+    auto cmd = compiler.get_compile_command(ctx).argv;
+    auto has = [&](const std::string& s) { return std::find(cmd.begin(), cmd.end(), s) != cmd.end(); };
+
+    CHECK(cmd[0] == "nvcc");
+    CHECK(has("-std=c++17"));
+    CHECK(has("-fPIC"));
+    CHECK(has("-DCUDA_BUILD"));
+    CHECK(has("-Iinclude"));
+    CHECK(has("-isystem/usr/local/cuda/include"));
+    CHECK(has("-fvisibility=hidden"));
+    CHECK(has("-fdiagnostics-color=always"));
+    CHECK(has("-c"));
+    CHECK(has("kernel.o"));
+    CHECK(has("kernel.cu"));
+}
+
+TEST_CASE("NvccCompiler: std_compile_option for CUDA", "[compiler][cuda]") {
+    NvccCompiler compiler("nvcc", Language::CUDA);
+    CHECK(compiler.std_compile_option(Language::CUDA, 17) == "-std=c++17");
+    CHECK(compiler.std_compile_option(Language::CUDA, 20) == "-std=c++20");
+    CHECK(compiler.std_compile_option(Language::CXX, 17) == "-std=c++17");
+    CHECK(compiler.std_compile_option(Language::C, 11) == "-std=c11");
+    CHECK(compiler.std_compile_option(Language::ASM, 0).empty());
+    CHECK(compiler.std_compile_option(Language::UNKNOWN, 0).empty());
+}

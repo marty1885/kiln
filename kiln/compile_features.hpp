@@ -37,15 +37,20 @@ public:
     // Get all known C features
     const std::vector<CompileFeature>& get_c_features() const { return c_features_; }
 
+    // Get all known cuda features
+    const std::vector<CompileFeature>& get_cuda_features() const { return cuda_features_; }
+
 private:
     CompileFeatures();
 
     std::vector<CompileFeature> cxx_features_;
     std::vector<CompileFeature> c_features_;
+    std::vector<CompileFeature> cuda_features_;
     std::map<std::string, const CompileFeature*> feature_map_;
 
     void register_cxx_features();
     void register_c_features();
+    void register_cuda_features();
 };
 
 } // namespace kiln

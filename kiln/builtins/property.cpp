@@ -407,6 +407,9 @@ void register_property_builtins(Interpreter& interp) {
                 } else if (property_name == "CXX_STANDARD") {
                     target->set_language_standard(Language::CXX, value);
                     continue;
+                } else if (property_name == "CUDA_STANDARD") {
+                    target->set_language_standard(Language::CUDA, value);
+                    continue;
                 } else if (property_name == "C_EXTENSIONS") {
                     bool enabled = !interp.is_falsy(value);
                     target->set_language_extensions(Language::C, enabled);
@@ -414,6 +417,10 @@ void register_property_builtins(Interpreter& interp) {
                 } else if (property_name == "CXX_EXTENSIONS") {
                     bool enabled = !interp.is_falsy(value);
                     target->set_language_extensions(Language::CXX, enabled);
+                    continue;
+                } else if (property_name == "CUDA_EXTENSIONS") {
+                    bool enabled = !interp.is_falsy(value);
+                    target->set_language_extensions(Language::CUDA, enabled);
                     continue;
                 }
 

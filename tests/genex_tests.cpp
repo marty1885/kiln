@@ -1695,3 +1695,32 @@ TEST_CASE("GenexEvaluator - monkey test", "[genex][evaluator][monkey]") {
     REQUIRE(errors < iterations);
     REQUIRE(leaks == 0);
 }
+
+// cuda tests
+TEST_CASE("GenexEvaluator - COMPILE_LANGUAGE:CUDA", "[genex][evaluator][cuda]") {
+    GenexEvaluationContext ctx;
+    ctx.compile_language = Language::CUDA;
+    GenexEvaluator eval(ctx);
+    CHECK(eval.evaluate("$<COMPILE_LANGUAGE:CUDA>").value() == "1");
+    CHECK(eval.evaluate("$<COMPILE_LANGUAGE:CXX>").value() == "0");
+    CHECK(eval.evaluate("$<COMPILE_LANGUAGE:C>").value() == "0");
+    CHECK(eval.evaluate("$<COMPILE_LANGUAGE:CUDA,CXX>").value() == "1");
+    CHECK(eval.evaluate("$<COMPILE_LANGUAGE:C,CXX>").value() == "0");
+}
+
+TEST_CASE("GenexEvaluator - LINK_LANGUAGE:CUDA", "[genex][evaluator][cuda]") {
+    auto cuda_lib = std::make_shared<Target>("cuda_lib", TargetType::STATIC_LIBRARY, "/src", "/build");
+    cuda_lib->append_property("SOURCES", {"kernel.cu", "utils.cu"}, PropertyVisibility::PRIVATE);
+
+    TargetMap targets;
+    targets["cuda_lib"] = cuda_lib;
+
+    GenexEvaluationContext ctx;
+    ctx.all_targets = &targets;
+    ctx.current_target = cuda_lib.get();
+    GenexEvaluator eval(ctx);
+
+    CHECK(eval.evaluate("$<LINK_LANGUAGE>").value() == "CUDA");
+    CHECK(eval.evaluate("$<LINK_LANGUAGE:CUDA>").value() == "1");
+    CHECK(eval.evaluate("$<LINK_LANGUAGE:CXX>").value() == "0");
+}

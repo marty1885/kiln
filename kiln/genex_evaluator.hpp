@@ -29,8 +29,10 @@ struct GenexEvaluationContext {
     std::string system_name;                  // CMAKE_SYSTEM_NAME
     std::string cxx_compiler_id;              // CMAKE_CXX_COMPILER_ID
     std::string c_compiler_id;                // CMAKE_C_COMPILER_ID
+    std::string cuda_compiler_id;             // CMAKE_CUDA_COMPILER_ID
     std::string cxx_compiler_version;         // CMAKE_CXX_COMPILER_VERSION
     std::string c_compiler_version;           // CMAKE_C_COMPILER_VERSION
+    std::string cuda_compiler_version;        // CMAKE_CUDA_COMPILER_VERSION
     std::optional<Language> compile_language; // For per-source evaluation
     const TargetMap* all_targets = nullptr;
     const std::unordered_map<std::string, std::string>* target_aliases = nullptr;

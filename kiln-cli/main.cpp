@@ -1255,8 +1255,7 @@ Examples:
         std::filesystem::path target_path(target);
         if (std::filesystem::exists(target_path / "CMakeLists.txt")) {
             std::cerr << kiln::c(std::cerr, kiln::colors::BOLD_YELLOW) << "hint:" << kiln::c(std::cerr, kiln::colors::RESET) << " '"
-                      << target << "' looks like a project directory. "
-                      << "Use 'kiln -C " << target << "' to build it." << std::endl;
+                      << target << "' looks like a project directory. " << "Use 'kiln -C " << target << "' to build it." << std::endl;
         }
     }
 

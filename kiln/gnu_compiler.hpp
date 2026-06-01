@@ -1396,10 +1396,17 @@ inline bool compiler_honors_target_flag(std::string_view id) {
     return id == "Clang" || id == "AppleClang" || id == "IntelLLVM" || id == "ARMClang";
 }
 
+} // namespace kiln
+
+#include "nvcc_compiler.hpp"
+
+namespace kiln {
+
 // Construct a Compiler driver for a detected compiler id. Dispatch:
 //   - Clang/AppleClang/IntelLLVM/ARMClang -> ClangCompiler (modules differ)
 //   - TCC                                 -> TccCompiler
 //   - Intel / ICC (classic)               -> IccCompiler
+//   - NVCC                                -> NvccCompiler
 //   - GNU/Unknown/everything else         -> GnuCompiler
 // Future: MSVC will branch off to its own non-gnu-derived class.
 inline std::unique_ptr<Compiler> make_compiler(const std::string& compiler_id, std::string binary, Language lang, std::string sysroot = {},
@@ -1412,6 +1419,9 @@ inline std::unique_ptr<Compiler> make_compiler(const std::string& compiler_id, s
     }
     if (compiler_id == "Intel" || compiler_id == "ICC") {
         return std::make_unique<IccCompiler>(std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
+    }
+    if (compiler_id == "NVCC" || compiler_id == "nvcc" || compiler_id == "Cuda") {
+        return std::make_unique<NvccCompiler>(std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
     }
     return std::make_unique<GnuCompiler>(std::move(binary), lang, std::move(sysroot), std::move(compiler_target));
 }

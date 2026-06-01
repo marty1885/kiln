@@ -19,8 +19,10 @@ GenexEvaluationContext GenexEvaluationContext::from_interpreter(const Interprete
     ctx.system_name = interp.get_variable("CMAKE_SYSTEM_NAME");
     ctx.cxx_compiler_id = interp.get_variable("CMAKE_CXX_COMPILER_ID");
     ctx.c_compiler_id = interp.get_variable("CMAKE_C_COMPILER_ID");
+    ctx.cuda_compiler_id = interp.get_variable("CMAKE_CUDA_COMPILER_ID");
     ctx.cxx_compiler_version = interp.get_variable("CMAKE_CXX_COMPILER_VERSION");
     ctx.c_compiler_version = interp.get_variable("CMAKE_C_COMPILER_VERSION");
+    ctx.cuda_compiler_version = interp.get_variable("CMAKE_CUDA_COMPILER_VERSION");
     ctx.all_targets = &all_targets;
     ctx.target_aliases = &interp.get_target_aliases();
     ctx.install_prefix = interp.get_variable("CMAKE_INSTALL_PREFIX");
@@ -840,6 +842,8 @@ std::expected<std::string, std::string> GenexEvaluator::evaluate_node(const Gene
             compiler_id = ctx_.c_compiler_id;
         } else if (current_lang == "CXX") {
             compiler_id = ctx_.cxx_compiler_id;
+        } else if (current_lang == "CUDA") {
+            compiler_id = ctx_.cuda_compiler_id;
         } else {
             // For other languages, we don't have compiler ID in context yet
             return "0";

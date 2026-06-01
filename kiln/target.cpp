@@ -262,6 +262,8 @@ Language Target::get_linker_language() const {
             Language lang = Language::CXX;
             if (explicit_lang == "C")
                 lang = Language::C;
+            else if (explicit_lang == "CUDA")
+                lang = Language::CUDA;
             else if (explicit_lang == "ASM")
                 lang = Language::ASM;
             // Fall back to CXX for unknown — keeps us linking with the most
@@ -273,12 +275,17 @@ Language Target::get_linker_language() const {
 
     // Else infer from this target's own sources: any C++ source promotes to CXX.
     Language lang = Language::C;
+    bool has_cuda = false;
     auto sources = get_property_list("SOURCES", TargetPropertyScope::BUILD);
     for (const auto& src : sources) {
         auto info = LanguageClassifier::from_path(src);
         if (info.lang == Language::CXX) {
             lang = Language::CXX;
             break;
+        }
+        if (info.lang == Language::CUDA) {
+            has_cuda = true;
+            continue;
         }
         if (info.lang == Language::UNKNOWN) {
             // Extensionless source: probe filesystem for a C++ companion
@@ -290,8 +297,10 @@ Language Target::get_linker_language() const {
                 }
             }
             if (lang == Language::CXX) break;
+            if (std::filesystem::exists(abs + ".cu")) has_cuda = true;
         }
     }
+    if (lang != Language::CXX && has_cuda) lang = Language::CUDA;
     cached_linker_language_ = lang;
     return lang;
 }
@@ -1215,27 +1224,32 @@ Target::generate_object_tasks(GraphTransaction& txn, const Toolchain& toolchain,
     const auto& compile_features = get_resolved_property("COMPILE_FEATURES");
     int cxx_required_std = 0;
     int c_required_std = 0;
+    int cuda_required_std = 0;
     if (!compile_features.empty()) {
         const auto& features_db = CompileFeatures::instance();
         cxx_required_std = features_db.get_required_standard(compile_features, Language::CXX);
         c_required_std = features_db.get_required_standard(compile_features, Language::C);
+        cuda_required_std = features_db.get_required_standard(compile_features, Language::CUDA);
     }
 
     // Read compiler default standards (to suppress unnecessary -std= flags)
     int cxx_default_std = 0;
     int c_default_std = 0;
+    int cuda_default_std = 0;
     {
         const std::string& cxx_def = interp.get_variable("CMAKE_CXX_STANDARD_DEFAULT");
         if (!cxx_def.empty()) cxx_default_std = parse_number<int>(cxx_def).value_or(0);
         const std::string& c_def = interp.get_variable("CMAKE_C_STANDARD_DEFAULT");
         if (!c_def.empty()) c_default_std = parse_number<int>(c_def).value_or(0);
+        const std::string& cuda_def = interp.get_variable("CMAKE_CUDA_STANDARD_DEFAULT");
+        if (!cuda_def.empty()) cuda_default_std = parse_number<int>(cuda_def).value_or(0);
     }
 
     // Compute effective standard per language (hoisted out of per-source loop)
     auto effective_standard = [&](Language lang) -> std::string {
         if (lang == Language::ASM) return "";
-        int required = (lang == Language::CXX) ? cxx_required_std : c_required_std;
-        int compiler_default = (lang == Language::CXX) ? cxx_default_std : c_default_std;
+        int required = (lang == Language::CXX) ? cxx_required_std : (lang == Language::CUDA) ? cuda_required_std : c_required_std;
+        int compiler_default = (lang == Language::CXX) ? cxx_default_std : (lang == Language::CUDA) ? cuda_default_std : c_default_std;
         return compute_effective_standard(get_language_standard(lang), required, compiler_default);
     };
 
@@ -1294,7 +1308,7 @@ Target::generate_object_tasks(GraphTransaction& txn, const Toolchain& toolchain,
             return result;
         };
 
-        for (Language lang : {Language::C, Language::CXX, Language::ASM}) {
+        for (Language lang : {Language::C, Language::CXX, Language::CUDA, Language::ASM}) {
             GenexEvaluationContext lang_ctx = source_genex_base;
             lang_ctx.compile_language = lang;
             GenexEvaluator lang_evaluator(lang_ctx);
@@ -1517,6 +1531,9 @@ Target::generate_object_tasks(GraphTransaction& txn, const Toolchain& toolchain,
                 } else if (lang_it->second == "C") {
                     lang_info.lang = Language::C;
                     lang_info.is_header = false;
+                } else if (lang_it->second == "CUDA") {
+                    lang_info.lang = Language::CUDA;
+                    lang_info.is_header = false;
                 } else if (lang_it->second == "ASM") {
                     lang_info.lang = Language::ASM;
                     lang_info.is_header = false;
@@ -1583,8 +1600,8 @@ Target::generate_object_tasks(GraphTransaction& txn, const Toolchain& toolchain,
             std::string vis = get_property(std::string(lang_info.name) + "_VISIBILITY_PRESET");
             if (!vis.empty()) ctx.visibility_preset = vis;
 
-            // Inline visibility hiding (only meaningful for C++/ObjC++)
-            if (lang_info.lang == Language::CXX) {
+            // Inline visibility hiding (only meaningful for C++/ObjC++/Cuda)
+            if (lang_info.lang == Language::CXX || lang_info.lang == Language::CUDA) {
                 std::string vih_val = get_property("VISIBILITY_INLINES_HIDDEN");
                 if (!vih_val.empty() && !Interpreter::is_falsy(vih_val)) ctx.visibility_inlines_hidden = true;
             }
@@ -1979,11 +1996,14 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
     // Read compiler default standards (for suppressing unnecessary -std= flags)
     int cxx_default_std = 0;
     int c_default_std = 0;
+    int cuda_default_std = 0;
     {
         const std::string& cxx_def = interp.get_variable("CMAKE_CXX_STANDARD_DEFAULT");
         if (!cxx_def.empty()) cxx_default_std = parse_number<int>(cxx_def).value_or(0);
         const std::string& c_def = interp.get_variable("CMAKE_C_STANDARD_DEFAULT");
         if (!c_def.empty()) c_default_std = parse_number<int>(c_def).value_or(0);
+        const std::string& cuda_def = interp.get_variable("CMAKE_CUDA_STANDARD_DEFAULT");
+        if (!cuda_def.empty()) cuda_default_std = parse_number<int>(cuda_def).value_or(0);
     }
 
     // C++20 modules: generate scanner tasks first (they have no dependencies)
@@ -2182,14 +2202,18 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
     }
 
     auto sources_list = get_property_list("SOURCES", TargetPropertyScope::BUILD);
-    // Determine linker language. If any source is C++, use g++ for linking.
-    // For extensionless sources, check if a C++ file exists with that base name.
+    // Determine linker language. C++ wins over CUDA over C.
     Language linker_lang = Language::C;
+    bool has_cuda_sources = false;
     for (const auto& src : sources_list) {
         auto info = LanguageClassifier::from_path(src);
         if (info.lang == Language::CXX) {
             linker_lang = Language::CXX;
             break;
+        }
+        if (info.lang == Language::CUDA) {
+            has_cuda_sources = true;
+            continue;
         }
         if (info.lang == Language::UNKNOWN) {
             // Try resolving extensionless source (CMake compat)
@@ -2201,8 +2225,10 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
                 }
             }
             if (linker_lang == Language::CXX) break;
+            if (std::filesystem::exists(abs + ".cu")) has_cuda_sources = true;
         }
     }
+    if (linker_lang != Language::CXX && has_cuda_sources) linker_lang = Language::CUDA;
 
     std::string output_path = get_output_path(&evaluator);
     BuildTask link;
@@ -2285,7 +2311,9 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
             int required_std = 0;
             const auto& cf = get_resolved_property("COMPILE_FEATURES");
             if (!cf.empty()) { required_std = CompileFeatures::instance().get_required_standard(cf, linker_lang); }
-            int compiler_default = (linker_lang == Language::CXX) ? cxx_default_std : c_default_std;
+            int compiler_default = (linker_lang == Language::CXX)    ? cxx_default_std
+                                   : (linker_lang == Language::CUDA) ? cuda_default_std
+                                                                     : c_default_std;
             ctx.standard = compute_effective_standard(get_language_standard(linker_lang), required_std, compiler_default);
         }
         ctx.extensions_enabled = get_language_extensions(linker_lang);
@@ -2330,8 +2358,9 @@ std::expected<void, std::string> Target::generate_tasks(GraphTransaction& txn, c
         for (const auto& dir : get_resolved_property("LINK_DIRECTORIES")) { ctx.lib_dirs.push_back(dir); }
 
         {
-            const char* implicit_var =
-                (linker_lang == Language::C) ? "CMAKE_C_IMPLICIT_LINK_DIRECTORIES" : "CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES";
+            const char* implicit_var = (linker_lang == Language::C)      ? "CMAKE_C_IMPLICIT_LINK_DIRECTORIES"
+                                       : (linker_lang == Language::CUDA) ? "CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES"
+                                                                         : "CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES";
             for (const auto& dir : CMakeArray(interp.get_variable(implicit_var))) { ctx.implicit_link_dirs.push_back(dir); }
         }
 
